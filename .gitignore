@@ -30,12 +30,22 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# env files — NEVER commit real credentials
+.env
+.env.local
+.env.production
+.env.development
+!.env.example
 
 # vercel
 .vercel
 
+# drizzle — migrasi SQL justru WAJIB ikut commit; ia riwayat perubahan skema
+# dan satu-satunya cara menerapkan skema yang sama di mesin lain.
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# file instruksi agen lokal, tidak ikut repo
+CLAUDE.md

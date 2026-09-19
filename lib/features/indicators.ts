@@ -1,0 +1,542 @@
+/**
+ * Indikator teknikal — fungsi murni.
+ *
+ * Tidak ada satu pun yang lewat model bahasa. Inilah yang membuat seluruh sistem
+ * bisa di-backtest: hasil hari ini harus persis sama dengan hasil yang dihitung
+ * ulang tahun depan atas data yang sama.
+ *
+ * Dua aturan yang dipegang seluruh file ini:
+ *
+ * 1. Deret masuk urut menaik menurut tanggal, dan deret keluar selalu sepanjang
+ *    deret masuk. Posisi yang belum punya cukup riwayat berisi `null`, bukan nol.
+ *    Nol adalah angka; ketiadaan data bukan.
+ * 2. Tidak ada nilai yang melihat ke depan. Nilai di indeks `i` hanya boleh
+ *    dihitung dari indeks 0..i. Ini pencegah look-ahead bias yang paling murah,
+ *    dan sumber kebohongan paling umum di backtest amatir.
+ *
+ * Deteksi pola candlestick sengaja tidak ada: bukti statistiknya lemah dan hanya
+ * menambah derau ke dalam skor.
+ */
+
+export type Series = readonly number[]
+export type MaybeSeries = (number | null)[]
+
+export interface OhlcvSeries {
+  date: readonly string[]
+  open: Series
+  high: Series
+  low: Series
+  close: Series
+  volume: Series
+}
+
+function filled(length: number): MaybeSeries {
+  return new Array<number | null>(length).fill(null)
+}
+
+// ---------------------------------------------------------------------------
+// Tren
+// ---------------------------------------------------------------------------
+
+/** Rata-rata bergerak sederhana. */
+export function sma(values: Series, period: number): MaybeSeries {
+  const out = filled(values.length)
+  if (period < 1) return out
+
+  let sum = 0
+  for (let i = 0; i < values.length; i++) {
+    sum += values[i]
+    if (i >= period) sum -= values[i - period]
+    if (i >= period - 1) out[i] = sum / period
+  }
+  return out
+}
+
+/**
+ * Rata-rata bergerak eksponensial.
+ *
+ * Disemai dengan SMA pada periode pertama, bukan dengan nilai tunggal. Penyemaian
+ * satu nilai membuat puluhan nilai pertama bergantung pada satu hari acak.
+ */
+export function ema(values: Series, period: number): MaybeSeries {
+  const out = filled(values.length)
+  if (period < 1 || values.length < period) return out
+
+  const multiplier = 2 / (period + 1)
+
+  let seed = 0
+  for (let i = 0; i < period; i++) seed += values[i]
+  let previous = seed / period
+  out[period - 1] = previous
+
+  for (let i = period; i < values.length; i++) {
+    previous = (values[i] - previous) * multiplier + previous
+    out[i] = previous
+  }
+  return out
+}
+
+/**
+ * Kemiringan rata-rata bergerak, dinyatakan sebagai persen perubahan per hari
+ * selama `lookback` hari terakhir. Satuan relatif membuat saham mahal dan saham
+ * murah bisa dibandingkan.
+ */
+export function slopePct(values: MaybeSeries, lookback: number): MaybeSeries {
+  const out = filled(values.length)
+  for (let i = lookback; i < values.length; i++) {
+    const now = values[i]
+    const then = values[i - lookback]
+    if (now === null || then === null || then === 0) continue
+    out[i] = ((now - then) / Math.abs(then) / lookback) * 100
+  }
+  return out
+}
+
+// ---------------------------------------------------------------------------
+// Momentum
+// ---------------------------------------------------------------------------
+
+/**
+ * Relative Strength Index, penghalusan Wilder.
+ *
+ * Nilainya harus selalu dibaca sebagai persentil terhadap riwayat saham itu
+ * sendiri. RSI 70 pada aset tenang berarti hal yang sama sekali berbeda dengan
+ * RSI 70 pada aset yang memang selalu bergerak keras.
+ */
+export function rsi(values: Series, period = 14): MaybeSeries {
+  const out = filled(values.length)
+  if (values.length <= period) return out
+
+  let gainSum = 0
+  let lossSum = 0
+  for (let i = 1; i <= period; i++) {
+    const change = values[i] - values[i - 1]
+    if (change >= 0) gainSum += change
+    else lossSum -= change
+  }
+
+  let avgGain = gainSum / period
+  let avgLoss = lossSum / period
+  out[period] = toRsi(avgGain, avgLoss)
+
+  for (let i = period + 1; i < values.length; i++) {
+    const change = values[i] - values[i - 1]
+    const gain = change > 0 ? change : 0
+    const loss = change < 0 ? -change : 0
+
+    avgGain = (avgGain * (period - 1) + gain) / period
+    avgLoss = (avgLoss * (period - 1) + loss) / period
+    out[i] = toRsi(avgGain, avgLoss)
+  }
+
+  return out
+}
+
+function toRsi(avgGain: number, avgLoss: number): number {
+  // Tanpa satu pun hari turun, RSI terdefinisi sebagai 100, bukan pembagian nol.
+  if (avgLoss === 0) return avgGain === 0 ? 50 : 100
+  const rs = avgGain / avgLoss
+  return 100 - 100 / (1 + rs)
+}
+
+export interface MacdResult {
+  macd: MaybeSeries
+  signal: MaybeSeries
+  histogram: MaybeSeries
+}
+
+/** MACD klasik: EMA cepat dikurangi EMA lambat, plus garis sinyal. */
+export function macd(values: Series, fast = 12, slow = 26, signalPeriod = 9): MacdResult {
+  const fastEma = ema(values, fast)
+  const slowEma = ema(values, slow)
+
+  const line = filled(values.length)
+  for (let i = 0; i < values.length; i++) {
+    const f = fastEma[i]
+    const s = slowEma[i]
+    if (f !== null && s !== null) line[i] = f - s
+  }
+
+  // Garis sinyal adalah EMA dari garis MACD, jadi hanya dihitung setelah garis
+  // MACD punya nilai — memulainya lebih awal berarti menghaluskan null.
+  const firstDefined = line.findIndex((v) => v !== null)
+  const signal = filled(values.length)
+
+  if (firstDefined !== -1) {
+    const dense = line.slice(firstDefined) as number[]
+    const denseSignal = ema(dense, signalPeriod)
+    for (let i = 0; i < denseSignal.length; i++) {
+      signal[firstDefined + i] = denseSignal[i]
+    }
+  }
+
+  const histogram = filled(values.length)
+  for (let i = 0; i < values.length; i++) {
+    const m = line[i]
+    const s = signal[i]
+    if (m !== null && s !== null) histogram[i] = m - s
+  }
+
+  return { macd: line, signal, histogram }
+}
+
+/** Rate of change, dalam persen terhadap `period` hari lalu. */
+export function roc(values: Series, period: number): MaybeSeries {
+  const out = filled(values.length)
+  for (let i = period; i < values.length; i++) {
+    const then = values[i - period]
+    if (then === 0) continue
+    out[i] = ((values[i] - then) / then) * 100
+  }
+  return out
+}
+
+// ---------------------------------------------------------------------------
+// Volatilitas
+// ---------------------------------------------------------------------------
+
+/** Rentang sebenarnya, memperhitungkan gap dari penutupan sebelumnya. */
+export function trueRange(high: Series, low: Series, close: Series): MaybeSeries {
+  const out = filled(close.length)
+  for (let i = 1; i < close.length; i++) {
+    out[i] = Math.max(
+      high[i] - low[i],
+      Math.abs(high[i] - close[i - 1]),
+      Math.abs(low[i] - close[i - 1]),
+    )
+  }
+  return out
+}
+
+/** Average True Range, penghalusan Wilder. Dipakai untuk ukuran risiko dan stop. */
+export function atr(high: Series, low: Series, close: Series, period = 14): MaybeSeries {
+  const tr = trueRange(high, low, close)
+  const out = filled(close.length)
+  if (close.length <= period) return out
+
+  let sum = 0
+  for (let i = 1; i <= period; i++) sum += tr[i] ?? 0
+  let previous = sum / period
+  out[period] = previous
+
+  for (let i = period + 1; i < close.length; i++) {
+    previous = (previous * (period - 1) + (tr[i] ?? 0)) / period
+    out[i] = previous
+  }
+  return out
+}
+
+/** ATR sebagai persen harga, supaya bisa dibandingkan antar-instrumen. */
+export function atrPct(atrValues: MaybeSeries, close: Series): MaybeSeries {
+  const out = filled(close.length)
+  for (let i = 0; i < close.length; i++) {
+    const a = atrValues[i]
+    if (a !== null && close[i] !== 0) out[i] = (a / close[i]) * 100
+  }
+  return out
+}
+
+export interface BollingerResult {
+  upper: MaybeSeries
+  middle: MaybeSeries
+  lower: MaybeSeries
+  /** Lebar pita sebagai persen dari pita tengah. */
+  widthPct: MaybeSeries
+}
+
+export function bollinger(values: Series, period = 20, stdDevs = 2): BollingerResult {
+  const middle = sma(values, period)
+  const upper = filled(values.length)
+  const lower = filled(values.length)
+  const widthPct = filled(values.length)
+
+  for (let i = period - 1; i < values.length; i++) {
+    const mean = middle[i]
+    if (mean === null) continue
+
+    let variance = 0
+    for (let j = i - period + 1; j <= i; j++) {
+      variance += (values[j] - mean) ** 2
+    }
+    const sd = Math.sqrt(variance / period)
+
+    upper[i] = mean + stdDevs * sd
+    lower[i] = mean - stdDevs * sd
+    if (mean !== 0) widthPct[i] = ((2 * stdDevs * sd) / mean) * 100
+  }
+
+  return { upper, middle, lower, widthPct }
+}
+
+/** Imbal hasil harian sederhana, dipakai sebagai masukan volatilitas. */
+export function dailyReturns(values: Series): MaybeSeries {
+  const out = filled(values.length)
+  for (let i = 1; i < values.length; i++) {
+    if (values[i - 1] === 0) continue
+    out[i] = (values[i] - values[i - 1]) / values[i - 1]
+  }
+  return out
+}
+
+/**
+ * Volatilitas terealisasi, disetahunkan memakai 365 hari.
+ *
+ * Crypto diperdagangkan setiap hari, sementara bursa saham hanya sekitar 252
+ * hari setahun. Pemanggil memberi `periodsPerYear` yang sesuai pasarnya; memakai
+ * satu angka untuk keduanya membuat volatilitas saham tampak lebih besar sekitar
+ * dua puluh persen daripada yang sebenarnya.
+ */
+export function realizedVolatility(
+  values: Series,
+  period = 20,
+  periodsPerYear = 365,
+): MaybeSeries {
+  const returns = dailyReturns(values)
+  const out = filled(values.length)
+
+  for (let i = period; i < values.length; i++) {
+    const window: number[] = []
+    for (let j = i - period + 1; j <= i; j++) {
+      const r = returns[j]
+      if (r !== null) window.push(r)
+    }
+    if (window.length < period) continue
+
+    const mean = window.reduce((a, b) => a + b, 0) / window.length
+    const variance =
+      window.reduce((acc, r) => acc + (r - mean) ** 2, 0) / (window.length - 1)
+    out[i] = Math.sqrt(variance) * Math.sqrt(periodsPerYear)
+  }
+
+  return out
+}
+
+/** Penurunan terdalam dari puncak tertinggi sejauh ini, sebagai pecahan negatif. */
+export function maxDrawdown(values: Series): number | null {
+  if (values.length === 0) return null
+
+  let peak = values[0]
+  let worst = 0
+
+  for (const value of values) {
+    if (value > peak) peak = value
+    if (peak > 0) {
+      const drawdown = (value - peak) / peak
+      if (drawdown < worst) worst = drawdown
+    }
+  }
+
+  return worst
+}
+
+// ---------------------------------------------------------------------------
+// Volume
+// ---------------------------------------------------------------------------
+
+/** Volume hari ini dibagi rata-rata `period` hari. Satu berarti biasa saja. */
+export function relativeVolume(volume: Series, period = 20): MaybeSeries {
+  const average = sma(volume, period)
+  const out = filled(volume.length)
+  for (let i = 0; i < volume.length; i++) {
+    const avg = average[i]
+    if (avg !== null && avg > 0) out[i] = volume[i] / avg
+  }
+  return out
+}
+
+/** On-Balance Volume: volume kumulatif bertanda arah harga. */
+export function obv(close: Series, volume: Series): MaybeSeries {
+  const out = filled(close.length)
+  if (close.length === 0) return out
+
+  let total = 0
+  out[0] = 0
+  for (let i = 1; i < close.length; i++) {
+    if (close[i] > close[i - 1]) total += volume[i]
+    else if (close[i] < close[i - 1]) total -= volume[i]
+    out[i] = total
+  }
+  return out
+}
+
+/**
+ * Simpangan harga terhadap VWAP bergulir.
+ *
+ * VWAP yang sebenarnya butuh data intraday, yang tidak disimpan sistem ini.
+ * Yang dihitung di sini adalah pendekatannya dari candle harian memakai harga
+ * tipikal (H+L+C)/3. Namanya sengaja tetap disebut pendekatan, supaya tidak ada
+ * yang menyangka ini VWAP eksekusi.
+ */
+export function vwapDeviationPct(
+  high: Series,
+  low: Series,
+  close: Series,
+  volume: Series,
+  period = 20,
+): MaybeSeries {
+  const out = filled(close.length)
+
+  for (let i = period - 1; i < close.length; i++) {
+    let weighted = 0
+    let totalVolume = 0
+    for (let j = i - period + 1; j <= i; j++) {
+      const typical = (high[j] + low[j] + close[j]) / 3
+      weighted += typical * volume[j]
+      totalVolume += volume[j]
+    }
+    if (totalVolume <= 0) continue
+
+    const vwap = weighted / totalVolume
+    if (vwap !== 0) out[i] = ((close[i] - vwap) / vwap) * 100
+  }
+
+  return out
+}
+
+// ---------------------------------------------------------------------------
+// Struktur harga
+// ---------------------------------------------------------------------------
+
+export interface RangePosition {
+  /** Jarak ke tertinggi periode, dalam persen. Nol berarti sedang di puncak. */
+  distanceFromHighPct: MaybeSeries
+  /** Jarak dari terendah periode, dalam persen. */
+  distanceFromLowPct: MaybeSeries
+  /** Posisi 0..1 di dalam rentang; 1 berarti di tertinggi periode. */
+  positionInRange: MaybeSeries
+}
+
+/** Posisi harga dalam rentangnya sendiri, bawaan 252 hari perdagangan. */
+export function rangePosition(
+  high: Series,
+  low: Series,
+  close: Series,
+  period = 252,
+): RangePosition {
+  const distanceFromHighPct = filled(close.length)
+  const distanceFromLowPct = filled(close.length)
+  const positionInRange = filled(close.length)
+
+  for (let i = 0; i < close.length; i++) {
+    const start = Math.max(0, i - period + 1)
+    // Rentang penuh belum terbentuk di awal deret; melaporkannya akan membuat
+    // instrumen yang baru tercatat terlihat seperti menyentuh tertinggi setahun.
+    if (i - start + 1 < Math.min(period, 60)) continue
+
+    let highest = -Infinity
+    let lowest = Infinity
+    for (let j = start; j <= i; j++) {
+      if (high[j] > highest) highest = high[j]
+      if (low[j] < lowest) lowest = low[j]
+    }
+
+    if (highest > 0) distanceFromHighPct[i] = ((close[i] - highest) / highest) * 100
+    if (lowest > 0) distanceFromLowPct[i] = ((close[i] - lowest) / lowest) * 100
+    if (highest > lowest) positionInRange[i] = (close[i] - lowest) / (highest - lowest)
+  }
+
+  return { distanceFromHighPct, distanceFromLowPct, positionInRange }
+}
+
+export interface PivotLevels {
+  pivot: MaybeSeries
+  resistance1: MaybeSeries
+  support1: MaybeSeries
+  /** Posisi harga antara S1 dan R1; di bawah nol berarti menembus support. */
+  positionBetweenLevels: MaybeSeries
+}
+
+/**
+ * Titik pivot klasik dari candle sebelumnya.
+ *
+ * Dihitung dari hari sebelumnya, tidak pernah dari hari berjalan — level yang
+ * memakai penutupan hari ini untuk menilai harga hari ini tidak berarti apa-apa.
+ */
+export function pivotLevels(high: Series, low: Series, close: Series): PivotLevels {
+  const pivot = filled(close.length)
+  const resistance1 = filled(close.length)
+  const support1 = filled(close.length)
+  const positionBetweenLevels = filled(close.length)
+
+  for (let i = 1; i < close.length; i++) {
+    const p = (high[i - 1] + low[i - 1] + close[i - 1]) / 3
+    const r1 = 2 * p - low[i - 1]
+    const s1 = 2 * p - high[i - 1]
+
+    pivot[i] = p
+    resistance1[i] = r1
+    support1[i] = s1
+    if (r1 !== s1) positionBetweenLevels[i] = (close[i] - s1) / (r1 - s1)
+  }
+
+  return { pivot, resistance1, support1, positionBetweenLevels }
+}
+
+// ---------------------------------------------------------------------------
+// Kekuatan relatif
+// ---------------------------------------------------------------------------
+
+/**
+ * Kekuatan relatif terhadap tolok ukur, dalam poin persen.
+ *
+ * Positif berarti instrumen ini unggul dari tolok ukurnya selama periode itu.
+ * Deret tolok ukur wajib sudah disejajarkan menurut tanggal oleh pemanggil;
+ * menyejajarkannya di sini akan menyembunyikan tanggal yang tidak cocok.
+ */
+export function relativeStrength(
+  values: Series,
+  benchmark: MaybeSeries,
+  period: number,
+): MaybeSeries {
+  const out = filled(values.length)
+
+  for (let i = period; i < values.length; i++) {
+    const ownThen = values[i - period]
+    const benchNow = benchmark[i]
+    const benchThen = benchmark[i - period]
+
+    if (ownThen === 0 || benchNow === null || benchThen === null || benchThen === 0) continue
+
+    const ownReturn = ((values[i] - ownThen) / ownThen) * 100
+    const benchReturn = ((benchNow - benchThen) / benchThen) * 100
+    out[i] = ownReturn - benchReturn
+  }
+
+  return out
+}
+
+// ---------------------------------------------------------------------------
+// Normalisasi
+// ---------------------------------------------------------------------------
+
+/**
+ * Peringkat persentil sebuah nilai terhadap riwayatnya sendiri, 0..1.
+ *
+ * Hanya melihat ke belakang: persentil di indeks `i` dihitung dari jendela yang
+ * berakhir di `i`. Memakai seluruh deret, termasuk masa depan, akan membuat
+ * backtest tampak jauh lebih pintar daripada kenyataannya.
+ */
+export function rollingPercentile(values: MaybeSeries, window: number): MaybeSeries {
+  const out = filled(values.length)
+  const minimumSample = Math.min(window, 60)
+
+  for (let i = 0; i < values.length; i++) {
+    const current = values[i]
+    if (current === null) continue
+
+    const start = Math.max(0, i - window + 1)
+    let belowOrEqual = 0
+    let counted = 0
+
+    for (let j = start; j <= i; j++) {
+      const past = values[j]
+      if (past === null) continue
+      counted++
+      if (past <= current) belowOrEqual++
+    }
+
+    if (counted >= minimumSample) out[i] = belowOrEqual / counted
+  }
+
+  return out
+}

@@ -1,0 +1,317 @@
+import {
+  pgTable,
+  pgEnum,
+  serial,
+  text,
+  varchar,
+  timestamp,
+  date,
+  numeric,
+  integer,
+  boolean,
+  jsonb,
+  primaryKey,
+  index,
+  uniqueIndex,
+} from 'drizzle-orm/pg-core'
+
+// ---------------------------------------------------------------------------
+// Enum
+// ---------------------------------------------------------------------------
+
+export const marketEnum = pgEnum('market', ['crypto', 'idx', 'us'])
+export const healthStatusEnum = pgEnum('health_status', ['healthy', 'degraded', 'dead'])
+export const jobStatusEnum = pgEnum('job_status', ['running', 'success', 'failed', 'partial'])
+
+// ---------------------------------------------------------------------------
+// Fakta mentah
+// ---------------------------------------------------------------------------
+
+export const instrument = pgTable(
+  'instrument',
+  {
+    id: serial('id').primaryKey(),
+    symbol: varchar('symbol', { length: 32 }).notNull(),
+    name: text('name').notNull(),
+    market: marketEnum('market').notNull(),
+    currency: varchar('currency', { length: 8 }).notNull(),
+    sector: text('sector'),
+    isActive: boolean('is_active').notNull().default(true),
+    listedAt: date('listed_at'),
+    // Diisi saat delisting. Instrumen delisting TIDAK dihapus — kalau dihapus,
+    // backtest kena survivorship bias.
+    delistedAt: date('delisted_at'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('instrument_market_symbol_uq').on(t.market, t.symbol),
+    index('instrument_market_idx').on(t.market),
+  ],
+)
+
+/** Satu instrumen bisa punya simbol berbeda di tiap sumber: BBCA / BBCA.JK / IDX:BBCA. */
+export const symbolAlias = pgTable(
+  'symbol_alias',
+  {
+    instrumentId: integer('instrument_id')
+      .notNull()
+      .references(() => instrument.id, { onDelete: 'cascade' }),
+    sourceId: varchar('source_id', { length: 32 }).notNull(),
+    alias: varchar('alias', { length: 64 }).notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.instrumentId, t.sourceId] }),
+    uniqueIndex('symbol_alias_source_alias_uq').on(t.sourceId, t.alias),
+  ],
+)
+
+/**
+ * Harga harian. Nilai numerik disimpan sebagai `numeric`, bukan float —
+ * driver mengembalikannya sebagai string, jadi tidak ada galat pembulatan biner.
+ */
+export const candleDaily = pgTable(
+  'candle_daily',
+  {
+    instrumentId: integer('instrument_id')
+      .notNull()
+      .references(() => instrument.id, { onDelete: 'cascade' }),
+    date: date('date').notNull(),
+    open: numeric('open', { precision: 20, scale: 8 }).notNull(),
+    high: numeric('high', { precision: 20, scale: 8 }).notNull(),
+    low: numeric('low', { precision: 20, scale: 8 }).notNull(),
+    close: numeric('close', { precision: 20, scale: 8 }).notNull(),
+    volume: numeric('volume', { precision: 28, scale: 8 }).notNull(),
+    // Diisi setelah aksi korporasi terekam; null berarti belum disesuaikan.
+    adjClose: numeric('adj_close', { precision: 20, scale: 8 }),
+    sourceId: varchar('source_id', { length: 32 }).notNull(),
+    fetchedAt: timestamp('fetched_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.instrumentId, t.date] }),
+    index('candle_daily_date_idx').on(t.date),
+  ],
+)
+
+// ---------------------------------------------------------------------------
+// Operasional
+// ---------------------------------------------------------------------------
+
+export const dataSourceHealth = pgTable('data_source_health', {
+  sourceId: varchar('source_id', { length: 32 }).primaryKey(),
+  status: healthStatusEnum('status').notNull().default('healthy'),
+  consecutiveFailures: integer('consecutive_failures').notNull().default(0),
+  lastError: text('last_error'),
+  lastSuccessAt: timestamp('last_success_at', { withTimezone: true }),
+  checkedAt: timestamp('checked_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+/**
+ * Penjadwalan halus ada di sini, bukan di vercel.json — tier Hobby hanya
+ * mengizinkan sedikit cron, jadi satu dispatcher per jam membaca tabel ini.
+ */
+export const jobSchedule = pgTable('job_schedule', {
+  jobName: varchar('job_name', { length: 64 }).primaryKey(),
+  // Jam dalam sehari saat job jatuh tempo, pada zona waktu di bawah.
+  hoursOfDay: jsonb('hours_of_day').$type<number[]>().notNull(),
+  timezone: varchar('timezone', { length: 48 }).notNull().default('UTC'),
+  // false untuk job yang jalan tiap hari termasuk akhir pekan (crypto).
+  tradingDaysOnly: boolean('trading_days_only').notNull().default(false),
+  market: marketEnum('market'),
+  enabled: boolean('enabled').notNull().default(true),
+  lastRunAt: timestamp('last_run_at', { withTimezone: true }),
+})
+
+export const jobRun = pgTable(
+  'job_run',
+  {
+    id: serial('id').primaryKey(),
+    jobName: varchar('job_name', { length: 64 }).notNull(),
+    // Identitas satu batch di dalam satu job. Bersama job_name ia unik, sehingga
+    // QStash boleh mengirim ulang batch yang sama tanpa menggandakan baris.
+    batchKey: varchar('batch_key', { length: 128 }).notNull(),
+    status: jobStatusEnum('status').notNull().default('running'),
+    itemsProcessed: integer('items_processed').notNull().default(0),
+    itemsFailed: integer('items_failed').notNull().default(0),
+    startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+    finishedAt: timestamp('finished_at', { withTimezone: true }),
+    // Kursor untuk job bertahap (backfill) supaya bisa dilanjut antar-invocation.
+    cursor: jsonb('cursor').$type<Record<string, unknown> | null>(),
+    stats: jsonb('stats').$type<Record<string, unknown> | null>(),
+    error: text('error'),
+  },
+  (t) => [
+    uniqueIndex('job_run_job_batch_uq').on(t.jobName, t.batchKey),
+    index('job_run_job_started_idx').on(t.jobName, t.startedAt),
+  ],
+)
+
+/**
+ * Baris yang gagal uji kualitas. Dikarantina, bukan dibuang — sebagian besar
+ * anomali ternyata aksi korporasi yang belum terekam.
+ */
+export const ingestQuarantine = pgTable(
+  'ingest_quarantine',
+  {
+    id: serial('id').primaryKey(),
+    instrumentId: integer('instrument_id').references(() => instrument.id, {
+      onDelete: 'cascade',
+    }),
+    sourceId: varchar('source_id', { length: 32 }).notNull(),
+    payload: jsonb('payload').notNull(),
+    reason: text('reason').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('ingest_quarantine_created_idx').on(t.createdAt)],
+)
+
+// ---------------------------------------------------------------------------
+// Kosakata pasar
+// ---------------------------------------------------------------------------
+
+/**
+ * Lapisan adaptor memakai 'CRYPTO' | 'IDX' | 'US'; kolom Postgres memakai huruf
+ * kecil. Dua fungsi di bawah adalah satu-satunya tempat kedua kosakata bertemu —
+ * di luar sini tidak ada perbandingan string pasar yang ditulis tangan.
+ */
+export type MarketCode = 'CRYPTO' | 'IDX' | 'US'
+export type DbMarket = (typeof marketEnum.enumValues)[number]
+
+export function toDbMarket(market: MarketCode): DbMarket {
+  return market.toLowerCase() as DbMarket
+}
+
+export function fromDbMarket(market: DbMarket): MarketCode {
+  return market.toUpperCase() as MarketCode
+}
+
+export type Instrument = typeof instrument.$inferSelect
+export type NewInstrument = typeof instrument.$inferInsert
+export type CandleRow = typeof candleDaily.$inferSelect
+export type NewCandleRow = typeof candleDaily.$inferInsert
+
+// ---------------------------------------------------------------------------
+// Komite agen
+// ---------------------------------------------------------------------------
+
+export const agentSessionStatusEnum = pgEnum('agent_session_status', [
+  'running',
+  'done',
+  'failed',
+])
+
+/** Putusan akhir komite. 'abstain' dipakai saat datanya sendiri tidak layak dinilai. */
+export const agentVerdictEnum = pgEnum('agent_verdict', ['beli', 'tahan', 'jual', 'abstain'])
+
+/**
+ * Satu rapat komite atas satu instrumen.
+ *
+ * `sessionKey` adalah kunci idempotensi yang sama perannya dengan `batchKey` di
+ * `job_run`: QStash boleh mengirim ulang rapat yang sama tanpa melahirkan rapat
+ * kedua. Tanpa itu, satu retry menghasilkan dua putusan yang bisa berbeda isi.
+ */
+export const agentSession = pgTable(
+  'agent_session',
+  {
+    id: serial('id').primaryKey(),
+    sessionKey: varchar('session_key', { length: 128 }).notNull(),
+    instrumentId: integer('instrument_id').references(() => instrument.id, {
+      onDelete: 'cascade',
+    }),
+    market: marketEnum('market').notNull(),
+    symbol: varchar('symbol', { length: 32 }).notNull(),
+    status: agentSessionStatusEnum('status').notNull().default('running'),
+    verdict: agentVerdictEnum('verdict'),
+    /** 0–100. Rendah bukan berarti salah, melainkan bahwa buktinya tipis. */
+    confidence: integer('confidence'),
+    rationale: text('rationale'),
+    /**
+     * Fakta persis yang dilihat komite saat memutuskan. Disimpan, bukan dihitung
+     * ulang saat dibaca: menilai putusan lama dengan data baru membuat semua
+     * putusan tampak keliru, karena harganya memang sudah berubah.
+     */
+    factsSnapshot: jsonb('facts_snapshot').$type<Record<string, unknown> | null>(),
+    startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+    finishedAt: timestamp('finished_at', { withTimezone: true }),
+    error: text('error'),
+  },
+  (t) => [
+    uniqueIndex('agent_session_key_uq').on(t.sessionKey),
+    index('agent_session_symbol_idx').on(t.market, t.symbol, t.startedAt),
+  ],
+)
+
+/**
+ * Satu giliran bicara di dalam rapat.
+ *
+ * Transkrip disimpan utuh, bukan hanya kesimpulannya. Putusan agen yang tidak
+ * bisa ditelusuri ke argumen yang melahirkannya tidak bisa diperbaiki — saat
+ * hasilnya buruk, tidak ada cara tahu apakah datanya, prompt-nya, atau modelnya
+ * yang salah.
+ */
+export const agentMessage = pgTable(
+  'agent_message',
+  {
+    id: serial('id').primaryKey(),
+    sessionId: integer('session_id')
+      .notNull()
+      .references(() => agentSession.id, { onDelete: 'cascade' }),
+    /** Urutan bicara di dalam rapat, mulai dari 0. */
+    seq: integer('seq').notNull(),
+    /** Peran agen: 'analis' | 'strateg' | 'risiko' | 'ketua'. */
+    agent: varchar('agent', { length: 32 }).notNull(),
+    content: text('content').notNull(),
+    /** Penyedia yang benar-benar menjawab — bisa berbeda tiap giliran karena failover. */
+    providerId: varchar('provider_id', { length: 32 }),
+    model: varchar('model', { length: 64 }),
+    /** Indeks kunci di kolam, bukan kuncinya. */
+    keyIndex: integer('key_index'),
+    latencyMs: integer('latency_ms'),
+    inputTokens: integer('input_tokens'),
+    outputTokens: integer('output_tokens'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    // Giliran yang sama tidak boleh tercatat dua kali saat batch diulang.
+    uniqueIndex('agent_message_session_seq_uq').on(t.sessionId, t.seq),
+  ],
+)
+
+export type AgentSessionRow = typeof agentSession.$inferSelect
+export type AgentMessageRow = typeof agentMessage.$inferSelect
+export type AgentVerdict = (typeof agentVerdictEnum.enumValues)[number]
+
+// ---------------------------------------------------------------------------
+// Turunan: fitur harian
+// ---------------------------------------------------------------------------
+
+/**
+ * Hasil hitungan engine fitur, satu baris per instrumen per hari per versi.
+ *
+ * Fakta mentah dan hasil turunan dipisah total. Tabel `candle_daily` tidak
+ * pernah ditimpa oleh proses ini; seluruh isi tabel di bawah selalu bisa dibuang
+ * dan dihitung ulang dari nol. Tanpa pemisahan itu, backtest jadi bohong karena
+ * data historisnya diam-diam ikut berubah setiap kali formula disempurnakan.
+ *
+ * `feature_set_version` ikut jadi bagian kunci utama, bukan sekadar kolom
+ * penanda. Dua versi formula boleh hidup berdampingan atas tanggal yang sama,
+ * dan itulah yang membuat perbandingan performa antar versi mungkin dilakukan.
+ */
+export const featureDaily = pgTable(
+  'feature_daily',
+  {
+    instrumentId: integer('instrument_id')
+      .notNull()
+      .references(() => instrument.id, { onDelete: 'cascade' }),
+    date: date('date').notNull(),
+    featureSetVersion: varchar('feature_set_version', { length: 32 }).notNull(),
+    /** Nilai mentah dan persentilnya, satu objek datar bernama-jelas. */
+    values: jsonb('values').$type<Record<string, number | null>>().notNull(),
+    computedAt: timestamp('computed_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.instrumentId, t.date, t.featureSetVersion] }),
+    index('feature_daily_version_date_idx').on(t.featureSetVersion, t.date),
+  ],
+)
+
+export type FeatureRowRecord = typeof featureDaily.$inferSelect

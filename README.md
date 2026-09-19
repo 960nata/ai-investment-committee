@@ -1,36 +1,149 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ai-investment-committee
 
-## Getting Started
+Mesin analisis probabilistik untuk saham IDX, saham AS, dan crypto.
 
-First, run the development server:
+Keluarannya berbentuk peluang, bukan ramalan harga: "peluang naik 61% dalam 1–3
+bulan, confidence sedang" — lengkap dengan data mentah yang bisa diperiksa dan
+rekam jejak seberapa sering sinyal serupa ternyata benar.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Yang bukan
+
+Sebelum apa pun yang lain, tiga hal yang sistem ini tidak lakukan:
+
+- **Tidak meramal harga.** Harga saham mengandung komponen acak yang besar.
+  Sistem yang menjanjikan "besok 5.400" bukan sistem yang lebih pintar, hanya
+  sistem yang menyembunyikan ketidakpastiannya.
+- **Tidak memberi rekomendasi.** Kata "beli", "jual", dan "rekomendasi" tidak
+  dipakai. Di Indonesia, memberi rekomendasi investasi sebagai kegiatan usaha
+  memerlukan izin Penasihat Investasi dari OJK. Posisi proyek ini adalah alat
+  analisis data, dan itu tercermin di desainnya, bukan sekadar di disclaimer.
+- **Tidak cocok untuk perdagangan harian.** Semua sumber data gratis punya jeda,
+  dari lima belas menit sampai empat jam.
+
+## Peran model bahasa
+
+Garis pemisahnya tegas dan tidak bisa ditawar.
+
+| Pekerjaan | Dikerjakan oleh |
+| --- | --- |
+| Indikator, rasio, skor | Kode deterministik |
+| Ekstraksi data dari teks | Model bahasa, keluaran terstruktur |
+| Klasifikasi sentimen | Model bahasa |
+| Penjelasan untuk pembaca | Model bahasa |
+| Angka apa pun yang masuk ke skor | Tidak pernah model bahasa |
+
+Model bahasa membaca dan menjelaskan. Matematika dikerjakan kode, karena hanya
+kode yang bisa dihitung ulang persis sama bertahun-tahun kemudian, dan tanpa itu
+tidak ada backtest yang berarti.
+
+## Arsitektur
+
+```
+Sumber data  ->  Adaptor  ->  Postgres (candle_daily)
+                                  |
+                                  v
+                            Engine fitur  ->  feature_daily
+                                  |
+                                  v
+                            Engine skor   ->  score_daily
+                                  |
+                                  v
+                            Next.js API   ->  Dashboard
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Berjalan di Vercel. Kendala terbesarnya bukan CPU melainkan batas durasi
+function, jadi seluruh pipeline dirancang sebagai potongan kecil yang idempoten:
+satu cron per jam membaca tabel jadwal, memecah pekerjaan jadi batch, lalu
+menyerahkannya ke QStash yang memanggil worker satu per satu.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Lapisan | Pilihan |
+| --- | --- |
+| Web dan API | Next.js 16, App Router |
+| Basis data | Postgres, Drizzle ORM |
+| Cache | Upstash Redis |
+| Antrian | Upstash QStash |
+| Penjadwal | Vercel Cron, satu saja |
+| Grafik | Lightweight Charts |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Menjalankan secara lokal
 
-## Learn More
+```bash
+npm install
+cp .env.example .env.local   # isi DATABASE_URL minimal
+npm run db:migrate
+npm run db:seed
+npm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+Yang benar-benar wajib hanya `DATABASE_URL`. Tanpa Redis aplikasi tetap jalan
+tanpa cache; tanpa QStash, dispatcher memanggil worker langsung, yang cukup untuk
+mesin sendiri tetapi tidak untuk produksi karena tidak ada retry di jalur itu.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Perintah | Kegunaan |
+| --- | --- |
+| `npm run dev` | Server pengembangan |
+| `npm test` | Uji engine fitur |
+| `npm run typecheck` | Periksa tipe |
+| `npm run db:generate` | Buat migrasi dari perubahan skema |
+| `npm run db:migrate` | Terapkan migrasi |
+| `npm run db:seed` | Isi jadwal job dan instrumen awal |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Job terjadwal
 
-## Deploy on Vercel
+Penjadwalan hidup di tabel `job_schedule`, bukan di `vercel.json`. Tier Hobby
+hanya mengizinkan sedikit cron, sementara tiga pasar punya ritme berbeda: IDX
+tutup sore WIB, bursa AS buka malam WIB, crypto tidak pernah tidur.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| Job | Jadwal | Status |
+| --- | --- | --- |
+| `ingest-crypto-daily` | tiap jam | aktif |
+| `compute-features-crypto` | 01.00 UTC | aktif |
+| `ingest-idx-daily` | 17.00 WIB, hari bursa | menunggu adaptor IDX |
+| `compute-features-idx` | 18.00 WIB, hari bursa | menunggu adaptor IDX |
+| `ingest-us-daily` | 05.00 WIB, hari bursa | menunggu adaptor Finnhub |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Aturan yang tidak bisa ditawar
+
+Empat hal yang dipegang seluruh basis kode, karena melanggarnya membuat seluruh
+angka yang dihasilkan sistem ini tidak berarti.
+
+1. **Fakta mentah dan hasil turunan dipisah total.** Tabel candle tidak pernah
+   ditimpa oleh proses perhitungan. Isi `feature_daily` selalu boleh dibuang dan
+   dihitung ulang dari nol.
+2. **Tidak ada look-ahead.** Nilai fitur hari tertentu hanya boleh dihitung dari
+   data sampai hari itu. Sifat ini diuji langsung: `npm test` menghitung seluruh
+   set fitur dua kali, atas deret penuh dan atas potongannya, lalu memastikan
+   tidak ada satu angka pun yang berubah.
+3. **Versi ikut di setiap baris turunan.** Begitu formula berubah,
+   `feature_set_version` naik, dan baris lama tetap mencerminkan formula lamanya.
+4. **Data basi diberi label.** Pengguna yang tidak tahu datanya mati akan
+   mengambil keputusan berdasarkan angka mati. Itu kegagalan produk, bukan
+   sekadar kegagalan teknis.
+
+## Status
+
+| Fase | Isi | Status |
+| --- | --- | --- |
+| 0 | Fondasi: adaptor, dispatcher, worker, skema | selesai |
+| 1 | Fitur teknikal, engine skor, backtest | fitur selesai, skor berikutnya |
+| 2 | Masuk IDX: XBRL, KSEI, backfill | belum |
+| 3 | Lapisan penjelasan dan sentimen | belum |
+| 4 | Produk: auth, watchlist, track record | belum |
+
+Urutannya tidak boleh dibalik. Lapisan penjelasan yang dipasang di atas skor yang
+belum terbukti hanya menghasilkan omong kosong yang terdengar meyakinkan, dan itu
+lebih berbahaya daripada tidak ada penjelasan sama sekali.
+
+## Batasan yang diakui terbuka
+
+- Lemah untuk instrumen tidak likuid; sinyal statistik butuh volume.
+- Lemah untuk emiten yang baru tercatat; riwayatnya terlalu pendek untuk
+  normalisasi persentil.
+- Tidak bisa memprediksi kejutan. Bencana, skandal, dan perubahan regulasi
+  mendadak tidak ada di data historis.
+- Tidak tahu situasi keuangan penggunanya, jadi tidak bisa menilai apakah sesuatu
+  cocok untuk siapa pun.
+
+## Lisensi
+
+Belum ditentukan.
