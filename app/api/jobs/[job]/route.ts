@@ -31,6 +31,7 @@ import {
   type CandleInput,
 } from '@/lib/db/queries'
 import { verifyQStashRequest, type JobPayload } from '@/lib/queue/qstash'
+import { badRequest, failure, notFound, unauthorized, NO_STORE } from '@/lib/http/errors'
 import { runFeatureJob } from '@/lib/features/job'
 import { runCommittee } from '@/lib/agents/committee'
 
@@ -62,23 +63,26 @@ export async function POST(request: Request, ctx: RouteContext<'/api/jobs/[job]'
 
   const verified = await verifyQStashRequest(request)
   if (!verified.ok) {
+    // Alasan penolakan hanya masuk log. Memberitahukannya kepada pemanggil
+    // menjelaskan persis apa yang kurang dari percobaannya.
     console.warn(`[Worker/${jobName}] Permintaan ditolak: ${verified.reason}`)
-    return NextResponse.json({ error: 'Unauthorized', reason: verified.reason }, { status: 401 })
+    return unauthorized()
   }
 
   const handler = HANDLERS[jobName]
   if (!handler) {
-    return NextResponse.json(
-      { error: `Job tidak dikenal: ${jobName}`, known: Object.keys(HANDLERS) },
-      { status: 404 },
-    )
+    // Daftar job yang dikenal hanya ditampilkan di luar produksi; di produksi ia
+    // sekadar memberi peta pekerjaan internal kepada siapa pun yang menebak.
+    return process.env.NODE_ENV === 'production'
+      ? notFound()
+      : badRequest(`Job tidak dikenal: ${jobName}`, { known: Object.keys(HANDLERS) })
   }
 
   let payload: JobPayload
   try {
     payload = JSON.parse(verified.body) as JobPayload
   } catch {
-    return NextResponse.json({ error: 'Body bukan JSON yang sah' }, { status: 400 })
+    return badRequest('Body bukan JSON yang sah')
   }
 
   const batchKey = payload.batchKey || `manual-${new Date().toISOString()}`
@@ -113,19 +117,19 @@ export async function POST(request: Request, ctx: RouteContext<'/api/jobs/[job]'
       error: result.errors.length > 0 ? result.errors.join('; ').slice(0, 2000) : null,
     })
 
-    return NextResponse.json({
-      status,
-      ...result,
-      durationMs: Date.now() - startedAt,
-    })
+    return NextResponse.json(
+      { status, ...result, durationMs: Date.now() - startedAt },
+      { headers: NO_STORE },
+    )
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    console.error(`[Worker/${jobName}] Gagal total:`, message)
 
+    // Rincian penuh tetap disimpan di `job_run`, yang hanya bisa dibaca dari
+    // dalam. Yang keluar ke jaringan hanya kalimat umum.
     await upsertJobRun({ jobName, batchKey, status: 'failed', error: message.slice(0, 2000) })
 
     // Status 5xx supaya QStash mencoba lagi dengan jeda menaik.
-    return NextResponse.json({ error: message }, { status: 500 })
+    return failure(`worker/${jobName}`, err)
   }
 }
 
@@ -135,7 +139,9 @@ export async function POST(request: Request, ctx: RouteContext<'/api/jobs/[job]'
  */
 export async function GET(request: Request, ctx: RouteContext<'/api/jobs/[job]'>) {
   if (process.env.NODE_ENV === 'production') {
-    return NextResponse.json({ error: 'Hanya tersedia di luar produksi' }, { status: 405 })
+    // Bukan 405. Di produksi endpoint ini sebaiknya tidak terlihat ada sama
+    // sekali; jawaban "metode tidak diizinkan" mengonfirmasi keberadaannya.
+    return notFound()
   }
 
   const { job: jobName } = await ctx.params

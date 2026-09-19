@@ -19,6 +19,8 @@ import {
   type JobScheduleRow,
 } from '@/lib/db/queries'
 import { publishJob, type JobPayload } from '@/lib/queue/qstash'
+import { requireCron } from '@/lib/http/auth'
+import { failure, unauthorized, NO_STORE } from '@/lib/http/errors'
 import { fromDbMarket } from '@/lib/db/schema'
 
 /** Batas 25–50 instrumen per batch menjaga tiap worker jauh di bawah batas waktu. */
@@ -72,16 +74,17 @@ export async function GET(request: Request) {
     }
 
     const dispatched = results.filter((r) => r.dispatched).length
-    return NextResponse.json({
-      message: `${dispatched} dari ${schedules.length} job dikirim.`,
-      checkedAt: now.toISOString(),
-      results,
-      durationMs: Date.now() - startedAt,
-    })
+    return NextResponse.json(
+      {
+        message: `${dispatched} dari ${schedules.length} job dikirim.`,
+        checkedAt: now.toISOString(),
+        results,
+        durationMs: Date.now() - startedAt,
+      },
+      { headers: NO_STORE },
+    )
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    console.error('[Dispatcher] Gagal total:', message)
-    return NextResponse.json({ error: message }, { status: 500 })
+    return failure('api/cron/dispatcher', err)
   }
 }
 
@@ -91,16 +94,20 @@ export async function GET(request: Request) {
  * daripada terbuka untuk siapa saja.
  */
 function checkAuth(request: Request): NextResponse | null {
-  if (process.env.NODE_ENV !== 'production') return null
+  const check = requireCron(request)
+  if (check.ok) return null
 
-  const secret = process.env.CRON_SECRET
-  if (!secret) {
-    return NextResponse.json({ error: 'CRON_SECRET belum diset' }, { status: 500 })
+  if (check.reason === 'not-configured') {
+    // Gagal tertutup. Dispatcher yang berhenti bekerja akan segera terlihat;
+    // dispatcher yang diam-diam terbuka untuk seluruh internet tidak.
+    console.error('[Dispatcher] CRON_SECRET belum diset atau terlalu pendek')
+    return NextResponse.json(
+      { error: 'Endpoint belum dikonfigurasi' },
+      { status: 503, headers: NO_STORE },
+    )
   }
-  if (request.headers.get('authorization') !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-  return null
+
+  return unauthorized()
 }
 
 async function dispatchOne(schedule: JobScheduleRow, now: Date): Promise<JobOutcome> {

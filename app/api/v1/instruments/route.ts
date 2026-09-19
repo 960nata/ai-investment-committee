@@ -8,6 +8,7 @@
 
 import { NextResponse } from 'next/server'
 import { cache } from '@/lib/cache/redis'
+import { badRequest, failure, NO_STORE } from '@/lib/http/errors'
 import { getCandleCountsByInstrument, listInstruments } from '@/lib/db/queries'
 import type { MarketCode } from '@/lib/db/schema'
 
@@ -21,10 +22,7 @@ export async function GET(request: Request) {
   const raw = url.searchParams.get('market')?.toUpperCase()
 
   if (raw && !MARKETS.includes(raw as MarketCode)) {
-    return NextResponse.json(
-      { error: `Pasar tidak dikenal: ${raw}`, allowed: MARKETS },
-      { status: 400 },
-    )
+    return badRequest(`Pasar tidak dikenal: ${raw}`, { allowed: MARKETS })
   }
 
   const market = raw as MarketCode | undefined
@@ -46,10 +44,11 @@ export async function GET(request: Request) {
       CACHE_TTL_SECONDS,
     )
 
-    return NextResponse.json({ data, count: data.length, cached: cache.isAvailable() })
+    return NextResponse.json(
+      { data, count: data.length, cached: cache.isAvailable() },
+      { headers: NO_STORE },
+    )
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    console.error('[API] instruments:', message)
-    return NextResponse.json({ error: message }, { status: 500 })
+    return failure('api/v1/instruments', err)
   }
 }

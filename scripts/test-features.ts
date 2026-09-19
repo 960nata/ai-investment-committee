@@ -50,7 +50,12 @@ function test(name: string, body: () => void): void {
   }
 }
 
-function assert(condition: boolean, message: string): void {
+/**
+ * Ditulis sebagai fungsi penegasan TypeScript, bukan pemeriksa boolean biasa.
+ * Dengan begitu pemeriksa tipe ikut mempersempit tipe setelah pemanggilan, dan
+ * uji bisa langsung membaca bidang yang hanya ada di cabang tertentu.
+ */
+function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message)
 }
 

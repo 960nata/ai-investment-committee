@@ -1,15 +1,23 @@
 /**
- * Halaman Pipeline — kondisi mesin, bukan kondisi pasar.
+ * Pipeline — keadaan mesin, bukan keadaan pasar.
  *
- * Empat hal yang ditampilkan: jadwal job, hasil batch terakhir, kesehatan tiap
- * sumber data, dan baris yang dikarantina. Tiga yang pertama menjawab "apakah
- * data masih masuk"; yang terakhir menjawab "apa yang ditolak dan kenapa".
+ * Lima hal yang ditampilkan: kesiapan layanan penopang, jadwal job, kesehatan
+ * tiap sumber data, hasil batch terakhir, dan baris yang dikarantina.
  *
  * Baris karantina sengaja terlihat. Sebagian besar anomali harga ternyata aksi
- * korporasi yang belum terekam, bukan data rusak — kalau disembunyikan, yang
+ * korporasi yang belum terekam, bukan data rusak; kalau disembunyikan, yang
  * hilang justru petunjuknya.
  */
 
+import {
+  IconDatabase,
+  IconFlask,
+  IconLayers,
+  IconPlug,
+  IconQueue,
+  IconSchedule,
+} from '@/components/icons'
+import { Blank, DatabaseNotice, Lamp, Tag, type State } from '@/components/ui'
 import {
   getFeatureCoverage,
   listAdapterHealth,
@@ -25,9 +33,7 @@ import { fromDbMarket } from '@/lib/db/schema'
 
 export const dynamic = 'force-dynamic'
 
-export const metadata = {
-  title: 'Pipeline — Investasi',
-}
+export const metadata = { title: 'Pipeline' }
 
 export default async function PipelinePage() {
   const now = new Date()
@@ -55,47 +61,47 @@ export default async function PipelinePage() {
   }
 
   return (
-    <div>
-      <div className="page-header">
-        <h1 className="page-title">Pipeline</h1>
-        <p className="page-subtitle">
-          Penjadwalan, hasil batch, dan kesehatan sumber data. Waktu ditampilkan pada zona
+    <>
+      <header className="masthead">
+        <p className="eyebrow">Operasional</p>
+        <h1 className="headline">Pipeline</h1>
+        <p className="standfirst">
+          Penjadwalan, kesehatan sumber, dan hasil batch terakhir. Waktu ditampilkan pada zona
           waktu masing-masing job.
         </p>
+      </header>
+
+      <div className="statusbar">
+        <span className="status-item">
+          <Lamp state={error === null ? 'ok' : 'halted'} />
+          <IconDatabase size={14} />
+          basis data {error === null ? 'terhubung' : 'terputus'}
+        </span>
+        <span className="status-item">
+          <Lamp state={isQStashConfigured() ? 'ok' : 'unknown'} />
+          <IconQueue size={14} />
+          antrian {isQStashConfigured() ? 'aktif' : 'belum diset'}
+        </span>
+        <span className="status-item">
+          <Lamp state={cache.isAvailable() ? 'ok' : 'unknown'} />
+          cache {cache.isAvailable() ? 'aktif' : 'belum diset'}
+        </span>
+        <span className="status-spacer mono" style={{ fontSize: 'var(--t-small)', color: 'var(--ink-faint)' }}>
+          {now.toISOString().slice(0, 16).replace('T', ' ')} UTC
+        </span>
       </div>
 
-      <div className="pipeline-strip">
-        <Dependency label="Antrian QStash" ok={isQStashConfigured()} />
-        <div className="pipeline-strip-separator" />
-        <Dependency label="Cache Redis" ok={cache.isAvailable()} />
-        <div className="pipeline-strip-separator" />
-        <Dependency label="Database" ok={error === null} />
-        <div style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-tertiary)' }}>
-          Dicek {now.toISOString().slice(0, 19).replace('T', ' ')} UTC
-        </div>
-      </div>
-
-      {error && (
-        <div
-          className="card"
-          style={{ borderColor: 'var(--negative-border)', background: 'var(--negative-bg)' }}
-        >
-          <div className="card-title" style={{ color: 'var(--negative)' }}>
-            Database tidak terjangkau
-          </div>
-          <div style={{ marginTop: 8, fontSize: 13, color: 'var(--text-secondary)' }}>
-            {error}
-          </div>
-        </div>
-      )}
+      {error && <DatabaseNotice detail={error} />}
 
       {data && (
         <>
-          <Section title="Jadwal job" meta={`${data.schedules.length} terdaftar`}>
+          <Panel icon={<IconSchedule size={14} />} title="Jadwal" meta={`${data.schedules.length} job`}>
             {data.schedules.length === 0 ? (
-              <Empty text="Belum ada jadwal. Jalankan npm run db:seed." />
+              <Blank icon={<IconSchedule size={22} />} title="Belum ada jadwal">
+                Jalankan <code>npm run db:seed</code> untuk mengisi jadwal awal.
+              </Blank>
             ) : (
-              <table className="instruments-table">
+              <table className="grid">
                 <thead>
                   <tr>
                     <th>Job</th>
@@ -118,48 +124,29 @@ export default async function PipelinePage() {
                       },
                       now,
                     )
+
                     return (
                       <tr key={s.jobName}>
-                        <td className="symbol">
-                          {s.jobName}
-                          {!s.enabled && (
-                            <span
-                              style={{
-                                marginLeft: 8,
-                                fontSize: 11,
-                                color: 'var(--text-muted)',
-                                fontWeight: 500,
-                              }}
-                            >
-                              dimatikan
-                            </span>
-                          )}
-                        </td>
-                        <td>
-                          {s.market ? (
-                            <span className={`market-badge ${s.market}`}>
-                              {fromDbMarket(s.market)}
-                            </span>
-                          ) : (
-                            <span style={{ color: 'var(--text-muted)' }}>—</span>
-                          )}
-                        </td>
-                        <td className="name">{describeHours(s.hoursOfDay)}</td>
-                        <td className="name">
+                        <td className="key">{s.jobName}</td>
+                        <td>{s.market ? <Tag>{fromDbMarket(s.market)}</Tag> : <span className="dim">—</span>}</td>
+                        <td className="dim">{describeHours(s.hoursOfDay)}</td>
+                        <td className="dim">
                           {s.timezone}
-                          {s.tradingDaysOnly && (
-                            <span style={{ color: 'var(--text-muted)' }}> · hari bursa</span>
-                          )}
+                          {s.tradingDaysOnly && ' · hari bursa'}
                         </td>
-                        <td style={{ color: 'var(--text-tertiary)' }}>
+                        <td className="dim">
                           {s.lastRunAt ? localSlot(s.lastRunAt, s.timezone).slot : '—'}
                         </td>
-                        <td style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
-                          {!s.enabled
-                            ? 'dimatikan'
-                            : decision.due
-                              ? 'jatuh tempo'
-                              : decision.reason}
+                        <td>
+                          {!s.enabled ? (
+                            <Tag>dimatikan</Tag>
+                          ) : decision.due ? (
+                            <Tag tone="signal">jatuh tempo</Tag>
+                          ) : (
+                            <span className="dim" style={{ fontSize: 'var(--t-small)' }}>
+                              {decision.reason}
+                            </span>
+                          )}
                         </td>
                       </tr>
                     )
@@ -167,18 +154,20 @@ export default async function PipelinePage() {
                 </tbody>
               </table>
             )}
-          </Section>
+          </Panel>
 
-          <Section title="Sumber data" meta={`${data.health.length} adaptor`}>
+          <Panel icon={<IconPlug size={14} />} title="Sumber data" meta={`${data.health.length} adapter`}>
             {data.health.length === 0 ? (
-              <Empty text="Belum ada adaptor yang pernah dipanggil." />
+              <Blank icon={<IconPlug size={22} />} title="Belum ada adapter yang dipanggil">
+                Catatan kesehatan terisi sendiri begitu job ingest pertama berjalan.
+              </Blank>
             ) : (
-              <table className="instruments-table">
+              <table className="grid">
                 <thead>
                   <tr>
-                    <th>Adaptor</th>
+                    <th>Adapter</th>
                     <th>Status</th>
-                    <th style={{ textAlign: 'right' }}>Gagal beruntun</th>
+                    <th className="num">Gagal beruntun</th>
                     <th>Sukses terakhir</th>
                     <th>Galat terakhir</th>
                   </tr>
@@ -186,49 +175,42 @@ export default async function PipelinePage() {
                 <tbody>
                   {data.health.map((h) => (
                     <tr key={h.sourceId}>
-                      <td className="symbol">{h.sourceId}</td>
+                      <td className="key">{h.sourceId}</td>
                       <td>
-                        <span className={`status-dot ${dotClass(h.status)}`} />
-                        <span style={{ marginLeft: 8, fontSize: 13 }}>{h.status}</span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                          <Lamp state={healthState(h.status)} />
+                          {h.status}
+                        </span>
                       </td>
-                      <td
-                        style={{
-                          textAlign: 'right',
-                          fontFamily: "'JetBrains Mono', monospace",
-                          color:
-                            h.consecutiveFailures > 0
-                              ? 'var(--negative)'
-                              : 'var(--text-tertiary)',
-                        }}
-                      >
+                      <td className="num" style={{ color: h.consecutiveFailures > 0 ? 'var(--halted)' : undefined }}>
                         {h.consecutiveFailures}
                       </td>
-                      <td style={{ color: 'var(--text-tertiary)' }}>
-                        {h.lastSuccessAt ? formatUtc(h.lastSuccessAt) : '—'}
-                      </td>
-                      <td
-                        className="name"
-                        style={{ maxWidth: 320, color: 'var(--text-muted)' }}
-                      >
-                        {h.lastError ?? '—'}
-                      </td>
+                      <td className="dim">{h.lastSuccessAt ? stamp(h.lastSuccessAt) : '—'}</td>
+                      <td className="wrap">{h.lastError ?? '—'}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             )}
-          </Section>
+          </Panel>
 
-          <Section title="Fitur terhitung" meta={`versi berjalan ${FEATURE_SET_VERSION}`}>
+          <Panel
+            icon={<IconLayers size={14} />}
+            title="Fitur terhitung"
+            meta={`versi berjalan ${FEATURE_SET_VERSION}`}
+          >
             {data.features.length === 0 ? (
-              <Empty text="Belum ada fitur terhitung. Job compute-features belum pernah jalan." />
+              <Blank icon={<IconLayers size={22} />} title="Belum ada fitur terhitung">
+                Job <code>compute-features-crypto</code> belum pernah berjalan, atau riwayat
+                harganya belum cukup panjang.
+              </Blank>
             ) : (
-              <table className="instruments-table">
+              <table className="grid">
                 <thead>
                   <tr>
-                    <th>Versi set fitur</th>
-                    <th style={{ textAlign: 'right' }}>Baris</th>
-                    <th style={{ textAlign: 'right' }}>Instrumen</th>
+                    <th>Versi</th>
+                    <th className="num">Baris</th>
+                    <th className="num">Instrumen</th>
                     <th>Tanggal terakhir</th>
                     <th>Keterangan</th>
                   </tr>
@@ -236,99 +218,74 @@ export default async function PipelinePage() {
                 <tbody>
                   {data.features.map((f) => (
                     <tr key={f.featureSetVersion}>
-                      <td className="symbol">{f.featureSetVersion}</td>
-                      <td
-                        style={{
-                          textAlign: 'right',
-                          fontFamily: "'JetBrains Mono', monospace",
-                        }}
-                      >
-                        {f.rows.toLocaleString('id-ID')}
-                      </td>
-                      <td
-                        style={{
-                          textAlign: 'right',
-                          fontFamily: "'JetBrains Mono', monospace",
-                        }}
-                      >
-                        {f.instruments}
-                      </td>
-                      <td style={{ color: 'var(--text-tertiary)' }}>{f.latestDate ?? '—'}</td>
-                      <td className="name" style={{ color: 'var(--text-muted)' }}>
-                        {f.featureSetVersion === FEATURE_SET_VERSION
-                          ? 'versi berjalan'
-                          : 'versi lama, disimpan untuk perbandingan'}
+                      <td className="key">{f.featureSetVersion}</td>
+                      <td className="num">{f.rows.toLocaleString('id-ID')}</td>
+                      <td className="num">{f.instruments}</td>
+                      <td className="dim">{f.latestDate ?? '—'}</td>
+                      <td>
+                        {f.featureSetVersion === FEATURE_SET_VERSION ? (
+                          <Tag tone="ok">versi berjalan</Tag>
+                        ) : (
+                          <Tag>disimpan untuk perbandingan</Tag>
+                        )}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             )}
-          </Section>
+          </Panel>
 
-          <Section title="Batch terakhir" meta={`${data.runs.length} terbaru`}>
+          <Panel icon={<IconQueue size={14} />} title="Batch terakhir" meta={`${data.runs.length} terbaru`}>
             {data.runs.length === 0 ? (
-              <Empty text="Belum ada job yang pernah jalan." />
+              <Blank icon={<IconQueue size={22} />} title="Belum ada job yang pernah jalan" />
             ) : (
-              <table className="instruments-table">
+              <table className="grid">
                 <thead>
                   <tr>
                     <th>Job</th>
                     <th>Batch</th>
                     <th>Status</th>
-                    <th style={{ textAlign: 'right' }}>Berhasil</th>
-                    <th style={{ textAlign: 'right' }}>Gagal</th>
+                    <th className="num">Berhasil</th>
+                    <th className="num">Gagal</th>
                     <th>Mulai</th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.runs.map((r) => (
                     <tr key={r.id}>
-                      <td className="symbol">{r.jobName}</td>
-                      <td className="name">{r.batchKey}</td>
+                      <td className="key">{r.jobName}</td>
+                      <td className="dim">{r.batchKey}</td>
                       <td>
-                        <span className={`status-dot ${runDotClass(r.status)}`} />
-                        <span style={{ marginLeft: 8, fontSize: 13 }}>{r.status}</span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                          <Lamp state={runState(r.status)} />
+                          {r.status}
+                        </span>
                       </td>
-                      <td
-                        style={{
-                          textAlign: 'right',
-                          fontFamily: "'JetBrains Mono', monospace",
-                        }}
-                      >
-                        {r.itemsProcessed}
-                      </td>
-                      <td
-                        style={{
-                          textAlign: 'right',
-                          fontFamily: "'JetBrains Mono', monospace",
-                          color: r.itemsFailed > 0 ? 'var(--negative)' : 'var(--text-tertiary)',
-                        }}
-                      >
+                      <td className="num">{r.itemsProcessed}</td>
+                      <td className="num" style={{ color: r.itemsFailed > 0 ? 'var(--halted)' : undefined }}>
                         {r.itemsFailed}
                       </td>
-                      <td style={{ color: 'var(--text-tertiary)' }}>
-                        {formatUtc(r.startedAt)}
-                      </td>
+                      <td className="dim">{stamp(r.startedAt)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             )}
-          </Section>
+          </Panel>
 
-          <Section
+          <Panel
+            icon={<IconFlask size={14} />}
             title="Karantina"
-            meta={
-              data.quarantined.length === 0
-                ? 'kosong'
-                : `${data.quarantined.length} baris terbaru`
-            }
+            meta={data.quarantined.length === 0 ? 'kosong' : `${data.quarantined.length} terbaru`}
           >
             {data.quarantined.length === 0 ? (
-              <Empty text="Tidak ada baris yang ditolak uji kualitas." />
+              <Blank icon={<IconFlask size={22} />} title="Tidak ada baris yang ditolak">
+                Baris yang gagal uji kualitas ditahan di sini, bukan dibuang. Sebagian besar
+                anomali harga ternyata aksi korporasi yang belum terekam.
+              </Blank>
             ) : (
-              <table className="instruments-table">
+              <table className="grid">
                 <thead>
                   <tr>
                     <th>Sumber</th>
@@ -339,80 +296,62 @@ export default async function PipelinePage() {
                 <tbody>
                   {data.quarantined.map((q) => (
                     <tr key={q.id}>
-                      <td className="symbol">{q.sourceId}</td>
-                      <td className="name" style={{ maxWidth: 520 }}>
-                        {q.reason}
-                      </td>
-                      <td style={{ color: 'var(--text-tertiary)' }}>
-                        {formatUtc(q.createdAt)}
-                      </td>
+                      <td className="key">{q.sourceId}</td>
+                      <td className="wrap">{q.reason}</td>
+                      <td className="dim">{stamp(q.createdAt)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             )}
-          </Section>
+          </Panel>
         </>
       )}
-    </div>
+    </>
   )
 }
 
 // ---------------------------------------------------------------------------
 
-function Section({
+function Panel({
+  icon,
   title,
   meta,
   children,
 }: {
+  icon: React.ReactNode
   title: string
   meta: string
   children: React.ReactNode
 }) {
   return (
-    <div className="card" style={{ marginBottom: 'var(--space-md)' }}>
-      <div className="card-header">
-        <span className="card-title">{title}</span>
-        <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>{meta}</span>
+    <section className="panel">
+      <div className="panel-head">
+        <span className="panel-title">
+          {icon}
+          {title}
+        </span>
+        <span className="panel-meta">{meta}</span>
       </div>
-      {children}
-    </div>
+      <div className="scroll-x">{children}</div>
+    </section>
   )
 }
 
-function Dependency({ label, ok }: { label: string; ok: boolean }) {
-  return (
-    <div className="pipeline-strip-item">
-      <span className={`status-dot ${ok ? 'healthy' : 'down'}`} />
-      <span>
-        {label} {ok ? 'siap' : 'belum diset'}
-      </span>
-    </div>
-  )
-}
-
-function Empty({ text }: { text: string }) {
-  return (
-    <div className="empty-state" style={{ padding: 'var(--space-lg)' }}>
-      <div className="empty-state-text">{text}</div>
-    </div>
-  )
-}
-
-function dotClass(status: string): string {
-  if (status === 'healthy') return 'healthy'
+function healthState(status: string): State {
+  if (status === 'healthy') return 'ok'
   if (status === 'degraded') return 'degraded'
-  return 'down'
+  return 'halted'
 }
 
-function runDotClass(status: string): string {
-  if (status === 'success') return 'healthy'
+function runState(status: string): State {
+  if (status === 'success') return 'ok'
   if (status === 'partial' || status === 'running') return 'degraded'
-  return 'down'
+  return 'halted'
 }
 
-/** Semua timestamp disimpan UTC; konversi ke zona waktu pasar hanya di tampilan. */
-function formatUtc(value: Date): string {
+/** Semua stempel waktu disimpan UTC; konversi zona waktu hanya di tampilan. */
+function stamp(value: Date): string {
   return value.toISOString().slice(0, 16).replace('T', ' ')
 }
 

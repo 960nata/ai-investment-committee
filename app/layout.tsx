@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Investasi — Analisis Probabilistik Multi-Horizon",
+  title: { default: "Komite — analisis probabilistik", template: "%s — Komite" },
   description:
-    "Mesin analisis saham IDX, US, dan crypto berbasis probabilitas. " +
-    "Bukan peramal harga — alat analisis data dengan track record terbuka.",
+    "Alat analisis data untuk saham IDX, saham AS, dan crypto. " +
+    "Menampilkan peluang beserta dasarnya, bukan anjuran.",
   keywords: ["saham", "analisis", "IDX", "crypto", "investasi", "probabilistik"],
 };
 

@@ -11,6 +11,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
+import { IconBolt, IconRefresh } from './icons'
 
 export function IngestButton({ job }: { job: string }) {
   const router = useRouter()
@@ -30,8 +31,8 @@ export function IngestButton({ job }: { job: string }) {
         }
 
         setResult(
-          `${body.itemsProcessed} simbol, ${body.candlesWritten} candle` +
-            (body.quarantined > 0 ? `, ${body.quarantined} dikarantina` : ''),
+          `${body.itemsProcessed} simbol · ${body.candlesWritten} candle` +
+            (body.quarantined > 0 ? ` · ${body.quarantined} dikarantina` : ''),
         )
         router.refresh()
       } catch (err) {
@@ -41,26 +42,30 @@ export function IngestButton({ job }: { job: string }) {
   }
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-3)' }}>
       {result && (
-        <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>{result}</span>
+        <span
+          className="mono"
+          style={{ fontSize: 'var(--t-small)', color: 'var(--ink-mute)' }}
+        >
+          {result}
+        </span>
       )}
-      <button
-        type="button"
-        className="btn btn-ghost"
-        onClick={run}
-        disabled={pending}
-        style={{ fontSize: 12 }}
-      >
+      <button type="button" className="btn btn-signal" onClick={run} disabled={pending}>
         {pending ? (
           <>
-            <span className="loading-spinner" />
-            Memuat…
+            <span className="spin">
+              <IconRefresh size={13} />
+            </span>
+            menarik data
           </>
         ) : (
-          'Ingest sekarang'
+          <>
+            <IconBolt size={13} />
+            tarik sekarang
+          </>
         )}
       </button>
-    </div>
+    </span>
   )
 }

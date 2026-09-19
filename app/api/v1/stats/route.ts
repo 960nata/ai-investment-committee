@@ -10,6 +10,7 @@
 
 import { NextResponse } from 'next/server'
 import { cache } from '@/lib/cache/redis'
+import { failure, NO_STORE } from '@/lib/http/errors'
 import { getDashboardStats, listAdapterHealth } from '@/lib/db/queries'
 import { isQStashConfigured } from '@/lib/queue/qstash'
 
@@ -60,10 +61,8 @@ export async function GET() {
       CACHE_TTL_SECONDS,
     )
 
-    return NextResponse.json(data)
+    return NextResponse.json(data, { headers: NO_STORE })
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    console.error('[API] stats:', message)
-    return NextResponse.json({ error: message }, { status: 500 })
+    return failure('api/v1/stats', err)
   }
 }

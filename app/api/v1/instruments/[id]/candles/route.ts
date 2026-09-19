@@ -10,6 +10,7 @@
 
 import { NextResponse } from 'next/server'
 import { cache } from '@/lib/cache/redis'
+import { badRequest, failure, notFound, NO_STORE } from '@/lib/http/errors'
 import { getCandleCount, getCandles, getInstrumentById } from '@/lib/db/queries'
 
 const DEFAULT_RANGE_DAYS = 90
@@ -26,7 +27,7 @@ export async function GET(
   const instrumentId = Number(id)
 
   if (!Number.isInteger(instrumentId) || instrumentId <= 0) {
-    return NextResponse.json({ error: `Id instrumen tidak sah: ${id}` }, { status: 400 })
+    return badRequest('Id instrumen tidak sah')
   }
 
   const url = new URL(request.url)
@@ -34,16 +35,16 @@ export async function GET(
   const to = url.searchParams.get('to') ?? isoDaysAgo(0)
 
   if (!ISO_DATE.test(from) || !ISO_DATE.test(to)) {
-    return NextResponse.json({ error: 'Tanggal harus berformat YYYY-MM-DD' }, { status: 400 })
+    return badRequest('Tanggal harus berformat YYYY-MM-DD')
   }
   if (from > to) {
-    return NextResponse.json({ error: '`from` melewati `to`' }, { status: 400 })
+    return badRequest('Tanggal awal melewati tanggal akhir')
   }
 
   try {
     const instrument = await getInstrumentById(instrumentId)
     if (!instrument) {
-      return NextResponse.json({ error: 'Instrumen tidak ditemukan' }, { status: 404 })
+      return notFound('Instrumen tidak ditemukan')
     }
 
     const data = await cache.getOrSet(
@@ -74,11 +75,9 @@ export async function GET(
       CACHE_TTL_SECONDS,
     )
 
-    return NextResponse.json(data)
+    return NextResponse.json(data, { headers: NO_STORE })
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    console.error('[API] candles:', message)
-    return NextResponse.json({ error: message }, { status: 500 })
+    return failure('api/v1/candles', err)
   }
 }
 

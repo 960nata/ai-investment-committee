@@ -1,24 +1,35 @@
 /**
- * Dashboard — Fase 0.
+ * Ringkasan — keadaan mesin dan data yang sudah masuk.
  *
  * Server Component: seluruh data dibaca di server, jadi halaman sudah terisi
- * pada muatan pertama dan kredensial database tidak pernah ikut ke browser.
+ * pada muatan pertama dan kredensial basis data tidak pernah ikut ke peramban.
  * Hanya pemilih instrumen dan grafiknya yang berjalan di klien.
  *
- * Yang ditampilkan di sini masih data mentah, belum skor. Skor baru muncul di
- * Fase 1, setelah backtest membuktikan angkanya berarti — menampilkan angka yang
- * belum teruji lebih berbahaya daripada tidak menampilkan apa pun.
+ * Belum ada satu pun skor di halaman ini, dan itu disengaja. Skor baru muncul
+ * setelah backtest membuktikan angkanya berarti; menampilkan angka yang belum
+ * teruji lebih berbahaya daripada tidak menampilkan apa pun.
  */
 
 import { InstrumentExplorer } from '@/components/instrument-explorer'
 import { IngestButton } from '@/components/ingest-button'
 import type { Candle } from '@/components/candlestick-chart'
 import {
+  IconCandles,
+  IconClock,
+  IconDatabase,
+  IconFlask,
+  IconPlug,
+  IconQueue,
+  IconRows,
+} from '@/components/icons'
+import { DatabaseNotice, Lamp, Track, type State } from '@/components/ui'
+import {
   describeAge,
   getCandles,
   getDashboardStats,
   listAdapterHealth,
   listInstruments,
+  STALE_AFTER_MINUTES,
   type DashboardStats,
 } from '@/lib/db/queries'
 import { isQStashConfigured } from '@/lib/queue/qstash'
@@ -28,107 +39,100 @@ export const dynamic = 'force-dynamic'
 
 const CHART_RANGE_DAYS = 180
 
-export default async function DashboardPage() {
-  let data: Awaited<ReturnType<typeof loadDashboard>> | null = null
+export default async function OverviewPage() {
+  let data: Awaited<ReturnType<typeof load>> | null = null
   let error: string | null = null
 
   try {
-    data = await loadDashboard()
+    data = await load()
   } catch (err) {
     error = err instanceof Error ? err.message : String(err)
   }
 
   return (
-    <div>
-      <div className="page-header">
-        <h1 className="page-title">Dashboard</h1>
-        <p className="page-subtitle">
-          Mesin analisis probabilistik multi-horizon. Sumber data gratis punya jeda, jadi
-          sistem ini tidak cocok untuk perdagangan harian.
+    <>
+      <header className="masthead">
+        <p className="eyebrow">Fase 1 · engine fitur</p>
+        <h1 className="headline">Ringkasan</h1>
+        <p className="standfirst">
+          Keadaan pipa data dan riwayat yang sudah tersimpan. Sumber gratis punya jeda, jadi
+          alat ini tidak cocok untuk perdagangan harian.
         </p>
-      </div>
+      </header>
 
-      {error && (
-        <div
-          className="card"
-          style={{ borderColor: 'var(--negative-border)', background: 'var(--negative-bg)' }}
-        >
-          <div className="card-title" style={{ color: 'var(--negative)' }}>
-            Database tidak terjangkau
-          </div>
-          <div style={{ marginTop: 8, fontSize: 13, color: 'var(--text-secondary)' }}>
-            {error}
-          </div>
-          <div style={{ marginTop: 12, fontSize: 13, color: 'var(--text-tertiary)' }}>
-            Pastikan DATABASE_URL terisi di .env.local, lalu jalankan{' '}
-            <code>npm run db:migrate</code> dan <code>npm run db:seed</code>.
-          </div>
-        </div>
-      )}
+      {error && <DatabaseNotice detail={error} />}
 
       {data && (
         <>
-          <div className="pipeline-strip">
-            <div className="pipeline-strip-item">
-              <span className={`status-dot ${adapterDot(data.adapterStatuses)}`} />
-              <span>{describeAdapters(data.adapterStatuses)}</span>
-            </div>
-            <div className="pipeline-strip-separator" />
-            <div className="pipeline-strip-item">
-              <span className={`status-dot ${freshnessDot(data.stats.freshness)}`} />
-              <span>
-                Data per {data.stats.latestCandleDate ?? '—'} · diperbarui{' '}
-                {describeAge(data.stats.ageMinutes)}
-                {data.stats.freshness === 'stale' && ' — sudah basi'}
-              </span>
-            </div>
-            <div className="pipeline-strip-separator" />
-            <div className="pipeline-strip-item">
-              <span className={`status-dot ${data.queueConfigured ? 'healthy' : 'down'}`} />
-              <span>Antrian {data.queueConfigured ? 'aktif' : 'belum diset'}</span>
-            </div>
+          <div className="statusbar">
+            <span className="status-item">
+              <Lamp state={data.adapterState} />
+              {data.adapterSummary}
+            </span>
+
+            <span className="status-item">
+              <IconClock size={14} />
+              {data.stats.latestCandleDate ?? 'belum ada data'}
+              <span style={{ color: 'var(--ink-faint)' }}>·</span>
+              {describeAge(data.stats.ageMinutes)}
+            </span>
+
+            <span className="status-item">
+              <Lamp state={freshnessState(data.stats.freshness)} />
+              {freshnessLabel(data.stats.freshness)}
+            </span>
+
+            <span className="status-item">
+              <IconQueue size={14} />
+              antrian {data.queueConfigured ? 'aktif' : 'belum diset'}
+            </span>
+
             {data.showManualIngest && (
-              <div style={{ marginLeft: 'auto' }}>
+              <span className="status-spacer">
                 <IngestButton job="ingest-crypto-daily" />
-              </div>
+              </span>
             )}
           </div>
 
-          <div className="stats-grid">
-            <StatCard
-              tone="blue"
-              icon="📊"
-              title="Instrumen"
+          <div className="readouts">
+            <Readout
+              icon={<IconRows size={14} />}
+              label="Instrumen"
               value={data.stats.instrumentCount.toLocaleString('id-ID')}
-              meta={data.stats.perMarket.map((m) => `${m.market} ${m.instruments}`).join(' · ')}
-            />
-            <StatCard
-              tone="cyan"
-              icon="🕯️"
-              title="Total Candle"
-              value={data.stats.candleCount.toLocaleString('id-ID')}
-              meta="Riwayat harian tersimpan sendiri"
-            />
-            <StatCard
-              tone="green"
-              icon="🔌"
-              title="Adapter Sehat"
-              value={`${data.adapterStatuses.filter((a) => a === 'healthy').length}/${data.adapterStatuses.length}`}
-              meta={
-                data.adapterStatuses.length === 0
-                  ? 'Belum ada adapter yang dipanggil'
-                  : 'Dibaca dari data_source_health'
+              note={
+                data.stats.perMarket.length > 0
+                  ? data.stats.perMarket.map((m) => `${m.market} ${m.instruments}`).join(' · ')
+                  : 'belum ada yang terdaftar'
               }
             />
-            <StatCard
-              tone="amber"
-              icon="🧪"
-              title="Karantina"
+
+            <Readout
+              icon={<IconCandles size={14} />}
+              label="Candle harian"
+              value={data.stats.candleCount.toLocaleString('id-ID')}
+              note="riwayat yang ditabung sendiri"
+            />
+
+            <Readout
+              icon={<IconPlug size={14} />}
+              label="Adapter sehat"
+              value={`${data.healthy}/${data.adapterCount}`}
+              note="dibaca dari data_source_health"
+              track={{
+                value: data.adapterCount === 0 ? null : data.healthy / data.adapterCount,
+                state: data.adapterState,
+              }}
+            />
+
+            <Readout
+              icon={<IconFlask size={14} />}
+              label="Karantina"
               value={data.stats.quarantinedCount.toLocaleString('id-ID')}
-              meta={
+              quiet={data.stats.quarantinedCount === 0}
+              note={
                 data.stats.quarantinedCount === 0
-                  ? 'Tidak ada baris ditolak'
-                  : 'Baris ditahan untuk diperiksa'
+                  ? 'tidak ada baris yang ditolak'
+                  : 'ditahan untuk diperiksa, bukan dibuang'
               }
             />
           </div>
@@ -140,13 +144,56 @@ export default async function DashboardPage() {
           />
         </>
       )}
-    </div>
+
+      {!data && !error && (
+        <div className="panel">
+          <div className="panel-body">
+            <div className="blank">
+              <IconDatabase size={22} />
+              <div className="blank-title">Memuat</div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
 
 // ---------------------------------------------------------------------------
 
-async function loadDashboard() {
+function Readout({
+  icon,
+  label,
+  value,
+  note,
+  quiet,
+  track,
+}: {
+  icon: React.ReactNode
+  label: string
+  value: string
+  note: string
+  quiet?: boolean
+  track?: { value: number | null; state: State }
+}) {
+  return (
+    <div className="readout">
+      <div className="readout-head">
+        {icon}
+        <span className="readout-label">{label}</span>
+      </div>
+      <div className={quiet ? 'readout-value quiet' : 'readout-value'}>{value}</div>
+      {track && (
+        <div style={{ marginTop: 'var(--space-3)' }}>
+          <Track value={track.value} state={track.state} ticks={16} label={label} />
+        </div>
+      )}
+      <p className="readout-note">{note}</p>
+    </div>
+  )
+}
+
+async function load() {
   const [stats, health, instruments] = await Promise.all([
     getDashboardStats(),
     listAdapterHealth(),
@@ -167,9 +214,14 @@ async function loadDashboard() {
       )
     : []
 
+  const healthy = health.filter((h) => h.status === 'healthy').length
+
   return {
     stats,
-    adapterStatuses: health.map((h) => h.status),
+    adapterCount: health.length,
+    healthy,
+    adapterState: adapterState(health.map((h) => h.status)),
+    adapterSummary: adapterSummary(health.map((h) => h.status)),
     instruments: instruments.map((i) => ({
       id: i.id,
       symbol: i.symbol,
@@ -180,54 +232,44 @@ async function loadDashboard() {
     initialCandles,
     queueConfigured: isQStashConfigured(),
     cacheAvailable: cache.isAvailable(),
-    // Pemicu manual hanya masuk akal di luar produksi; endpoint-nya pun ditutup.
+    // Pemicu manual hanya masuk akal di luar produksi; endpointnya pun tertutup.
     showManualIngest: process.env.NODE_ENV !== 'production',
   }
 }
 
-function StatCard({
-  tone,
-  icon,
-  title,
-  value,
-  meta,
-}: {
-  tone: 'blue' | 'cyan' | 'green' | 'amber'
-  icon: string
-  title: string
-  value: string
-  meta: string
-}) {
-  return (
-    <div className="card stat-card">
-      <div className={`stat-icon ${tone}`}>{icon}</div>
-      <div className="card-title">{title}</div>
-      <div className="card-value">{value}</div>
-      <div className="card-meta">{meta}</div>
-    </div>
-  )
-}
-
 type AdapterStatus = Awaited<ReturnType<typeof listAdapterHealth>>[number]['status']
 
-function adapterDot(statuses: AdapterStatus[]): string {
-  if (statuses.length === 0) return 'degraded'
-  if (statuses.includes('dead')) return 'down'
+function adapterState(statuses: AdapterStatus[]): State {
+  if (statuses.length === 0) return 'unknown'
+  if (statuses.includes('dead')) return 'halted'
   if (statuses.includes('degraded')) return 'degraded'
-  return 'healthy'
+  return 'ok'
 }
 
-function describeAdapters(statuses: AdapterStatus[]): string {
-  if (statuses.length === 0) return 'Adapter belum pernah dipanggil'
-  const unhealthy = statuses.filter((s) => s !== 'healthy').length
-  if (unhealthy === 0) return `${statuses.length} adapter sehat`
-  return `${unhealthy} dari ${statuses.length} adapter bermasalah`
+function adapterSummary(statuses: AdapterStatus[]): string {
+  if (statuses.length === 0) return 'adapter belum pernah dipanggil'
+  const bad = statuses.filter((s) => s !== 'healthy').length
+  return bad === 0
+    ? `${statuses.length} adapter sehat`
+    : `${bad} dari ${statuses.length} adapter bermasalah`
 }
 
-function freshnessDot(freshness: DashboardStats['freshness']): string {
-  if (freshness === 'fresh') return 'healthy'
-  if (freshness === 'stale') return 'down'
-  return 'degraded'
+function freshnessState(freshness: DashboardStats['freshness']): State {
+  if (freshness === 'fresh') return 'ok'
+  if (freshness === 'stale') return 'halted'
+  return 'unknown'
+}
+
+/**
+ * Data basi diberi nama terang-terangan.
+ *
+ * Pembaca yang tidak tahu datanya mati akan mengambil keputusan berdasarkan
+ * angka mati, dan itu kegagalan produk, bukan sekadar kegagalan teknis.
+ */
+function freshnessLabel(freshness: DashboardStats['freshness']): string {
+  if (freshness === 'fresh') return 'data segar'
+  if (freshness === 'stale') return `basi, lewat ${STALE_AFTER_MINUTES / 60} jam`
+  return 'belum ada data'
 }
 
 function isoDaysAgo(days: number): string {
