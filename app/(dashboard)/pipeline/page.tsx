@@ -12,6 +12,7 @@
 import {
   IconDatabase,
   IconFlask,
+  IconGauge,
   IconLayers,
   IconPlug,
   IconQueue,
@@ -20,12 +21,14 @@ import {
 import { Blank, DatabaseNotice, Lamp, Tag, type State } from '@/components/ui'
 import {
   getFeatureCoverage,
+  getScoreCoverage,
   listAdapterHealth,
   listQuarantined,
   listRecentJobRuns,
   listSchedules,
 } from '@/lib/db/queries'
 import { FEATURE_SET_VERSION } from '@/lib/features/compute'
+import { MODEL_VERSION } from '@/lib/scoring/weights'
 import { isDue, localSlot } from '@/lib/jobs/due'
 import { isQStashConfigured } from '@/lib/queue/qstash'
 import { cache } from '@/lib/cache/redis'
@@ -44,18 +47,20 @@ export default async function PipelinePage() {
     health: Awaited<ReturnType<typeof listAdapterHealth>>
     quarantined: Awaited<ReturnType<typeof listQuarantined>>
     features: Awaited<ReturnType<typeof getFeatureCoverage>>
+    scores: Awaited<ReturnType<typeof getScoreCoverage>>
   } | null = null
   let error: string | null = null
 
   try {
-    const [schedules, runs, health, quarantined, features] = await Promise.all([
+    const [schedules, runs, health, quarantined, features, scores] = await Promise.all([
       listSchedules(),
       listRecentJobRuns(15),
       listAdapterHealth(),
       listQuarantined(10),
       getFeatureCoverage(),
+      getScoreCoverage(),
     ])
-    data = { schedules, runs, health, quarantined, features }
+    data = { schedules, runs, health, quarantined, features, scores }
   } catch (err) {
     error = err instanceof Error ? err.message : String(err)
   }
@@ -227,6 +232,43 @@ export default async function PipelinePage() {
                           <Tag tone="ok">versi berjalan</Tag>
                         ) : (
                           <Tag>disimpan untuk perbandingan</Tag>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </Panel>
+
+          <Panel icon={<IconGauge size={14} />} title="Skor terhitung" meta={`versi berjalan ${MODEL_VERSION}`}>
+            {data.scores.length === 0 ? (
+              <Blank icon={<IconGauge size={22} />} title="Belum ada skor terhitung">
+                Job <code>score-crypto</code> belum pernah berjalan, atau fiturnya belum ada.
+              </Blank>
+            ) : (
+              <table className="grid">
+                <thead>
+                  <tr>
+                    <th>Versi model</th>
+                    <th className="num">Baris</th>
+                    <th className="num">Instrumen</th>
+                    <th>Tanggal terakhir</th>
+                    <th>Keterangan</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.scores.map((s) => (
+                    <tr key={s.modelVersion}>
+                      <td className="key">{s.modelVersion}</td>
+                      <td className="num">{s.rows.toLocaleString('id-ID')}</td>
+                      <td className="num">{s.instruments}</td>
+                      <td className="dim">{s.latestDate ?? '—'}</td>
+                      <td>
+                        {s.modelVersion === MODEL_VERSION ? (
+                          <Tag tone="warn">belum dikalibrasi</Tag>
+                        ) : (
+                          <Tag>versi lama</Tag>
                         )}
                       </td>
                     </tr>

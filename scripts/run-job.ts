@@ -14,6 +14,7 @@ import './load-env'
 import { listInstruments } from '../lib/db/queries'
 import { runIngestJob } from '../lib/jobs/ingest'
 import { runFeatureJob } from '../lib/features/job'
+import { runScoreJob } from '../lib/scoring/job'
 import type { MarketCode } from '../lib/db/schema'
 
 const JOBS = [
@@ -25,14 +26,18 @@ const JOBS = [
   'compute-features-idx',
   'compute-features-us',
   'compute-features-global',
+  'score-crypto',
+  'score-idx',
+  'score-us',
+  'score-global',
 ] as const
 
 type JobName = (typeof JOBS)[number]
 
 function marketOf(job: string): MarketCode {
-  if (job.includes('-idx')) return 'IDX'
+  if (job.includes('idx')) return 'IDX'
   if (job.includes('-us')) return 'US'
-  if (job.includes('-global')) return 'GLOBAL'
+  if (job.includes('global')) return 'GLOBAL'
   return 'CRYPTO'
 }
 
@@ -64,7 +69,13 @@ async function main(): Promise<void> {
 
   const started = Date.now()
 
-  if (job.startsWith('ingest-')) {
+  if (job.startsWith('score-')) {
+    const result = await runScoreJob({ symbols, market })
+    console.log(`  ${result.itemsProcessed} berhasil, ${result.itemsFailed} gagal`)
+    console.log(`  ${result.scoresWritten} baris skor ditulis`)
+    for (const s of result.skipped) console.log(`  - ${s.symbol}: ${s.reason}`)
+    for (const e of result.errors) console.log(`  ! ${e}`)
+  } else if (job.startsWith('ingest-')) {
     const result = await runIngestJob({
       symbols,
       market,

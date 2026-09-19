@@ -28,10 +28,13 @@ import {
   getDashboardStats,
   listAdapterHealth,
   listInstrumentQuotes,
+  listLatestScores,
   STALE_AFTER_MINUTES,
   type DashboardStats,
 } from '@/lib/db/queries'
 import { ASSET_CLASSES } from '@/lib/db/schema'
+import { MODEL_VERSION } from '@/lib/scoring/weights'
+import type { HorizonView } from '@/components/score-panel'
 import { isQStashConfigured } from '@/lib/queue/qstash'
 import { cache } from '@/lib/cache/redis'
 
@@ -138,6 +141,7 @@ export default async function OverviewPage() {
 
           <InstrumentExplorer
             instruments={data.instruments}
+            scores={data.scores}
             tabs={data.tabs}
             initialInstrumentId={data.initialInstrumentId}
             initialCandles={data.initialCandles}
@@ -194,11 +198,31 @@ function Readout({
 }
 
 async function load() {
-  const [stats, health, instruments] = await Promise.all([
+  const [stats, health, instruments, scores] = await Promise.all([
     getDashboardStats(),
     listAdapterHealth(),
     listInstrumentQuotes(),
+    listLatestScores(MODEL_VERSION),
   ])
+
+  // Skor dikelompokkan per instrumen dan diurutkan pendek, menengah, panjang —
+  // urutan jangka waktu, bukan urutan abjad yang kebetulan berbeda.
+  const order = { pendek: 0, menengah: 1, panjang: 2 }
+  const scoresByInstrument: Record<number, { asOf: string; horizons: HorizonView[] }> = {}
+
+  for (const row of scores) {
+    const bucket = (scoresByInstrument[row.instrumentId] ??= { asOf: row.date, horizons: [] })
+    bucket.horizons.push({
+      horizon: row.horizon,
+      score: row.score,
+      confidence: row.confidence,
+      missingWeight: row.missingWeight,
+      drivers: row.drivers as HorizonView['drivers'],
+    })
+  }
+  for (const bucket of Object.values(scoresByInstrument)) {
+    bucket.horizons.sort((a, b) => order[a.horizon] - order[b.horizon])
+  }
 
   // Instrumen pembuka: Bitcoin kalau ada, selainnya yang riwayatnya paling
   // panjang. Bukan yang pertama menurut abjad — grafik kosong sebagai kesan
@@ -233,6 +257,7 @@ async function load() {
     adapterState: adapterState(health.map((h) => h.status)),
     adapterSummary: adapterSummary(health.map((h) => h.status)),
     instruments,
+    scores: scoresByInstrument,
     tabs: ASSET_CLASSES.filter((c) => present.has(c.id)),
     initialInstrumentId,
     initialCandles,

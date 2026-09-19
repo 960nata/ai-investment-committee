@@ -22,6 +22,7 @@ import { verifyQStashRequest, type JobPayload } from '@/lib/queue/qstash'
 import { badRequest, failure, notFound, unauthorized, NO_STORE } from '@/lib/http/errors'
 import { runIngestJob } from '@/lib/jobs/ingest'
 import { runFeatureJob } from '@/lib/features/job'
+import { runScoreJob } from '@/lib/scoring/job'
 import { runCommittee } from '@/lib/agents/committee'
 
 export const dynamic = 'force-dynamic'
@@ -36,6 +37,10 @@ const HANDLERS: Record<string, (payload: JobPayload) => Promise<BatchResult>> = 
   'compute-features-idx': computeFeaturesBatch,
   'compute-features-us': computeFeaturesBatch,
   'compute-features-global': computeFeaturesBatch,
+  'score-crypto': scoreBatch,
+  'score-idx': scoreBatch,
+  'score-us': scoreBatch,
+  'score-global': scoreBatch,
   'komite-review': reviewCommittee,
 }
 
@@ -256,4 +261,28 @@ async function reviewCommittee(payload: JobPayload): Promise<BatchResult> {
 
   result.extra = { verdicts }
   return result
+}
+
+// ---------------------------------------------------------------------------
+// Perhitungan skor
+// ---------------------------------------------------------------------------
+
+/**
+ * Hitung skor tiga horizon untuk satu batch instrumen.
+ *
+ * Dipisah dari perhitungan fitur supaya bobot bisa diubah dan skornya dihitung
+ * ulang tanpa menyentuh fitur sama sekali — dan fitur tidak perlu dihitung
+ * ulang hanya karena satu bobot bergeser.
+ */
+async function scoreBatch(payload: JobPayload): Promise<BatchResult> {
+  const outcome = await runScoreJob({ symbols: payload.symbols, market: payload.market })
+
+  return {
+    itemsProcessed: outcome.itemsProcessed,
+    itemsFailed: outcome.itemsFailed,
+    candlesWritten: 0,
+    quarantined: 0,
+    errors: outcome.errors,
+    extra: { scoresWritten: outcome.scoresWritten, skipped: outcome.skipped },
+  }
 }

@@ -17,6 +17,7 @@ import { CandlestickChart, type Candle } from './candlestick-chart'
 import { RegionFlag } from './flags'
 import { IconAlert, IconCandles, IconRows } from './icons'
 import { Blank } from './ui'
+import { ScorePanel, type HorizonView } from './score-panel'
 
 export interface ExplorerInstrument {
   id: number
@@ -34,12 +35,13 @@ export interface ExplorerInstrument {
 
 interface Props {
   instruments: ExplorerInstrument[]
+  scores: Record<number, { asOf: string; horizons: HorizonView[] }>
   tabs: { id: string; label: string }[]
   initialInstrumentId: number | null
   initialCandles: Candle[]
 }
 
-export function InstrumentExplorer({ instruments, tabs, initialInstrumentId, initialCandles }: Props) {
+export function InstrumentExplorer({ instruments, scores, tabs, initialInstrumentId, initialCandles }: Props) {
   const initial = instruments.find((i) => i.id === initialInstrumentId)
   const [tab, setTab] = useState(initial?.assetClass ?? tabs[0]?.id ?? 'crypto')
   const [selectedId, setSelectedId] = useState(initialInstrumentId)
@@ -149,6 +151,11 @@ export function InstrumentExplorer({ instruments, tabs, initialInstrumentId, ini
           )}
         </div>
       </section>
+
+      <ScorePanel
+        horizons={selected ? (scores[selected.id]?.horizons ?? []) : []}
+        asOf={selected ? (scores[selected.id]?.asOf ?? null) : null}
+      />
 
       <section className="panel">
         <div className="panel-head">

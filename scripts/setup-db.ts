@@ -122,9 +122,28 @@ async function main(): Promise<void> {
       line('tabel sudah lengkap, menjalankan migrasi yang belum terpasang')
       await migrate(drizzle(sql), { migrationsFolder: FOLDER })
       line('selesai')
+    } else if (journal().some((e) => !applied.has(migrationHash(e.tag)))) {
+      // Ada tabel yang belum berdiri, tetapi juga ada migrasi yang belum
+      // dijalankan. Itu keadaan normal setelah menarik perubahan skema, bukan
+      // kerusakan: jalankan migrasinya, lalu periksa ulang hasilnya.
+      line('ada migrasi yang belum dijalankan, menjalankannya sekarang')
+      await migrate(drizzle(sql), { migrationsFolder: FOLDER })
+
+      const after = await sql<{ name: string }[]>`
+        select tablename as name from pg_tables where schemaname = 'public'
+      `
+      const stillMissing = expected.filter((t) => !new Set(after.map((r) => r.name)).has(t))
+
+      if (stillMissing.length > 0) {
+        throw new Error(
+          `Migrasi selesai tetapi tabel ini tetap belum ada: ${stillMissing.join(', ')}`,
+        )
+      }
+      line('selesai, seluruh tabel berdiri')
     } else {
-      // Sebagian ada, sebagian tidak. Skrip ini tidak menebak dan tidak menghapus.
-      line('skema terpasang sebagian, dan itu tidak bisa diperbaiki tanpa keputusan.')
+      // Ada tabel hilang tanpa satu pun migrasi tertunda yang menjelaskannya.
+      // Skrip ini tidak menebak dan tidak menghapus.
+      line('skema terpasang sebagian dan tidak ada migrasi tertunda yang menjelaskannya.')
       line('')
       line('Kalau belum ada data yang sayang hilang, cara tercepat:')
       line('  npx drizzle-kit push')

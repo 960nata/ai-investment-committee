@@ -347,3 +347,57 @@ export const featureDaily = pgTable(
 )
 
 export type FeatureRowRecord = typeof featureDaily.$inferSelect
+
+// ---------------------------------------------------------------------------
+// Turunan: skor harian
+// ---------------------------------------------------------------------------
+
+export const horizonEnum = pgEnum('horizon', ['pendek', 'menengah', 'panjang'])
+export const confidenceEnum = pgEnum('confidence', [
+  'tinggi',
+  'sedang',
+  'rendah',
+  'tidak memadai',
+])
+
+/**
+ * Skor per instrumen per horizon per hari.
+ *
+ * `probability` sengaja boleh null, dan untuk sekarang selalu null. Skor mentah
+ * baru berhak jadi persen setelah dikalibrasi lewat regresi logistik pada hasil
+ * historis; sebelum itu ia hanya peringkat. Menyimpan 0,5 sebagai pengganti
+ * akan membuat "belum tahu" tidak bisa dibedakan dari "kemungkinannya seimbang".
+ *
+ * `model_version` dan `feature_set_version` ikut jadi bagian kunci utama. Begitu
+ * bobot atau rumus berubah, baris lama tetap mencerminkan model lamanya, dan
+ * perbandingan performa antar versi tetap punya arti.
+ */
+export const scoreDaily = pgTable(
+  'score_daily',
+  {
+    instrumentId: integer('instrument_id')
+      .notNull()
+      .references(() => instrument.id, { onDelete: 'cascade' }),
+    date: date('date').notNull(),
+    horizon: horizonEnum('horizon').notNull(),
+    modelVersion: varchar('model_version', { length: 32 }).notNull(),
+    featureSetVersion: varchar('feature_set_version', { length: 32 }).notNull(),
+    /** −10 sampai +10. */
+    score: numeric('score', { precision: 6, scale: 3 }).notNull(),
+    probability: numeric('probability', { precision: 5, scale: 4 }),
+    confidence: confidenceEnum('confidence').notNull(),
+    confidenceScore: numeric('confidence_score', { precision: 5, scale: 4 }).notNull(),
+    /** Porsi bobot yang tidak punya data sama sekali, 0..1. */
+    missingWeight: numeric('missing_weight', { precision: 5, scale: 4 }).notNull(),
+    /** Pendorong pendukung dan penentang, beserta sumbangan masing-masing. */
+    drivers: jsonb('drivers').$type<Record<string, unknown>>().notNull(),
+    groups: jsonb('groups').$type<Record<string, unknown>[]>().notNull(),
+    computedAt: timestamp('computed_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.instrumentId, t.date, t.horizon, t.modelVersion] }),
+    index('score_daily_date_horizon_idx').on(t.date, t.horizon),
+  ],
+)
+
+export type ScoreRow = typeof scoreDaily.$inferSelect

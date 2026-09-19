@@ -38,15 +38,19 @@ const SCHEDULES: ScheduleSeed[] = [
   { jobName: 'ingest-crypto-daily', hoursOfDay: EVERY_HOUR, timezone: 'UTC', tradingDaysOnly: false, market: 'CRYPTO', enabled: true, note: 'tiap jam, tujuh hari seminggu' },
   { jobName: 'compute-features-crypto', hoursOfDay: [1], timezone: 'UTC', tradingDaysOnly: false, market: 'CRYPTO', enabled: true, note: '01.00 UTC, setelah candle harian tertutup' },
   // 17.00 WIB, setelah sesi IDX tutup dan data penutupnya terbit.
+  { jobName: 'score-crypto', hoursOfDay: [2], timezone: 'UTC', tradingDaysOnly: false, market: 'CRYPTO', enabled: true, note: '02.00 UTC, setelah fitur selesai' },
   { jobName: 'ingest-idx-daily', hoursOfDay: [17], timezone: 'Asia/Jakarta', tradingDaysOnly: true, market: 'IDX', enabled: true, note: '17.00 WIB, hari bursa' },
   { jobName: 'compute-features-idx', hoursOfDay: [18], timezone: 'Asia/Jakarta', tradingDaysOnly: true, market: 'IDX', enabled: true, note: '18.00 WIB, hari bursa' },
   // 05.00 WIB, beberapa jam setelah bursa New York tutup.
+  { jobName: 'score-idx', hoursOfDay: [19], timezone: 'Asia/Jakarta', tradingDaysOnly: true, market: 'IDX', enabled: true, note: '19.00 WIB, setelah fitur selesai' },
   { jobName: 'ingest-us-daily', hoursOfDay: [5], timezone: 'Asia/Jakarta', tradingDaysOnly: true, market: 'US', enabled: true, note: '05.00 WIB, hari bursa' },
   { jobName: 'compute-features-us', hoursOfDay: [6], timezone: 'Asia/Jakarta', tradingDaysOnly: true, market: 'US', enabled: true, note: '06.00 WIB, hari bursa' },
   // Indeks dunia dan berjangka tutup pada jam berbeda-beda; 07.00 WIB sudah
   // lewat penutupan Amerika sekaligus sebelum Asia membuka hari berikutnya.
+  { jobName: 'score-us', hoursOfDay: [7], timezone: 'Asia/Jakarta', tradingDaysOnly: true, market: 'US', enabled: true, note: '07.00 WIB, setelah fitur selesai' },
   { jobName: 'ingest-global-daily', hoursOfDay: [7], timezone: 'Asia/Jakarta', tradingDaysOnly: true, market: 'GLOBAL', enabled: true, note: '07.00 WIB, indeks dunia dan berjangka' },
   { jobName: 'compute-features-global', hoursOfDay: [8], timezone: 'Asia/Jakarta', tradingDaysOnly: true, market: 'GLOBAL', enabled: true, note: '08.00 WIB, hari bursa' },
+  { jobName: 'score-global', hoursOfDay: [9], timezone: 'Asia/Jakarta', tradingDaysOnly: true, market: 'GLOBAL', enabled: true, note: '09.00 WIB, setelah fitur selesai' },
 ]
 
 async function seedSchedules(): Promise<void> {

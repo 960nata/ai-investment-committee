@@ -23,6 +23,7 @@ import {
   instrument,
   jobRun,
   jobSchedule,
+  scoreDaily,
   symbolAlias,
   toDbMarket,
   type AgentVerdict,
@@ -912,4 +913,140 @@ export async function listInstrumentQuotes(): Promise<InstrumentQuote[]> {
       candleCount: Number(r.candle_count),
     }
   })
+}
+
+// ---------------------------------------------------------------------------
+// Skor harian
+// ---------------------------------------------------------------------------
+
+export interface ScoreInputRow {
+  instrumentId: number
+  date: string
+  horizon: 'pendek' | 'menengah' | 'panjang'
+  modelVersion: string
+  featureSetVersion: string
+  score: number
+  probability: number | null
+  confidence: 'tinggi' | 'sedang' | 'rendah' | 'tidak memadai'
+  confidenceScore: number
+  missingWeight: number
+  drivers: Record<string, unknown>
+  groups: Record<string, unknown>[]
+}
+
+export async function upsertScores(rows: ScoreInputRow[], chunkSize = 300): Promise<number> {
+  if (rows.length === 0) return 0
+
+  let written = 0
+  for (let i = 0; i < rows.length; i += chunkSize) {
+    const slice = rows.slice(i, i + chunkSize)
+    const inserted = await db
+      .insert(scoreDaily)
+      .values(
+        slice.map((r) => ({
+          instrumentId: r.instrumentId,
+          date: r.date,
+          horizon: r.horizon,
+          modelVersion: r.modelVersion,
+          featureSetVersion: r.featureSetVersion,
+          score: String(r.score),
+          probability: r.probability === null ? null : String(r.probability),
+          confidence: r.confidence,
+          confidenceScore: String(r.confidenceScore),
+          missingWeight: String(r.missingWeight),
+          drivers: r.drivers,
+          groups: r.groups,
+          computedAt: new Date(),
+        })),
+      )
+      .onConflictDoUpdate({
+        target: [scoreDaily.instrumentId, scoreDaily.date, scoreDaily.horizon, scoreDaily.modelVersion],
+        set: {
+          featureSetVersion: sql`excluded.feature_set_version`,
+          score: sql`excluded.score`,
+          probability: sql`excluded.probability`,
+          confidence: sql`excluded.confidence`,
+          confidenceScore: sql`excluded.confidence_score`,
+          missingWeight: sql`excluded.missing_weight`,
+          drivers: sql`excluded.drivers`,
+          groups: sql`excluded.groups`,
+          computedAt: sql`excluded.computed_at`,
+        },
+      })
+      .returning({ date: scoreDaily.date })
+
+    written += inserted.length
+  }
+  return written
+}
+
+export interface LatestScore {
+  instrumentId: number
+  horizon: 'pendek' | 'menengah' | 'panjang'
+  date: string
+  score: number
+  probability: number | null
+  confidence: 'tinggi' | 'sedang' | 'rendah' | 'tidak memadai'
+  missingWeight: number
+  drivers: Record<string, unknown>
+  groups: Record<string, unknown>[]
+}
+
+/**
+ * Skor terbaru tiap instrumen untuk satu versi model, seluruh horizon sekaligus.
+ *
+ * Satu kueri dengan window function, bukan satu kueri per instrumen. Tujuh
+ * puluh instrumen dikali tiga horizon berarti dua ratus sepuluh perjalanan
+ * bolak-balik kalau ditulis dengan pola kueri-per-baris.
+ */
+export async function listLatestScores(modelVersion: string): Promise<LatestScore[]> {
+  const rows = await db.execute<{
+    instrument_id: number
+    horizon: 'pendek' | 'menengah' | 'panjang'
+    date: string
+    score: string
+    probability: string | null
+    confidence: 'tinggi' | 'sedang' | 'rendah' | 'tidak memadai'
+    missing_weight: string
+    drivers: Record<string, unknown>
+    groups: Record<string, unknown>[]
+  }>(sql`
+    select instrument_id, horizon, date::text, score, probability, confidence,
+           missing_weight, drivers, groups
+    from (
+      select *, row_number() over (
+        partition by instrument_id, horizon order by date desc
+      ) as rn
+      from score_daily
+      where model_version = ${modelVersion}
+    ) s
+    where rn = 1
+  `)
+
+  return rows.map((r) => ({
+    instrumentId: r.instrument_id,
+    horizon: r.horizon,
+    date: r.date,
+    score: Number(r.score),
+    probability: r.probability === null ? null : Number(r.probability),
+    confidence: r.confidence,
+    missingWeight: Number(r.missing_weight),
+    drivers: r.drivers,
+    groups: r.groups,
+  }))
+}
+
+export async function getScoreCoverage(): Promise<
+  { modelVersion: string; rows: number; instruments: number; latestDate: string | null }[]
+> {
+  return db
+    .select({
+      modelVersion: scoreDaily.modelVersion,
+      rows: sql<number>`count(*)::int`,
+      instruments: sql<number>`count(distinct ${scoreDaily.instrumentId})::int`,
+      latestDate: sql<string | null>`max(${scoreDaily.date})`,
+    })
+    .from(scoreDaily)
+    .groupBy(scoreDaily.modelVersion)
+    .orderBy(scoreDaily.modelVersion)
 }
