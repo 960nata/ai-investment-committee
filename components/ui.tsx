@@ -92,9 +92,13 @@ export function DatabaseNotice({ detail }: { detail: string }) {
       <div>
         <div className="notice-title">Basis data tidak terjangkau</div>
         <p className="notice-body">
-          Isi <code>DATABASE_URL</code> di <code>.env.local</code>, lalu siapkan tabelnya
-          dengan <code>npm run db:migrate</code> dan isi jadwal awalnya dengan{' '}
-          <code>npm run db:seed</code>.
+          Jalankan <code>npm run db:setup</code>. Perintah itu memeriksa sambungan,
+          membuat tabel yang belum ada, menyelaraskan jurnal migrasi, lalu mengisi
+          jadwal dan instrumen awal.
+        </p>
+        <p className="notice-body" style={{ color: 'var(--ink-mute)' }}>
+          Kalau sambungannya sendiri yang gagal, isi <code>DATABASE_URL</code> dan{' '}
+          <code>DIRECT_URL</code> di <code>.env</code> lebih dulu.
         </p>
         {showDetail && (
           <p className="notice-body" style={{ color: 'var(--ink-mute)' }}>

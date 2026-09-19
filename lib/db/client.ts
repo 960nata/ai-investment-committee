@@ -22,7 +22,7 @@ declare global {
 function connect(): Database {
   const connectionString = process.env.DATABASE_URL
   if (!connectionString) {
-    throw new Error('DATABASE_URL belum diset. Salin .env.example ke .env.local.')
+    throw new Error('DATABASE_URL belum diset. Salin .env.example ke .env.local atau .env.')
   }
 
   // Di serverless tiap invocation bisa memakai ulang modul yang sama; klien

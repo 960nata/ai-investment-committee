@@ -69,11 +69,14 @@ menyerahkannya ke QStash yang memanggil worker satu per satu.
 
 ```bash
 npm install
-cp .env.example .env.local   # isi DATABASE_URL minimal
-npm run db:migrate
-npm run db:seed
+cp .env.example .env    # isi DATABASE_URL dan DIRECT_URL
+npm run db:setup        # cek sambungan, buat tabel, isi jadwal awal
 npm run dev
 ```
+
+`db:setup` menjalankan empat langkah berurutan dan menampilkan hasil tiap
+langkah: memeriksa kedua URL, membuat tabel yang belum ada, menyelaraskan
+jurnal migrasi, lalu mengisi jadwal job dan daftar instrumen.
 
 Yang benar-benar wajib hanya `DATABASE_URL`. Tanpa Redis aplikasi tetap jalan
 tanpa cache; tanpa QStash, dispatcher memanggil worker langsung, yang cukup untuk
@@ -84,6 +87,8 @@ mesin sendiri tetapi tidak untuk produksi karena tidak ada retry di jalur itu.
 | `npm run dev` | Server pengembangan |
 | `npm test` | Uji engine fitur |
 | `npm run typecheck` | Periksa tipe |
+| `npm run db:setup` | Siapkan basis data dari nol, satu perintah |
+| `npm run db:check` | Uji kedua URL dan daftar tabel yang sudah ada |
 | `npm run db:generate` | Buat migrasi dari perubahan skema |
 | `npm run db:migrate` | Terapkan migrasi |
 | `npm run db:seed` | Isi jadwal job dan instrumen awal |

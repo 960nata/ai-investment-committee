@@ -11,6 +11,7 @@
     "test": "tsx scripts/test-features.ts && tsx scripts/test-security.ts",
     "test:features": "tsx scripts/test-features.ts",
     "test:security": "tsx scripts/test-security.ts",
+    "db:setup": "npm run db:check && drizzle-kit push && tsx scripts/baseline-migrations.ts && tsx scripts/seed.ts",
     "db:check": "tsx scripts/check-db.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",

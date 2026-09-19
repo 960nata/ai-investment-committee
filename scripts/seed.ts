@@ -160,7 +160,7 @@ async function seedInstruments(): Promise<number> {
 
 async function main(): Promise<void> {
   if (!process.env.DATABASE_URL) {
-    throw new Error('DATABASE_URL belum diset. Salin .env.example ke .env.local.')
+    throw new Error('DATABASE_URL belum diset. Salin .env.example ke .env.local atau .env.')
   }
 
   await seedSchedules()
