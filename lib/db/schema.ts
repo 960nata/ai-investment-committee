@@ -474,3 +474,36 @@ export const fundamentalQuarterly = pgTable(
 )
 
 export type FundamentalRow = typeof fundamentalQuarterly.$inferSelect
+
+// ---------------------------------------------------------------------------
+// Backtest
+// ---------------------------------------------------------------------------
+
+/**
+ * Satu kali jalan backtest beserta hasilnya.
+ *
+ * Disimpan, bukan dihitung ulang saat halaman dibuka. Backtest memakan menit,
+ * dan angka yang muncul berbeda tiap kali halaman dimuat tidak bisa dipakai
+ * siapa pun untuk mengambil keputusan.
+ *
+ * `trials` mencatat berapa kali percobaan sudah dilakukan. Menguji lima ratus
+ * variasi lalu menampilkan yang terbaik adalah penambangan data, dan satu-satunya
+ * cara menahannya adalah dengan menghitung percobaannya secara terbuka.
+ */
+export const backtestRun = pgTable(
+  'backtest_run',
+  {
+    id: serial('id').primaryKey(),
+    runAt: timestamp('run_at', { withTimezone: true }).notNull().defaultNow(),
+    modelVersion: varchar('model_version', { length: 32 }).notNull(),
+    featureSetVersion: varchar('feature_set_version', { length: 32 }).notNull(),
+    market: marketEnum('market'),
+    config: jsonb('config').$type<Record<string, unknown>>().notNull(),
+    /** Metrik per horizon, beserta IC tiap fitur. */
+    metrics: jsonb('metrics').$type<Record<string, unknown>>().notNull(),
+    trials: integer('trials').notNull().default(1),
+  },
+  (t) => [index('backtest_run_at_idx').on(t.runAt)],
+)
+
+export type BacktestRunRow = typeof backtestRun.$inferSelect

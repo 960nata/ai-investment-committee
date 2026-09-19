@@ -16,6 +16,7 @@ import { useMemo, useState, useTransition } from 'react'
 import { CandlestickChart, type Candle } from './candlestick-chart'
 import { RegionFlag } from './flags'
 import { IconAlert, IconCandles, IconRows } from './icons'
+import { AssetIcon } from './asset-icons'
 import { Blank } from './ui'
 import { ScorePanel, type HorizonView } from './score-panel'
 
@@ -181,6 +182,7 @@ export function InstrumentExplorer({ instruments, scores, tabs, initialInstrumen
                 onClick={() => load(instrument)}
               >
                 <span className="card-pick-head">
+                  <AssetIcon symbol={instrument.symbol} size={16} />
                   <RegionFlag region={instrument.region} size={13} />
                   <span className="card-pick-symbol">{display(instrument.symbol)}</span>
                   <Change value={instrument.changePct} />

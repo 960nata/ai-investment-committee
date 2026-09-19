@@ -43,6 +43,13 @@
       "when": 1789811955397,
       "tag": "0005_bent_leader",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789835052248,
+      "tag": "0006_lethal_firelord",
+      "breakpoints": true
     }
   ]
 }

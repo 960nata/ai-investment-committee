@@ -15,6 +15,7 @@ import { db } from './client'
 import {
   agentMessage,
   agentSession,
+  backtestRun,
   candleDaily,
   dataSourceHealth,
   featureDaily,
@@ -1182,4 +1183,32 @@ export async function getFundamentalCoverage(): Promise<
     })
     .from(fundamentalQuarterly)
     .groupBy(fundamentalQuarterly.sourceId)
+}
+
+// ---------------------------------------------------------------------------
+// Backtest
+// ---------------------------------------------------------------------------
+
+export async function saveBacktestRun(data: {
+  modelVersion: string
+  featureSetVersion: string
+  market: MarketCode | null
+  config: Record<string, unknown>
+  metrics: Record<string, unknown>
+}): Promise<number> {
+  const rows = await db
+    .insert(backtestRun)
+    .values({
+      modelVersion: data.modelVersion,
+      featureSetVersion: data.featureSetVersion,
+      market: data.market ? toDbMarket(data.market) : null,
+      config: data.config,
+      metrics: data.metrics,
+    })
+    .returning({ id: backtestRun.id })
+  return rows[0].id
+}
+
+export async function listBacktestRuns(limit = 10) {
+  return db.select().from(backtestRun).orderBy(desc(backtestRun.runAt)).limit(limit)
 }
