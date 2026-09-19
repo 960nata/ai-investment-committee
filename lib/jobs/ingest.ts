@@ -19,7 +19,7 @@ import {
 import {
   getInstrumentBySymbol,
   getLatestCandle,
-  quarantineRow,
+  quarantineRows,
   upsertCandles,
   upsertInstrument,
   upsertSymbolAlias,
@@ -111,20 +111,26 @@ export async function runIngestJob(input: IngestInput): Promise<IngestResult> {
 
       await upsertSymbolAlias({ instrumentId: instrument.id, sourceId, alias: symbol })
 
-      let previousClose = latest ? Number(latest.close) : undefined
+      // Harga pembanding hanya diambil dari candle tersimpan bila deret yang baru
+      // ditarik memang menyambung sesudahnya. Saat mengisi riwayat ke belakang,
+      // candle terbaru bukan pendahulu candle tertua — memakainya membuat setiap
+      // baris terlihat melompat puluhan persen, lalu seluruh riwayat masuk
+      // karantina satu per satu.
+      const continues = latest !== null && candles[0].date > new Date(`${latest.date}T00:00:00Z`)
+      let previousClose = continues && latest ? Number(latest.close) : undefined
+
       const valid: CandleInput[] = []
+      const rejected: { candle: Candle; reason: string }[] = []
 
       for (const candle of candles) {
         const check = validateCandle(candle, { previousClose, maxJump })
 
         if (!check.valid) {
-          await quarantineRow({
-            instrumentId: instrument.id,
-            sourceId,
-            payload: { symbol, ...serialiseCandle(candle) },
-            reason: check.reason ?? 'tidak diketahui',
-          })
-          result.quarantined++
+          rejected.push({ candle, reason: check.reason ?? 'tidak diketahui' })
+          // Rantai perbandingan tetap berjalan meski satu baris ditolak.
+          // Tanpa ini, satu aksi korporasi membuat seluruh sisa deret ikut
+          // tertolak karena dibandingkan dengan harga sebelum aksi itu.
+          previousClose = candle.close
           continue
         }
 
@@ -143,6 +149,21 @@ export async function runIngestJob(input: IngestInput): Promise<IngestResult> {
           sourceId,
         })
         previousClose = candle.close
+      }
+
+      // Baris tertolak ditulis sekali jalan, bukan satu perjalanan per baris.
+      // Mengisi sebelas tahun riwayat bisa menolak ratusan baris, dan satu
+      // perjalanan masing-masing mengubah pekerjaan hitungan detik jadi menit.
+      if (rejected.length > 0) {
+        await quarantineRows(
+          rejected.map((r) => ({
+            instrumentId: instrument.id,
+            sourceId,
+            payload: { symbol, ...serialiseCandle(r.candle) },
+            reason: r.reason,
+          })),
+        )
+        result.quarantined += rejected.length
       }
 
       result.candlesWritten += await upsertCandles(valid)

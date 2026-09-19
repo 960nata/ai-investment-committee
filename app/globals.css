@@ -1050,6 +1050,109 @@ button {
   border-top: 1px solid var(--line);
 }
 
+/* ---------------------------------------------------------------------------
+   Baris penyaring — pencarian dan wilayah
+   --------------------------------------------------------------------------- */
+
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--line);
+}
+
+.search {
+  flex: 1 1 200px;
+  min-width: 0;
+  padding: 7px var(--space-3);
+  background: var(--surface-0);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: var(--t-small);
+}
+
+.search::placeholder {
+  color: var(--ink-faint);
+}
+
+.search:focus-visible {
+  outline: none;
+  border-color: var(--line-strong);
+  box-shadow: inset 0 0 0 1px var(--signal-dim);
+}
+
+/* Tombol silang bawaan Safari/Chrome memakai ikon terang yang menonjol di latar
+   gelap; bentuknya tidak bisa diwarnai, jadi dimatikan dan pengosongan
+   diserahkan ke Escape serta seleksi teks biasa. */
+.search::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.segmented {
+  display: inline-flex;
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.seg {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px var(--space-3);
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--line);
+  color: var(--ink-mute);
+  font-family: var(--mono);
+  font-size: var(--t-small);
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 120ms ease, background 120ms ease;
+}
+
+.seg:last-child {
+  border-right: none;
+}
+
+.seg:hover {
+  color: var(--ink);
+  background: var(--surface-2);
+}
+
+.seg[aria-pressed='true'] {
+  background: var(--surface-3);
+  color: var(--ink);
+}
+
+.seg-count {
+  font-size: var(--t-micro);
+  color: var(--ink-faint);
+}
+
+.seg[aria-pressed='true'] .seg-count {
+  color: var(--ink-mute);
+}
+
+/* Tombol yang menyamar sebagai tautan di dalam kalimat. Dipakai untuk melompat
+   ke kelas aset lain dari hasil pencarian yang kosong. */
+.link-inline {
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--signal);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .card-pick {
   display: flex;
   flex-direction: column;

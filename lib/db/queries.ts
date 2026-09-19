@@ -194,9 +194,20 @@ export interface CandleInput {
  * ditimpa supaya ketahuan adaptor mana yang terakhir mengisi baris itu — tanpa
  * kolom ini, pergantian sumber diam-diam mengubah hasil backtest.
  */
-export async function upsertCandles(candles: CandleInput[]): Promise<number> {
+export async function upsertCandles(candles: CandleInput[], chunkSize = 400): Promise<number> {
   if (candles.length === 0) return 0
 
+  // Ditulis per potongan. Satu pernyataan berisi ribuan baris menghasilkan
+  // puluhan ribu parameter, dan di seberang sambungan antar-benua ia berhenti
+  // di tengah jalan tanpa pesan apa pun — terlihat persis seperti macet.
+  let written = 0
+  for (let offset = 0; offset < candles.length; offset += chunkSize) {
+    written += await insertChunk(candles.slice(offset, offset + chunkSize))
+  }
+  return written
+}
+
+async function insertChunk(candles: CandleInput[]): Promise<number> {
   const rows = await db
     .insert(candleDaily)
     .values(
@@ -1211,4 +1222,38 @@ export async function saveBacktestRun(data: {
 
 export async function listBacktestRuns(limit = 10) {
   return db.select().from(backtestRun).orderBy(desc(backtestRun.runAt)).limit(limit)
+}
+
+/**
+ * Karantina banyak baris sekali jalan.
+ *
+ * Mengisi riwayat bertahun-tahun bisa menolak ratusan baris sekaligus, dan satu
+ * perjalanan ke basis data untuk masing-masing mengubah pekerjaan hitungan detik
+ * menjadi menit — gejalanya terlihat persis seperti proses yang macet.
+ */
+export async function quarantineRows(
+  rows: {
+    instrumentId?: number | null
+    sourceId: string
+    payload: unknown
+    reason: string
+  }[],
+  chunkSize = 200,
+): Promise<number> {
+  if (rows.length === 0) return 0
+
+  let written = 0
+  for (let i = 0; i < rows.length; i += chunkSize) {
+    const slice = rows.slice(i, i + chunkSize)
+    await db.insert(ingestQuarantine).values(
+      slice.map((r) => ({
+        instrumentId: r.instrumentId ?? null,
+        sourceId: r.sourceId,
+        payload: r.payload as Record<string, unknown>,
+        reason: r.reason,
+      })),
+    )
+    written += slice.length
+  }
+  return written
 }

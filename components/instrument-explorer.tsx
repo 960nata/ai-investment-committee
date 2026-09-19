@@ -45,15 +45,54 @@ interface Props {
 export function InstrumentExplorer({ instruments, scores, tabs, initialInstrumentId, initialCandles }: Props) {
   const initial = instruments.find((i) => i.id === initialInstrumentId)
   const [tab, setTab] = useState(initial?.assetClass ?? tabs[0]?.id ?? 'crypto')
+  const [query, setQuery] = useState('')
+  const [region, setRegion] = useState<RegionFilter>('semua')
   const [selectedId, setSelectedId] = useState(initialInstrumentId)
   const [candles, setCandles] = useState(initialCandles)
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
 
-  const visible = useMemo(
+  const inTab = useMemo(
     () => instruments.filter((i) => i.assetClass === tab),
     [instruments, tab],
   )
+
+  /**
+   * Penyaring wilayah hanya muncul bila kelas ini benar-benar punya dua sisi.
+   * Crypto dan komoditi seluruhnya global; menampilkan tombol "Indonesia" yang
+   * selalu kosong di sana melatih orang untuk mengabaikan penyaringnya.
+   */
+  const regionSplit = useMemo(() => {
+    let lokal = 0
+    for (const i of inTab) if (isIndonesian(i)) lokal++
+    return { lokal, asing: inTab.length - lokal }
+  }, [inTab])
+
+  const showRegions = regionSplit.lokal > 0 && regionSplit.asing > 0
+
+  const visible = useMemo(
+    () => inTab.filter((i) => matchesRegion(i, showRegions ? region : 'semua') && matchesQuery(i, query)),
+    [inTab, region, showRegions, query],
+  )
+
+  /**
+   * Berapa yang cocok di kelas aset lain.
+   *
+   * Pencarian sengaja dibatasi pada tab yang sedang dibuka — hasil yang melompat
+   * antar kelas aset membuat grafik dan daftar bicara tentang hal berbeda. Tapi
+   * pencarian yang berakhir kosong padahal barangnya ada di sebelah adalah jalan
+   * buntu, jadi jumlahnya tetap ditunjukkan beserta jalan ke sana.
+   */
+  const elsewhere = useMemo(() => {
+    if (query.trim() === '') return []
+    return tabs
+      .filter((t) => t.id !== tab)
+      .map((t) => ({
+        ...t,
+        count: instruments.filter((i) => i.assetClass === t.id && matchesQuery(i, query)).length,
+      }))
+      .filter((t) => t.count > 0)
+  }, [instruments, tabs, tab, query])
 
   const selected = instruments.find((i) => i.id === selectedId) ?? null
 
@@ -87,7 +126,9 @@ export function InstrumentExplorer({ instruments, scores, tabs, initialInstrumen
     setTab(next)
     // Pindah tab langsung memuat instrumen pertamanya. Grafik yang menampilkan
     // aset dari tab sebelumnya adalah cara termudah salah membaca harga.
-    const first = instruments.find((i) => i.assetClass === next)
+    const first = instruments.find(
+      (i) => i.assetClass === next && matchesQuery(i, query),
+    )
     if (first && first.id !== selectedId) load(first)
   }
 
@@ -164,12 +205,74 @@ export function InstrumentExplorer({ instruments, scores, tabs, initialInstrumen
             <IconRows size={14} />
             {tabs.find((t) => t.id === tab)?.label ?? 'Instrumen'}
           </span>
-          <span className="panel-meta">{visible.length} instrumen</span>
+          <span className="panel-meta">
+            {visible.length === inTab.length
+              ? `${inTab.length} instrumen`
+              : `${visible.length} dari ${inTab.length}`}
+          </span>
+        </div>
+
+        <div className="filter-bar">
+          <input
+            type="search"
+            className="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Cari simbol, nama, atau negara"
+            aria-label="Cari instrumen"
+            autoComplete="off"
+            spellCheck={false}
+          />
+
+          {showRegions && (
+            <div className="segmented" role="group" aria-label="Wilayah">
+              {(
+                [
+                  ['semua', 'Semua', inTab.length],
+                  ['indonesia', 'Indonesia', regionSplit.lokal],
+                  ['internasional', 'Internasional', regionSplit.asing],
+                ] as [RegionFilter, string, number][]
+              ).map(([id, label, count]) => (
+                <button
+                  key={id}
+                  type="button"
+                  className="seg"
+                  aria-pressed={region === id}
+                  onClick={() => setRegion(id)}
+                >
+                  {label}
+                  <span className="seg-count">{count}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {visible.length === 0 ? (
-          <Blank icon={<IconRows size={22} />} title="Belum ada instrumen di kelas ini">
-            Jalankan <code>npm run db:seed</code> untuk mengisi katalognya.
+          <Blank
+            icon={<IconRows size={22} />}
+            title={query ? `Tidak ada yang cocok dengan "${query}"` : 'Belum ada instrumen di kelas ini'}
+          >
+            {elsewhere.length > 0 ? (
+              <>
+                Ada di kelas lain:{' '}
+                {elsewhere.map((t, i) => (
+                  <span key={t.id}>
+                    {i > 0 && ', '}
+                    <button type="button" className="link-inline" onClick={() => switchTab(t.id)}>
+                      {t.label} ({t.count})
+                    </button>
+                  </span>
+                ))}
+                .
+              </>
+            ) : query ? (
+              'Coba kata kunci lain, atau kosongkan pencarian.'
+            ) : (
+              <>
+                Jalankan <code>npm run db:seed</code> untuk mengisi katalognya.
+              </>
+            )}
           </Blank>
         ) : (
           <div className="cards">
@@ -224,6 +327,45 @@ function Change({ value }: { value: number | null }) {
       {value > 0 ? '+' : ''}
       {value.toFixed(2)}%
     </span>
+  )
+}
+
+type RegionFilter = 'semua' | 'indonesia' | 'internasional'
+
+/**
+ * Indonesia ditentukan dari pasarnya lebih dulu, baru wilayahnya.
+ *
+ * `region` diisi dari katalog dan bisa kosong untuk instrumen yang masuk lewat
+ * jalur lain; `market` selalu terisi karena kolomnya tidak boleh null. Memakai
+ * wilayah saja akan menjatuhkan saham IDX yang wilayahnya belum sempat terisi
+ * ke sisi internasional — kesalahan yang tidak terlihat sampai ada yang
+ * menghitung jumlahnya.
+ */
+function isIndonesian(i: ExplorerInstrument): boolean {
+  return i.market === 'IDX' || i.region === 'Indonesia'
+}
+
+function matchesRegion(i: ExplorerInstrument, filter: RegionFilter): boolean {
+  if (filter === 'semua') return true
+  return filter === 'indonesia' ? isIndonesian(i) : !isIndonesian(i)
+}
+
+/**
+ * Pencarian mencakup simbol utuh, simbol yang sudah dirapikan, nama, dan negara.
+ *
+ * Simbol yang dirapikan ikut dicocokkan karena itulah yang tertulis di layar:
+ * orang mengetik "BTC" setelah membaca "BTC", bukan "BTCUSDT". Negara ikut
+ * dicocokkan supaya "jepang" mengembalikan seluruh bursa Tokyo tanpa perlu tahu
+ * satu pun kode emitennya.
+ */
+function matchesQuery(i: ExplorerInstrument, query: string): boolean {
+  const q = query.trim().toLowerCase()
+  if (q === '') return true
+  return (
+    i.symbol.toLowerCase().includes(q) ||
+    display(i.symbol).toLowerCase().includes(q) ||
+    i.name.toLowerCase().includes(q) ||
+    (i.region ?? '').toLowerCase().includes(q)
   )
 }
 
