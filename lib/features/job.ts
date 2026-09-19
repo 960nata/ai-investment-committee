@@ -69,6 +69,15 @@ export interface FeatureJobInput {
   writeFrom?: string
 }
 
+/**
+ * Pemanasan yang harus ada sebelum tanggal tulis paling awal.
+ *
+ * Jendela persentil dua tahun ditambah rata-rata bergerak dua ratus hari.
+ * Tanpa pemanasan sepanjang ini, baris pertama dihitung dari jendela yang
+ * pendek diam-diam, dan nilainya tidak sebanding dengan baris sesudahnya.
+ */
+const WARMUP_DAYS = 1000
+
 export async function runFeatureJob(input: FeatureJobInput): Promise<FeatureJobResult> {
   const { symbols, market } = input
   const result: FeatureJobResult = {
@@ -79,9 +88,17 @@ export async function runFeatureJob(input: FeatureJobInput): Promise<FeatureJobR
     errors: [],
   }
 
-  const from = isoDaysAgo(LOOKBACK_DAYS)
   const to = isoDaysAgo(0)
   const writeFrom = input.writeFrom ?? isoDaysAgo(WRITE_WINDOW_DAYS)
+
+  // Riwayat yang dimuat mengikuti tanggal tulis paling awal, bukan angka tetap.
+  // Mengisi ulang sepuluh tahun dengan jendela muat tiga tahun akan diam-diam
+  // menghasilkan tujuh tahun baris kosong, dan itu terlihat seperti data yang
+  // memang tidak ada.
+  const earliest = new Date(`${writeFrom}T00:00:00Z`).getTime() - WARMUP_DAYS * 86_400_000
+  const from = new Date(Math.min(earliest, Date.now() - LOOKBACK_DAYS * 86_400_000))
+    .toISOString()
+    .slice(0, 10)
 
   // Tolok ukur dimuat sekali untuk seluruh batch, bukan sekali per simbol.
   const benchmarkByDate = await loadBenchmark(market, from, to)
