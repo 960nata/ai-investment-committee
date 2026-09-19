@@ -22,7 +22,10 @@ export function IngestButton({ job }: { job: string }) {
     setResult(null)
     startTransition(async () => {
       try {
-        const response = await fetch(`/api/jobs/${job}?market=CRYPTO`)
+        // Menarik data seluruh batch bisa makan waktu, tetapi tidak selamanya.
+        const response = await fetch(`/api/jobs/${job}?market=CRYPTO`, {
+          signal: AbortSignal.timeout(120_000),
+        })
         const body = await response.json()
 
         if (!response.ok) {
@@ -36,7 +39,13 @@ export function IngestButton({ job }: { job: string }) {
         )
         router.refresh()
       } catch (err) {
-        setResult(err instanceof Error ? err.message : String(err))
+        setResult(
+          err instanceof DOMException && err.name === 'TimeoutError'
+            ? 'tidak selesai dalam 2 menit'
+            : err instanceof Error
+              ? err.message
+              : String(err),
+        )
       }
     })
   }

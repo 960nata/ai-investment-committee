@@ -13,6 +13,7 @@
  */
 
 import type { PriceAdapter, Market, Candle, HealthStatus } from './types';
+import { fetchWithTimeout } from '@/lib/http/fetch';
 
 const BINANCE_BASE_URL = 'https://api.binance.com';
 const MAX_KLINES_PER_REQUEST = 1000; // Binance limit
@@ -80,7 +81,7 @@ export class BinanceAdapter implements PriceAdapter {
       url.searchParams.set('endTime', endTime.toString());
       url.searchParams.set('limit', MAX_KLINES_PER_REQUEST.toString());
 
-      const response = await fetch(url.toString());
+      const response = await fetchWithTimeout(url.toString(), { label: 'Binance' });
 
       if (!response.ok) {
         const errorText = await response.text().catch(() => 'Unknown error');
@@ -124,7 +125,12 @@ export class BinanceAdapter implements PriceAdapter {
    * menghasilkan kegagalan harian selamanya di log.
    */
   async fetchSymbols(): Promise<{ symbol: string; name: string }[]> {
-    const response = await fetch(`${BINANCE_BASE_URL}/api/v3/exchangeInfo`);
+    // exchangeInfo mengembalikan beberapa megabyte; batas waktunya dilonggarkan
+    // dari bawaan, tetapi tetap ada batasnya.
+    const response = await fetchWithTimeout(`${BINANCE_BASE_URL}/api/v3/exchangeInfo`, {
+      label: 'Binance exchangeInfo',
+      timeoutMs: 20_000,
+    });
 
     if (!response.ok) {
       throw new Error(`Binance exchangeInfo gagal: HTTP ${response.status}`);
@@ -141,7 +147,10 @@ export class BinanceAdapter implements PriceAdapter {
   async health(): Promise<HealthStatus> {
     const start = Date.now();
     try {
-      const response = await fetch(`${BINANCE_BASE_URL}/api/v3/ping`);
+      const response = await fetchWithTimeout(`${BINANCE_BASE_URL}/api/v3/ping`, {
+        label: 'Binance',
+        timeoutMs: 5_000,
+      });
       const latencyMs = Date.now() - start;
 
       return {

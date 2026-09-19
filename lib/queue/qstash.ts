@@ -8,6 +8,7 @@
  */
 
 import { Client, Receiver } from '@upstash/qstash'
+import { fetchWithTimeout } from '@/lib/http/fetch'
 
 export interface JobPayload {
   jobName: string
@@ -65,7 +66,12 @@ export async function publishJob(payload: JobPayload): Promise<PublishResult> {
   const qstash = getClient()
 
   if (!qstash) {
-    const response = await fetch(destination, {
+    // Worker menarik data dari sumber luar, jadi batas waktunya jauh lebih
+    // longgar daripada panggilan biasa — tetapi tetap ada, supaya dispatcher
+    // tidak ikut menggantung bersama satu batch yang macet.
+    const response = await fetchWithTimeout(destination, {
+      label: `worker ${payload.jobName}`,
+      timeoutMs: 120_000,
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(payload),

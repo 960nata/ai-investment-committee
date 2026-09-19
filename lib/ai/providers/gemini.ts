@@ -12,6 +12,7 @@
  * membedakan keduanya.
  */
 
+import { fetchWithTimeout, MODEL_TIMEOUT_MS } from '@/lib/http/fetch'
 import {
   LlmError,
   classifyStatus,
@@ -63,7 +64,9 @@ export const geminiAdapter: LlmAdapter = {
 
     let response: Response
     try {
-      response = await fetch(`${BASE_URL}/models/${MODEL}:generateContent`, {
+      response = await fetchWithTimeout(`${BASE_URL}/models/${MODEL}:generateContent`, {
+        label: 'Gemini',
+        timeoutMs: MODEL_TIMEOUT_MS,
         method: 'POST',
         headers: {
           'content-type': 'application/json',

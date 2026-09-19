@@ -7,6 +7,7 @@
  * jadi yang dibedakan cuma base URL dan nama modelnya.
  */
 
+import { fetchWithTimeout, MODEL_TIMEOUT_MS } from '@/lib/http/fetch'
 import {
   LlmError,
   classifyStatus,
@@ -51,7 +52,9 @@ export function createOpenAiCompatibleAdapter(config: OpenAiCompatibleConfig): L
 
       let response: Response
       try {
-        response = await fetch(`${config.baseUrl}/chat/completions`, {
+        response = await fetchWithTimeout(`${config.baseUrl}/chat/completions`, {
+          label: config.name,
+          timeoutMs: MODEL_TIMEOUT_MS,
           method: 'POST',
           headers: {
             'content-type': 'application/json',

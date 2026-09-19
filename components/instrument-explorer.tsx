@@ -43,14 +43,24 @@ export function InstrumentExplorer({ instruments, initialInstrumentId, initialCa
 
     startTransition(async () => {
       try {
-        const response = await fetch(`/api/v1/instruments/${instrument.id}/candles`)
+        // Tanpa batas waktu, permintaan yang menggantung membuat grafik berputar
+        // tanpa ujung dan pembacanya tidak tahu harus menunggu atau menyerah.
+        const response = await fetch(`/api/v1/instruments/${instrument.id}/candles`, {
+          signal: AbortSignal.timeout(15_000),
+        })
         if (!response.ok) throw new Error(`HTTP ${response.status}`)
 
         const body = await response.json()
         setCandles(body.candles ?? [])
       } catch (err) {
         setCandles([])
-        setError(err instanceof Error ? err.message : String(err))
+        setError(
+          err instanceof DOMException && err.name === 'TimeoutError'
+            ? 'Server tidak menjawab dalam 15 detik.'
+            : err instanceof Error
+              ? err.message
+              : String(err),
+        )
       }
     })
   }
