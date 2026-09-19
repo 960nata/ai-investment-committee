@@ -243,12 +243,22 @@ function judge(effectiveN: number, hitRate: number | null, baseRate: number | nu
  * IC di atas 0,15 pada data harian di pasar publik nyaris tidak pernah nyata.
  * Menemukannya berarti memeriksa ulang penyaringan tanggal terbit, bukan
  * merayakan.
+ *
+ * Tandanya dibaca, bukan diabaikan. IC yang masuk ke sini sudah dikalikan arah
+ * yang diasumsikan registry, jadi nilai negatif tidak berarti "sama bagusnya,
+ * tinggal dibalik" — ia berarti asumsi arahnya salah untuk sampel ini. Versi
+ * pertama fungsi ini memakai nilai mutlak, dan akibatnya laporan menyebut
+ * "bagus" untuk fitur yang justru menarik skor ke arah yang keliru.
+ *
+ * Yang tidak dilakukan: membalik arahnya otomatis. Membalik tanda karena satu
+ * sampel bilang begitu adalah mencocokkan model ke masa lalu, dan blueprint
+ * sudah menetapkan arah hanya boleh datang dari kalibrasi.
  */
 export function describeIc(ic: number | null): string {
   if (ic === null) return 'belum bisa dihitung'
   const a = Math.abs(ic)
   if (a > 0.15) return 'curiga — periksa ulang kebocoran data'
-  if (a >= 0.05) return 'bagus'
-  if (a >= 0.02) return 'lemah tetapi nyata'
-  return 'tidak berguna'
+  if (a < 0.02) return 'tidak berguna'
+  if (ic < 0) return a >= 0.05 ? 'arah terbalik dari asumsi' : 'terbalik, lemah'
+  return a >= 0.05 ? 'bagus' : 'lemah tetapi nyata'
 }

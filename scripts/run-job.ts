@@ -16,6 +16,7 @@ import { runIngestJob } from '../lib/jobs/ingest'
 import { runFeatureJob } from '../lib/features/job'
 import { runScoreJob } from '../lib/scoring/job'
 import { runFundamentalJob } from '../lib/fundamentals/job'
+import { runCrossSectionJob } from '../lib/features/cross-section-job'
 import type { MarketCode } from '../lib/db/schema'
 
 const JOBS = [
@@ -32,6 +33,7 @@ const JOBS = [
   'score-us',
   'score-global',
   'fundamental-us',
+  'normalise-cross-section',
 ] as const
 
 type JobName = (typeof JOBS)[number]
@@ -56,6 +58,22 @@ async function main(): Promise<void> {
     for (const j of JOBS) console.error(`  ${j}`)
     console.error('')
     process.exit(1)
+  }
+
+  // Job ini bekerja per tanggal untuk seluruh pasar sekaligus, bukan per pasar,
+  // jadi ia tidak perlu — dan tidak boleh disaring oleh — daftar instrumen.
+  if (job === 'normalise-cross-section') {
+    console.log(`\n${job} · seluruh pasar`)
+    const started = Date.now()
+    const result = await runCrossSectionJob({ from: flag('from'), to: flag('to') })
+    console.log(`  ${result.datesProcessed} tanggal diproses`)
+    console.log(`  ${result.rowsUpdated} baris fitur diperbarui`)
+    for (const s of result.skipped.slice(0, 10)) {
+      console.log(`  - ${s.date} ${s.assetClass}: ${s.reason}`)
+    }
+    for (const e of result.errors.slice(0, 10)) console.log(`  ! ${e}`)
+    console.log(`  selesai dalam ${((Date.now() - started) / 1000).toFixed(1)} detik\n`)
+    return
   }
 
   const market = marketOf(job)

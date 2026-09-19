@@ -25,7 +25,8 @@
     "schedule:setup": "tsx scripts/setup-schedule.ts",
     "schedule:delete": "tsx scripts/setup-schedule.ts --delete",
     "test:backtest": "tsx scripts/test-backtest.ts",
-    "backtest": "tsx scripts/run-backtest.ts"
+    "backtest": "tsx scripts/run-backtest.ts",
+    "db:status": "tsx scripts/db-status.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

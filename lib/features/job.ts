@@ -95,10 +95,15 @@ const WARMUP_DAYS = 1000
  * Yang hilang hampir tidak ada. Untuk horizon lima, enam puluh tiga, dan dua
  * ratus lima puluh dua hari, pengamatan harian saling tumpang tindih di atas
  * sembilan puluh persen — itu sebabnya jumlah pengamatan bebas dihitung dengan
- * membagi rentang waktunya. Menyimpan setiap hari berarti membayar lima kali
+ * membagi rentang waktunya. Menyimpan setiap hari berarti membayar sepuluh kali
  * lipat ruang untuk informasi yang praktis sama.
+ *
+ * Angkanya dinaikkan dari lima ke sepuluh setelah diukur: sebelas tahun riwayat
+ * untuk tiga ratus instrumen pada jarak lima hari saja sudah melewati batas
+ * setengah gigabyte, dan basis data yang penuh menghentikan seluruh penulisan,
+ * bukan hanya yang terakhir.
  */
-const HISTORY_STRIDE = 5
+const HISTORY_STRIDE = 10
 
 /** Hari terakhir yang tetap disimpan harian, karena inilah yang dilihat orang. */
 const DENSE_WINDOW_DAYS = 120

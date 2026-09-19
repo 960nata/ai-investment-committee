@@ -92,11 +92,18 @@ export function normaliseCrossSection(
       const centre = median(trimmed)!
       const spread = medianAbsoluteDeviation(trimmed)!
 
-      const sorted = [...trimmed].sort((a, b) => a - b)
+      // Persentil dihitung dari nilai asli, bukan dari yang sudah dipangkas.
+      // Peringkat sudah kebal pencilan menurut definisinya — memangkas lebih
+      // dulu hanya membuat dua nilai terendah jadi seri. Pada 18 September 2026
+      // itu menyamakan emiten ber-PER 6,61 dengan yang 9,52, tepat di ujung
+      // distribusi yang justru ingin dibedakan orang.
+      const sorted = [...raw].sort((a, b) => a - b)
 
       for (let i = 0; i < present.length; i++) {
         const value = trimmed[i]
         const target = computed.get(present[i].id)!
+        // Pemangkasan tetap dipakai untuk z-score: tanpa itu satu emiten dengan
+        // rasio empat ribu menggeser sebaran seluruh kelompoknya.
 
         target[`${name}_zcs`] =
           spread === 0
@@ -114,7 +121,7 @@ export function normaliseCrossSection(
 
         // Persentil dipakai untuk ditampilkan: "di persentil 15 sektornya"
         // langsung dimengerti orang, sementara "z-score −1,2" tidak.
-        const below = sorted.filter((v) => v <= value).length
+        const below = sorted.filter((v) => v <= present[i].v).length
         target[`${name}_pcs`] = round((below - 0.5) / sorted.length)
       }
 

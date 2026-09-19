@@ -165,6 +165,20 @@ test('tafsiran IC menandai nilai yang terlalu bagus', () => {
   assert(describeIc(0.07) === 'bagus', 'IC menengah')
   assert(describeIc(0.03).includes('lemah'), 'IC kecil tetap berguna')
   assert(describeIc(0.001).includes('tidak berguna'), 'IC nyaris nol')
+
+  // IC yang masuk ke describeIc sudah dikalikan arah asumsi, jadi tanda negatif
+  // berarti asumsinya keliru — bukan temuan bagus yang tinggal dibalik.
+  assert(
+    describeIc(-0.07).includes('terbalik'),
+    'IC negatif kuat harus disebut terbalik, bukan bagus',
+  )
+  assert(
+    describeIc(-0.03).includes('terbalik'),
+    'IC negatif lemah pun tetap terbalik arahnya',
+  )
+  assert(describeIc(-0.001).includes('tidak berguna'), 'IC negatif nyaris nol tetap tak berguna')
+  assert(describeIc(-0.3).includes('curiga'), 'IC negatif ekstrem sama mencurigakannya')
+  assert(describeIc(null) === 'belum bisa dihitung', 'IC kosong')
 })
 
 // ---------------------------------------------------------------------------

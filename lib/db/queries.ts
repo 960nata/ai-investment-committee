@@ -841,6 +841,134 @@ export async function getFeatureCoverage(): Promise<FeatureCoverage[]> {
 }
 
 // ---------------------------------------------------------------------------
+// Normalisasi lintas penampang
+// ---------------------------------------------------------------------------
+
+export interface CrossSectionFeatureRow {
+  instrumentId: number
+  date: string
+  /** Sektor bila sudah terisi; kalau belum, pasarnya. */
+  peerGroup: string
+  values: Record<string, number | null>
+}
+
+/**
+ * Tanggal yang benar-benar punya baris fitur, terbaru dulu.
+ *
+ * Perbandingan lintas penampang hanya sah antar instrumen pada hari yang sama,
+ * jadi job memprosesnya per tanggal dan butuh daftar tanggalnya lebih dulu.
+ */
+export async function listFeatureDates(
+  featureSetVersion: string,
+  from: string,
+  to: string,
+): Promise<string[]> {
+  const rows = await db
+    .selectDistinct({ date: featureDaily.date })
+    .from(featureDaily)
+    .where(
+      and(
+        eq(featureDaily.featureSetVersion, featureSetVersion),
+        gte(featureDaily.date, from),
+        lte(featureDaily.date, to),
+      ),
+    )
+    .orderBy(desc(featureDaily.date))
+
+  return rows.map((r) => r.date)
+}
+
+/**
+ * Semua baris fitur satu tanggal untuk satu kelas aset, beserta kelompok
+ * pembandingnya.
+ *
+ * Dibatasi per kelas aset karena membandingkan rasio harga terhadap laba sebuah
+ * bank dengan sebuah koin tidak menghasilkan apa-apa.
+ */
+export async function loadCrossSectionRows(
+  featureSetVersion: string,
+  date: string,
+  assetClass: AssetClass,
+): Promise<CrossSectionFeatureRow[]> {
+  const rows = await db
+    .select({
+      instrumentId: featureDaily.instrumentId,
+      date: featureDaily.date,
+      sector: instrument.sector,
+      market: instrument.market,
+      values: featureDaily.values,
+    })
+    .from(featureDaily)
+    .innerJoin(instrument, eq(instrument.id, featureDaily.instrumentId))
+    .where(
+      and(
+        eq(featureDaily.featureSetVersion, featureSetVersion),
+        eq(featureDaily.date, date),
+        eq(instrument.assetClass, assetClass),
+        eq(instrument.isActive, true),
+      ),
+    )
+
+  return rows.map((r) => ({
+    instrumentId: r.instrumentId,
+    date: r.date,
+    peerGroup: r.sector ?? fromDbMarket(r.market),
+    values: r.values,
+  }))
+}
+
+export interface FeaturePatch {
+  instrumentId: number
+  date: string
+  values: Record<string, number | null>
+}
+
+/**
+ * Sisipkan kunci baru ke baris fitur yang sudah ada, tanpa menyentuh isinya
+ * yang lain.
+ *
+ * Memakai `||` jsonb, bukan menulis ulang seluruh objek, karena job ini berjalan
+ * setelah job fitur dan hanya menambah kunci `_zcs` dan `_pcs`. Menulis ulang
+ * berarti job yang belakangan bisa menghapus hasil job yang duluan hanya karena
+ * ia tidak tahu kunci itu ada.
+ *
+ * Baris yang belum ada sengaja tidak dibuat: nilai lintas penampang tidak berdiri
+ * sendiri, ia hanya keterangan tambahan bagi fitur yang sudah dihitung.
+ */
+export async function mergeFeatureValues(
+  featureSetVersion: string,
+  patches: FeaturePatch[],
+  chunkSize = 300,
+): Promise<number> {
+  if (patches.length === 0) return 0
+
+  let updated = 0
+  for (let i = 0; i < patches.length; i += chunkSize) {
+    const slice = patches.slice(i, i + chunkSize)
+    const tuples = sql.join(
+      slice.map(
+        (p) =>
+          sql`(${p.instrumentId}::int, ${p.date}::date, ${JSON.stringify(p.values)}::jsonb)`,
+      ),
+      sql`, `,
+    )
+
+    const result = await db.execute(sql`
+      update ${featureDaily} as f
+      set values = f.values || v.patch
+      from (values ${tuples}) as v(instrument_id, date, patch)
+      where f.instrument_id = v.instrument_id
+        and f.date = v.date
+        and f.feature_set_version = ${featureSetVersion}
+    `)
+
+    updated += Number((result as unknown as { count?: number }).count ?? slice.length)
+  }
+
+  return updated
+}
+
+// ---------------------------------------------------------------------------
 // Daftar instrumen beserta harga terakhirnya
 // ---------------------------------------------------------------------------
 

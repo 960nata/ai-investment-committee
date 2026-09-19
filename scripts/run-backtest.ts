@@ -55,7 +55,10 @@ async function main(): Promise<void> {
     console.log('    npm run job ingest-us-daily -- --from 2010-01-01')
   }
 
-  console.log('\nLima fitur ber-IC tertinggi, horizon menengah')
+  // Diurutkan menurut besarnya, bukan nilainya: fitur ber-IC −0,15 sama
+  // informatifnya dengan yang +0,15 — bedanya ia memberi tahu arah asumsinya
+  // keliru.
+  console.log('\nLima fitur ber-IC terkuat, horizon menengah')
   for (const f of result.featureIc.menengah.slice(0, 5)) {
     console.log(
       `  ${f.label.padEnd(34)} ${(f.ic === null ? '—' : f.ic.toFixed(4)).padStart(8)}  ${describeIc(f.ic)}`,

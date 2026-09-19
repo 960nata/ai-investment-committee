@@ -634,6 +634,26 @@ test('persentil lintas penampang berada di rentang nol sampai satu', () => {
   }
 })
 
+test('dua nilai terendah tetap dapat persentil berbeda meski dipangkas', () => {
+  // Pemangkasan hanya untuk z-score. Peringkat tidak butuh itu, dan memangkas
+  // sebelum memeringkat justru menyamakan dua emiten termurah — tepat pasangan
+  // yang paling ingin dibedakan orang.
+  const rows = peers('bank', [5, 9, 20, 21, 22, 23, 24, 200])
+  const out = normaliseCrossSection(rows, ['per'])
+  const termurah = out.find((r) => r.instrumentId === rows[0].instrumentId)!
+  const kedua = out.find((r) => r.instrumentId === rows[1].instrumentId)!
+
+  assert(
+    termurah.values.per_pcs! < kedua.values.per_pcs!,
+    `persentil tidak boleh seri: ${termurah.values.per_pcs} vs ${kedua.values.per_pcs}`,
+  )
+
+  // Sementara z-nya tetap terjepit, karena nilai 200 tidak boleh menarik
+  // sebaran seluruh kelompoknya.
+  const termahal = out.find((r) => r.instrumentId === rows[7].instrumentId)!
+  assert(Math.abs(termahal.values.per_zcs!) <= 3, 'z harus tetap terjepit di ±3')
+})
+
 test('kelompok kecil disatukan, dan tetap kosong bila gabungannya masih tipis', () => {
   // Dua perilaku yang keduanya benar. Anggota kelompok tipis tidak pernah
   // dibuang — ia tetap muncul dengan kunci lengkap. Tetapi selama pembandingnya
