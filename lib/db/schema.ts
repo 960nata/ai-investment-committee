@@ -19,7 +19,24 @@ import {
 // Enum
 // ---------------------------------------------------------------------------
 
-export const marketEnum = pgEnum('market', ['crypto', 'idx', 'us'])
+/** Tempat dan kalender perdagangan. `global` untuk berjangka emas dan komoditi. */
+export const marketEnum = pgEnum('market', ['crypto', 'idx', 'us', 'global'])
+
+/**
+ * Jenis aset, terpisah dari tempat ia diperdagangkan.
+ *
+ * Keduanya memang beda pertanyaan. Emas bisa dibeli lewat kontrak berjangka
+ * maupun lewat token di bursa crypto; kalendernya berbeda, tetapi yang dibeli
+ * benda yang sama. Menyatukan keduanya jadi satu kolom memaksa memilih salah
+ * satu pertanyaan dan kehilangan jawaban yang lain.
+ */
+export const assetClassEnum = pgEnum('asset_class', [
+  'crypto',
+  'saham',
+  'emas',
+  'komoditi',
+  'indeks',
+])
 export const healthStatusEnum = pgEnum('health_status', ['healthy', 'degraded', 'dead'])
 export const jobStatusEnum = pgEnum('job_status', ['running', 'success', 'failed', 'partial'])
 
@@ -34,6 +51,9 @@ export const instrument = pgTable(
     symbol: varchar('symbol', { length: 32 }).notNull(),
     name: text('name').notNull(),
     market: marketEnum('market').notNull(),
+    assetClass: assetClassEnum('asset_class').notNull().default('crypto'),
+    /** Negara atau kawasan, dipakai untuk mengelompokkan dan memberi bendera. */
+    region: varchar('region', { length: 48 }),
     currency: varchar('currency', { length: 8 }).notNull(),
     sector: text('sector'),
     isActive: boolean('is_active').notNull().default(true),
@@ -46,6 +66,7 @@ export const instrument = pgTable(
   (t) => [
     uniqueIndex('instrument_market_symbol_uq').on(t.market, t.symbol),
     index('instrument_market_idx').on(t.market),
+    index('instrument_asset_class_idx').on(t.assetClass),
   ],
 )
 
@@ -173,7 +194,7 @@ export const ingestQuarantine = pgTable(
  * kecil. Dua fungsi di bawah adalah satu-satunya tempat kedua kosakata bertemu —
  * di luar sini tidak ada perbandingan string pasar yang ditulis tangan.
  */
-export type MarketCode = 'CRYPTO' | 'IDX' | 'US'
+export type MarketCode = 'CRYPTO' | 'IDX' | 'US' | 'GLOBAL'
 export type DbMarket = (typeof marketEnum.enumValues)[number]
 
 export function toDbMarket(market: MarketCode): DbMarket {
@@ -183,6 +204,17 @@ export function toDbMarket(market: MarketCode): DbMarket {
 export function fromDbMarket(market: DbMarket): MarketCode {
   return market.toUpperCase() as MarketCode
 }
+
+export type AssetClass = (typeof assetClassEnum.enumValues)[number]
+
+/** Urutan tampil di antarmuka, dari yang paling banyak datanya. */
+export const ASSET_CLASSES: { id: AssetClass; label: string }[] = [
+  { id: 'crypto', label: 'Crypto' },
+  { id: 'saham', label: 'Saham' },
+  { id: 'emas', label: 'Emas' },
+  { id: 'komoditi', label: 'Komoditi' },
+  { id: 'indeks', label: 'Indeks' },
+]
 
 export type Instrument = typeof instrument.$inferSelect
 export type NewInstrument = typeof instrument.$inferInsert

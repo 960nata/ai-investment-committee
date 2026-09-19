@@ -1,23 +1,28 @@
 /**
- * Seed — isi jadwal job dan daftar instrumen awal.
+ * Seed — isi jadwal job dan katalog instrumen.
  *
  *   npm run db:seed
+ *   npm run db:seed -- --skip-verify
  *
- * Idempoten: menjalankannya berkali-kali tidak menggandakan apa pun, jadi aman
- * dipakai ulang setiap kali jadwal berubah.
+ * Idempoten: menjalankannya berkali-kali tidak menggandakan apa pun.
  *
- * Penjadwalan sengaja hidup di database, bukan di `vercel.json`. Tier Hobby
- * hanya mengizinkan sedikit cron, sementara sistem ini butuh ritme berbeda untuk
- * tiga pasar: IDX tutup sore WIB, bursa US buka malam WIB, crypto tidak tidur.
+ * Tiap simbol diperiksa ke sumbernya lebih dulu. Simbol berganti nama, kontrak
+ * berjangka berpindah, dan bursa menghapus pasangan tanpa pemberitahuan.
+ * Memasukkan daftar keinginan tanpa memeriksanya berarti menaruh instrumen mati
+ * ke dalam katalog, lalu membiarkannya gagal tiap hari di dalam log sampai tidak
+ * ada lagi yang membaca log itu.
  */
 
 import './load-env'
-
-import { binanceAdapter, BINANCE_DEFAULT_SYMBOLS } from '../lib/adapters/binance'
+import { registry } from '../lib/adapters'
+import { CATALOGUE, type CatalogueEntry } from '../lib/adapters/catalogue'
 import { upsertInstrument, upsertSchedule, upsertSymbolAlias } from '../lib/db/queries'
 import type { MarketCode } from '../lib/db/schema'
 
 const EVERY_HOUR = Array.from({ length: 24 }, (_, hour) => hour)
+
+/** Berapa simbol diperiksa bersamaan. Cukup cepat tanpa memancing pembatasan laju. */
+const VERIFY_CONCURRENCY = 6
 
 interface ScheduleSeed {
   jobName: string
@@ -29,133 +34,92 @@ interface ScheduleSeed {
   note: string
 }
 
-/**
- * Job IDX dan US sudah punya barisnya sendiri tetapi dimatikan: adaptornya belum
- * ada, dan jadwal yang menunjuk ke sumber kosong hanya menghasilkan kegagalan
- * harian yang membuat log tidak lagi dibaca orang.
- */
 const SCHEDULES: ScheduleSeed[] = [
-  {
-    jobName: 'ingest-crypto-daily',
-    hoursOfDay: EVERY_HOUR,
-    timezone: 'UTC',
-    tradingDaysOnly: false,
-    market: 'CRYPTO',
-    enabled: true,
-    note: 'tiap jam, tujuh hari seminggu',
-  },
-  {
-    jobName: 'compute-features-crypto',
-    // 01.00 UTC, satu jam setelah candle harian crypto benar-benar tertutup.
-    hoursOfDay: [1],
-    timezone: 'UTC',
-    tradingDaysOnly: false,
-    market: 'CRYPTO',
-    enabled: true,
-    note: 'sekali sehari, setelah candle harian tertutup',
-  },
-  {
-    jobName: 'ingest-idx-daily',
-    // 17.00 WIB, setelah sesi IDX benar-benar tutup dan data EOD terbit.
-    hoursOfDay: [17],
-    timezone: 'Asia/Jakarta',
-    tradingDaysOnly: true,
-    market: 'IDX',
-    enabled: false,
-    note: 'menunggu adaptor IDX (Fase 2)',
-  },
-  {
-    jobName: 'compute-features-idx',
-    // 17.30 tidak bisa diwakili penjadwal berbutir jam, jadi 18.00 WIB.
-    hoursOfDay: [18],
-    timezone: 'Asia/Jakarta',
-    tradingDaysOnly: true,
-    market: 'IDX',
-    enabled: false,
-    note: 'menunggu adaptor IDX (Fase 2)',
-  },
-  {
-    jobName: 'ingest-us-daily',
-    // 05.00 WIB, beberapa jam setelah bursa US tutup.
-    hoursOfDay: [5],
-    timezone: 'Asia/Jakarta',
-    tradingDaysOnly: true,
-    market: 'US',
-    enabled: false,
-    note: 'menunggu adaptor Finnhub (Fase 4)',
-  },
-  {
-    jobName: 'komite-review',
-    // Sekali sehari, 08.00 WIB — setelah ingest crypto semalam selesai.
-    // Tiap simbol berarti empat panggilan model, jadi ritmenya sengaja jarang:
-    // menjalankannya tiap jam akan menghabiskan kuota harian sebelum siang.
-    hoursOfDay: [8],
-    timezone: 'Asia/Jakarta',
-    tradingDaysOnly: false,
-    market: 'CRYPTO',
-    // Dimatikan sampai ada kunci LLM terisi. Jadwal yang menunjuk ke registry
-    // kosong hanya menghasilkan kegagalan harian yang membuat log berhenti dibaca.
-    enabled: false,
-    note: 'aktifkan setelah kunci LLM terisi',
-  },
+  { jobName: 'ingest-crypto-daily', hoursOfDay: EVERY_HOUR, timezone: 'UTC', tradingDaysOnly: false, market: 'CRYPTO', enabled: true, note: 'tiap jam, tujuh hari seminggu' },
+  { jobName: 'compute-features-crypto', hoursOfDay: [1], timezone: 'UTC', tradingDaysOnly: false, market: 'CRYPTO', enabled: true, note: '01.00 UTC, setelah candle harian tertutup' },
+  // 17.00 WIB, setelah sesi IDX tutup dan data penutupnya terbit.
+  { jobName: 'ingest-idx-daily', hoursOfDay: [17], timezone: 'Asia/Jakarta', tradingDaysOnly: true, market: 'IDX', enabled: true, note: '17.00 WIB, hari bursa' },
+  { jobName: 'compute-features-idx', hoursOfDay: [18], timezone: 'Asia/Jakarta', tradingDaysOnly: true, market: 'IDX', enabled: true, note: '18.00 WIB, hari bursa' },
+  // 05.00 WIB, beberapa jam setelah bursa New York tutup.
+  { jobName: 'ingest-us-daily', hoursOfDay: [5], timezone: 'Asia/Jakarta', tradingDaysOnly: true, market: 'US', enabled: true, note: '05.00 WIB, hari bursa' },
+  { jobName: 'compute-features-us', hoursOfDay: [6], timezone: 'Asia/Jakarta', tradingDaysOnly: true, market: 'US', enabled: true, note: '06.00 WIB, hari bursa' },
+  // Indeks dunia dan berjangka tutup pada jam berbeda-beda; 07.00 WIB sudah
+  // lewat penutupan Amerika sekaligus sebelum Asia membuka hari berikutnya.
+  { jobName: 'ingest-global-daily', hoursOfDay: [7], timezone: 'Asia/Jakarta', tradingDaysOnly: true, market: 'GLOBAL', enabled: true, note: '07.00 WIB, indeks dunia dan berjangka' },
+  { jobName: 'compute-features-global', hoursOfDay: [8], timezone: 'Asia/Jakarta', tradingDaysOnly: true, market: 'GLOBAL', enabled: true, note: '08.00 WIB, hari bursa' },
 ]
 
 async function seedSchedules(): Promise<void> {
   console.log('\nJadwal job')
   for (const schedule of SCHEDULES) {
     await upsertSchedule(schedule)
-    const state = schedule.enabled ? 'aktif ' : 'mati  '
-    console.log(`  ${state} ${schedule.jobName.padEnd(22)} ${schedule.note}`)
+    console.log(`  ${schedule.enabled ? 'aktif' : 'mati '} ${schedule.jobName.padEnd(24)} ${schedule.note}`)
   }
 }
 
 /**
- * Daftar kurasi disaring dulu terhadap pasangan yang masih diperdagangkan.
- * Kalau bursa tidak bisa dihubungi, seed tetap jalan dengan daftar mentah —
- * simbol yang sudah mati akan tersaring sendiri oleh worker berikutnya.
+ * Tarik candle beberapa hari terakhir untuk memastikan simbolnya menjawab.
+ *
+ * Rentangnya tujuh hari, bukan satu: instrumen yang tidak berdagang kemarin
+ * bukan berarti mati, dan menolaknya karena itu akan membuang separuh katalog
+ * setiap kali seed dijalankan pada Senin pagi.
  */
-async function resolveCryptoSymbols(): Promise<{ symbol: string; name: string }[]> {
+async function verify(entry: CatalogueEntry): Promise<string | null> {
+  const to = new Date()
+  const from = new Date(to.getTime() - 7 * 86_400_000)
   try {
-    const tradable = await binanceAdapter.fetchSymbols()
-    const dropped = BINANCE_DEFAULT_SYMBOLS.filter(
-      (s) => !tradable.some((t) => t.symbol === s.symbol),
-    )
-    if (dropped.length > 0) {
-      console.warn(
-        `  ! tidak diperdagangkan lagi, dilewati: ${dropped.map((d) => d.symbol).join(', ')}`,
-      )
-    }
-    return tradable
+    const { candles } = await registry.fetchDailyWithFailover(entry.market, entry.symbol, from, to)
+    return candles.length > 0 ? null : 'tidak mengembalikan candle'
   } catch (err) {
-    console.warn(
-      `  ! exchangeInfo tidak terjangkau (${err instanceof Error ? err.message : err}); ` +
-        'memakai daftar bawaan tanpa penyaringan',
-    )
-    return BINANCE_DEFAULT_SYMBOLS
+    return err instanceof Error ? err.message : String(err)
   }
 }
 
-async function seedInstruments(): Promise<number> {
-  console.log('\nInstrumen crypto')
-  const symbols = await resolveCryptoSymbols()
+async function seedInstruments(skipVerify: boolean): Promise<void> {
+  console.log(`\nKatalog instrumen · ${CATALOGUE.length} simbol`)
+  if (skipVerify) console.log('  verifikasi dilewati')
 
-  for (const { symbol, name } of symbols) {
-    const instrument = await upsertInstrument({
-      symbol,
-      name,
-      market: 'CRYPTO',
-      currency: 'USDT',
-      sector: 'crypto',
-    })
-    await upsertSymbolAlias({
-      instrumentId: instrument.id,
-      sourceId: binanceAdapter.id,
-      alias: symbol,
-    })
-    console.log(`  + ${symbol.padEnd(12)} ${name}`)
+  const failures: { entry: CatalogueEntry; reason: string }[] = []
+  const accepted: CatalogueEntry[] = []
+
+  for (let i = 0; i < CATALOGUE.length; i += VERIFY_CONCURRENCY) {
+    const batch = CATALOGUE.slice(i, i + VERIFY_CONCURRENCY)
+    const results = await Promise.all(
+      batch.map(async (entry) => ({ entry, reason: skipVerify ? null : await verify(entry) })),
+    )
+    for (const { entry, reason } of results) {
+      if (reason) failures.push({ entry, reason })
+      else accepted.push(entry)
+    }
   }
 
-  return symbols.length
+  const byClass = new Map<string, number>()
+  for (const entry of accepted) {
+    const saved = await upsertInstrument({
+      symbol: entry.symbol,
+      name: entry.name,
+      market: entry.market,
+      assetClass: entry.assetClass,
+      region: entry.region ?? null,
+      currency: entry.currency,
+    })
+    await upsertSymbolAlias({
+      instrumentId: saved.id,
+      sourceId: entry.market === 'CRYPTO' ? 'binance' : 'yahoo',
+      alias: entry.symbol,
+    })
+    byClass.set(entry.assetClass, (byClass.get(entry.assetClass) ?? 0) + 1)
+  }
+
+  console.log(`  ${accepted.length} instrumen tersimpan`)
+  for (const [cls, n] of [...byClass].sort()) console.log(`    ${cls.padEnd(10)} ${n}`)
+
+  if (failures.length > 0) {
+    console.log(`\n  ${failures.length} simbol tidak dimasukkan:`)
+    for (const { entry, reason } of failures) {
+      console.log(`    ${entry.symbol.padEnd(12)} ${entry.name.padEnd(26)} ${reason.slice(0, 55)}`)
+    }
+  }
 }
 
 async function main(): Promise<void> {
@@ -164,12 +128,11 @@ async function main(): Promise<void> {
   }
 
   await seedSchedules()
-  const instrumentCount = await seedInstruments()
+  await seedInstruments(process.argv.includes('--skip-verify'))
 
-  console.log(
-    `\nSelesai: ${SCHEDULES.length} jadwal, ${instrumentCount} instrumen.\n` +
-      'Langkah berikutnya: buka /pipeline untuk memastikan jadwalnya terbaca.\n',
-  )
+  console.log('\nBerikutnya, isi riwayatnya:')
+  for (const j of ['crypto', 'idx', 'us', 'global']) console.log(`  npm run job ingest-${j}-daily`)
+  console.log('')
 }
 
 main()

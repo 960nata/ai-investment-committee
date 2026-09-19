@@ -15,6 +15,13 @@
       "when": 1789782188295,
       "tag": "0001_familiar_hellfire_club",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789807071267,
+      "tag": "0002_friendly_virginia_dare",
+      "breakpoints": true
     }
   ]
 }

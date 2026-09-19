@@ -27,16 +27,17 @@ import {
   getCandles,
   getDashboardStats,
   listAdapterHealth,
-  listInstruments,
+  listInstrumentQuotes,
   STALE_AFTER_MINUTES,
   type DashboardStats,
 } from '@/lib/db/queries'
+import { ASSET_CLASSES } from '@/lib/db/schema'
 import { isQStashConfigured } from '@/lib/queue/qstash'
 import { cache } from '@/lib/cache/redis'
 
 export const dynamic = 'force-dynamic'
 
-const CHART_RANGE_DAYS = 180
+const CHART_RANGE_DAYS = 730
 
 export default async function OverviewPage() {
   let data: Awaited<ReturnType<typeof load>> | null = null
@@ -137,6 +138,7 @@ export default async function OverviewPage() {
 
           <InstrumentExplorer
             instruments={data.instruments}
+            tabs={data.tabs}
             initialInstrumentId={data.initialInstrumentId}
             initialCandles={data.initialCandles}
           />
@@ -195,10 +197,17 @@ async function load() {
   const [stats, health, instruments] = await Promise.all([
     getDashboardStats(),
     listAdapterHealth(),
-    listInstruments('CRYPTO'),
+    listInstrumentQuotes(),
   ])
 
-  const initialInstrumentId = instruments[0]?.id ?? null
+  // Instrumen pembuka: Bitcoin kalau ada, selainnya yang riwayatnya paling
+  // panjang. Bukan yang pertama menurut abjad — grafik kosong sebagai kesan
+  // pertama membuat seluruh halaman terlihat rusak padahal datanya ada di
+  // instrumen sebelah.
+  const opening =
+    instruments.find((i) => i.symbol === 'BTCUSDT' && i.candleCount > 0) ??
+    [...instruments].sort((a, b) => b.candleCount - a.candleCount)[0]
+  const initialInstrumentId = opening?.id ?? null
   const initialCandles: Candle[] = initialInstrumentId
     ? (await getCandles(initialInstrumentId, isoDaysAgo(CHART_RANGE_DAYS), isoDaysAgo(0))).map(
         (c) => ({
@@ -214,18 +223,17 @@ async function load() {
 
   const healthy = health.filter((h) => h.status === 'healthy').length
 
+  // Tab hanya menampilkan kelas aset yang benar-benar punya instrumen.
+  const present = new Set(instruments.map((i) => i.assetClass))
+
   return {
     stats,
     adapterCount: health.length,
     healthy,
     adapterState: adapterState(health.map((h) => h.status)),
     adapterSummary: adapterSummary(health.map((h) => h.status)),
-    instruments: instruments.map((i) => ({
-      id: i.id,
-      symbol: i.symbol,
-      name: i.name,
-      market: i.market,
-    })),
+    instruments,
+    tabs: ASSET_CLASSES.filter((c) => present.has(c.id)),
     initialInstrumentId,
     initialCandles,
     queueConfigured: isQStashConfigured(),

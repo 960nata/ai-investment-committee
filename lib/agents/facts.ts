@@ -26,6 +26,8 @@ export const STALE_LIMIT_DAYS: Record<MarketCode, number> = {
   CRYPTO: 2,
   IDX: 5,
   US: 5,
+  // Berjangka libur akhir pekan dan hari besar, sama seperti bursa saham.
+  GLOBAL: 5,
 }
 
 export interface PricePoint {

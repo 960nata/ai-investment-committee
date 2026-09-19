@@ -10,7 +10,6 @@
  */
 
 import { NextResponse } from 'next/server'
-import { BINANCE_DEFAULT_SYMBOLS } from '@/lib/adapters/binance'
 import { chunk, isDue } from '@/lib/jobs/due'
 import {
   listEnabledSchedules,
@@ -132,12 +131,9 @@ async function dispatchOne(schedule: JobScheduleRow, now: Date): Promise<JobOutc
 
     // Basis data yang masih kosong tetap bisa memulai dirinya sendiri dari daftar
     // simbol bawaan adaptor; setelah itu daftar instrumen di database yang dipakai.
-    const symbols =
-      instruments.length > 0
-        ? instruments.map((i) => i.symbol)
-        : market === 'CRYPTO'
-          ? BINANCE_DEFAULT_SYMBOLS.map((s) => s.symbol)
-          : []
+    // Daftar instrumen datang dari basis data. Kalau kosong, seed belum pernah
+    // dijalankan, dan menebak isinya di sini hanya menunda ketahuannya.
+    const symbols = instruments.map((i) => i.symbol)
 
     if (symbols.length === 0) {
       return {

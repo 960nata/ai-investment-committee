@@ -7,12 +7,12 @@
 
 import { registry } from './registry';
 import { binanceAdapter } from './binance';
+import { yahooAdapter } from './yahoo';
 
-// Register adapters in priority order
-// More adapters will be added in later phases:
-// - Finnhub (US stocks, Fase 4)
-// - IDX JSON endpoint (IDX, Fase 2)
-// - Twelve Data (backup, Fase 2)
+// Didaftarkan berurutan prioritas. Keduanya melayani pasar yang berbeda, jadi
+// belum ada yang saling mencadangkan; cadangan menyusul saat sumber berbayar
+// masuk, dan registry sudah siap menerimanya tanpa mengubah kode analisis.
 registry.register(binanceAdapter);
+registry.register(yahooAdapter);
 
 export { registry };

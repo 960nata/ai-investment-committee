@@ -41,8 +41,13 @@ const BENCHMARK: Record<MarketCode, string | null> = {
   // Hampir seluruh crypto bergerak mengikuti Bitcoin; tanpa membandingkan
   // terhadapnya, "naik 8% minggu ini" tidak memberi tahu apa pun.
   CRYPTO: 'BTCUSDT',
-  IDX: null, // menunggu data indeks IHSG (Fase 2)
-  US: null, // menunggu data indeks S&P 500 (Fase 4)
+  // Saham dibandingkan terhadap indeks pasarnya sendiri: naik 5% saat pasar
+  // naik 8% sebenarnya sedang tertinggal, dan tanpa fitur ini itu tidak terlihat.
+  IDX: '^JKSE',
+  US: '^GSPC',
+  // Emas dan komoditi tidak punya indeks induk yang wajar; membandingkan minyak
+  // terhadap emas tidak menjawab pertanyaan apa pun.
+  GLOBAL: null,
 }
 
 export interface FeatureJobResult {

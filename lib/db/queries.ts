@@ -26,6 +26,7 @@ import {
   symbolAlias,
   toDbMarket,
   type AgentVerdict,
+  type AssetClass,
   type DbMarket,
   type MarketCode,
 } from './schema'
@@ -39,6 +40,8 @@ export interface InstrumentView {
   symbol: string
   name: string
   market: MarketCode
+  assetClass: AssetClass
+  region: string | null
   currency: string
   sector: string | null
   isActive: boolean
@@ -52,6 +55,8 @@ function toInstrumentView(row: typeof instrument.$inferSelect): InstrumentView {
     symbol: row.symbol,
     name: row.name,
     market: fromDbMarket(row.market),
+    assetClass: row.assetClass,
+    region: row.region,
     currency: row.currency,
     sector: row.sector,
     isActive: row.isActive,
@@ -85,10 +90,11 @@ export async function getInstrumentById(id: number): Promise<InstrumentView | nu
  */
 export async function listInstruments(
   market?: MarketCode,
-  options: { includeDelisted?: boolean } = {},
+  options: { includeDelisted?: boolean; assetClass?: AssetClass } = {},
 ): Promise<InstrumentView[]> {
   const filters = []
   if (market) filters.push(eq(instrument.market, toDbMarket(market)))
+  if (options.assetClass) filters.push(eq(instrument.assetClass, options.assetClass))
   if (!options.includeDelisted) filters.push(eq(instrument.isActive, true))
 
   const rows = await db
@@ -104,6 +110,8 @@ export async function upsertInstrument(data: {
   symbol: string
   name: string
   market: MarketCode
+  assetClass?: AssetClass
+  region?: string | null
   currency: string
   sector?: string | null
   listedAt?: string | null
@@ -114,6 +122,8 @@ export async function upsertInstrument(data: {
       symbol: data.symbol,
       name: data.name,
       market: toDbMarket(data.market),
+      assetClass: data.assetClass ?? 'crypto',
+      region: data.region ?? null,
       currency: data.currency,
       sector: data.sector ?? null,
       listedAt: data.listedAt ?? null,
@@ -122,6 +132,8 @@ export async function upsertInstrument(data: {
       target: [instrument.market, instrument.symbol],
       set: {
         name: sql`excluded.name`,
+        assetClass: sql`excluded.asset_class`,
+        region: sql`excluded.region`,
         currency: sql`excluded.currency`,
         sector: sql`excluded.sector`,
       },
@@ -812,4 +824,92 @@ export async function getFeatureCoverage(): Promise<FeatureCoverage[]> {
     .orderBy(featureDaily.featureSetVersion)
 
   return rows
+}
+
+// ---------------------------------------------------------------------------
+// Daftar instrumen beserta harga terakhirnya
+// ---------------------------------------------------------------------------
+
+export interface InstrumentQuote extends InstrumentView {
+  lastClose: number | null
+  lastDate: string | null
+  /** Perubahan terhadap penutupan sebelumnya, dalam persen. */
+  changePct: number | null
+  candleCount: number
+}
+
+/**
+ * Seluruh instrumen aktif beserta dua penutupan terakhirnya, dalam satu kueri.
+ *
+ * Ditulis sebagai satu lateral join, bukan satu kueri per instrumen. Dengan
+ * tujuh puluh instrumen, pola kueri-per-baris berarti tujuh puluh perjalanan
+ * bolak-balik ke Seoul hanya untuk menggambar satu daftar.
+ */
+export async function listInstrumentQuotes(): Promise<InstrumentQuote[]> {
+  const rows = await db.execute<{
+    id: number
+    symbol: string
+    name: string
+    market: DbMarket
+    asset_class: AssetClass
+    region: string | null
+    currency: string
+    sector: string | null
+    is_active: boolean
+    listed_at: string | null
+    delisted_at: string | null
+    last_close: string | null
+    prev_close: string | null
+    last_date: string | null
+    candle_count: number
+  }>(sql`
+    select
+      i.id, i.symbol, i.name, i.market, i.asset_class, i.region, i.currency,
+      i.sector, i.is_active, i.listed_at, i.delisted_at,
+      c.last_close, c.prev_close, c.last_date, coalesce(c.candle_count, 0) as candle_count
+    from instrument i
+    left join lateral (
+      select
+        max(d.close) filter (where d.rn = 1) as last_close,
+        max(d.close) filter (where d.rn = 2) as prev_close,
+        max(d.date)  filter (where d.rn = 1) as last_date,
+        max(d.total) as candle_count
+      from (
+        select
+          close, date,
+          row_number() over (order by date desc) as rn,
+          count(*) over () as total
+        from candle_daily
+        where instrument_id = i.id
+      ) d
+      where d.rn <= 2
+    ) c on true
+    where i.is_active
+    order by i.asset_class, i.symbol
+  `)
+
+  return rows.map((r) => {
+    const last = r.last_close === null ? null : Number(r.last_close)
+    const prev = r.prev_close === null ? null : Number(r.prev_close)
+
+    return {
+      id: r.id,
+      symbol: r.symbol,
+      name: r.name,
+      market: fromDbMarket(r.market),
+      assetClass: r.asset_class,
+      region: r.region,
+      currency: r.currency,
+      sector: r.sector,
+      isActive: r.is_active,
+      listedAt: r.listed_at,
+      delistedAt: r.delisted_at,
+      lastClose: last,
+      lastDate: r.last_date,
+      // Butuh dua penutupan. Satu penutupan tidak memberi tahu arah apa pun,
+      // dan nol akan terbaca sebagai "tidak berubah".
+      changePct: last !== null && prev !== null && prev !== 0 ? ((last - prev) / prev) * 100 : null,
+      candleCount: Number(r.candle_count),
+    }
+  })
 }

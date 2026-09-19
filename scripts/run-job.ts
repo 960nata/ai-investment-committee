@@ -20,16 +20,19 @@ const JOBS = [
   'ingest-crypto-daily',
   'ingest-idx-daily',
   'ingest-us-daily',
+  'ingest-global-daily',
   'compute-features-crypto',
   'compute-features-idx',
   'compute-features-us',
+  'compute-features-global',
 ] as const
 
 type JobName = (typeof JOBS)[number]
 
 function marketOf(job: string): MarketCode {
-  if (job.endsWith('-idx') || job.includes('-idx-')) return 'IDX'
-  if (job.endsWith('-us') || job.includes('-us-')) return 'US'
+  if (job.includes('-idx')) return 'IDX'
+  if (job.includes('-us')) return 'US'
+  if (job.includes('-global')) return 'GLOBAL'
   return 'CRYPTO'
 }
 

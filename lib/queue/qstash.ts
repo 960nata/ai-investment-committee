@@ -14,7 +14,7 @@ export interface JobPayload {
   jobName: string
   batchKey: string
   symbols: string[]
-  market: 'IDX' | 'US' | 'CRYPTO'
+  market: 'IDX' | 'US' | 'CRYPTO' | 'GLOBAL'
   /** ISO date, batas awal rentang data yang diminta. */
   from?: string
   /** ISO date, batas akhir rentang data yang diminta. */

@@ -8,7 +8,7 @@
  */
 
 import { registry } from '@/lib/adapters'
-import { BINANCE_DEFAULT_SYMBOLS } from '@/lib/adapters/binance'
+import { catalogueEntry } from '@/lib/adapters/catalogue'
 import {
   MAX_DAILY_JUMP,
   formatDate,
@@ -17,6 +17,7 @@ import {
   type Market,
 } from '@/lib/adapters/types'
 import {
+  getInstrumentBySymbol,
   getLatestCandle,
   quarantineRow,
   upsertCandles,
@@ -45,6 +46,7 @@ const CURRENCY_BY_MARKET: Record<Market, string> = {
   CRYPTO: 'USDT',
   IDX: 'IDR',
   US: 'USD',
+  GLOBAL: 'USD',
 }
 
 /** Riwayat yang ditarik saat instrumen belum punya satu candle pun. */
@@ -71,13 +73,20 @@ export async function runIngestJob(input: IngestInput): Promise<IngestResult> {
 
   for (const symbol of symbols) {
     try {
-      const known = BINANCE_DEFAULT_SYMBOLS.find((s) => s.symbol === symbol)
-      const instrument = await upsertInstrument({
-        symbol,
-        name: known?.name ?? symbol,
-        market,
-        currency: CURRENCY_BY_MARKET[market],
-      })
+      // Instrumen yang sudah terdaftar dipakai apa adanya. Menimpanya di sini
+      // akan menghapus nama, kelas aset, dan mata uang yang diisi seed dengan
+      // nilai bawaan per pasar — dan indeks dunia tidak punya satu mata uang.
+      const known = catalogueEntry(market, symbol)
+      const instrument =
+        (await getInstrumentBySymbol(market, symbol)) ??
+        (await upsertInstrument({
+          symbol,
+          name: known?.name ?? symbol,
+          market,
+          assetClass: known?.assetClass,
+          region: known?.region,
+          currency: known?.currency ?? CURRENCY_BY_MARKET[market],
+        }))
 
       const latest = await getLatestCandle(instrument.id)
 
@@ -127,6 +136,10 @@ export async function runIngestJob(input: IngestInput): Promise<IngestResult> {
           low: String(candle.low),
           close: String(candle.close),
           volume: String(candle.volume),
+          // Disimpan hanya bila sumbernya memang menyediakan. Menyalin harga
+          // mentah ke kolom ini akan membuat engine fitur mengira harganya
+          // sudah disesuaikan padahal belum.
+          adjClose: candle.adjClose === undefined ? null : String(candle.adjClose),
           sourceId,
         })
         previousClose = candle.close

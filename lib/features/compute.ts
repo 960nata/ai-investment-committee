@@ -64,6 +64,7 @@ const PERIODS_PER_YEAR: Record<MarketCode, number> = {
   CRYPTO: 365,
   IDX: 252,
   US: 252,
+  GLOBAL: 252,
 }
 
 /** Jendela normalisasi deret waktu: riwayat dua tahun instrumen itu sendiri. */

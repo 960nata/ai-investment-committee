@@ -1,51 +1,66 @@
 'use client'
 
 /**
- * Pemilih instrumen dan grafiknya.
+ * Penjelajah instrumen.
  *
- * Satu-satunya bagian ringkasan yang perlu berjalan di klien. Instrumen pertama
- * beserta candle-nya datang sudah terisi dari server, jadi halaman langsung
- * tergambar penuh; pengambilan data hanya terjadi ketika seseorang mengklik,
- * bukan di dalam effect yang jalan sendiri tiap render.
+ * Grafik memakai lebar penuh dan daftarnya ada di bawahnya, bukan di samping.
+ * Grafik harga yang disempitkan jadi dua pertiga layar kehilangan justru hal
+ * yang membuatnya berguna: bentuk pergerakan sepanjang waktu.
+ *
+ * Tab memilah menurut jenis aset, bukan menurut bursa. Orang mencari "emas",
+ * bukan "kontrak berjangka di bursa global", dan emas kebetulan bisa dibeli di
+ * dua tempat dengan kalender berbeda.
  */
 
-import { useState, useTransition } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import { CandlestickChart, type Candle } from './candlestick-chart'
+import { RegionFlag } from './flags'
 import { IconAlert, IconCandles, IconRows } from './icons'
-import { Blank, Tag } from './ui'
+import { Blank } from './ui'
 
 export interface ExplorerInstrument {
   id: number
   symbol: string
   name: string
   market: string
+  assetClass: string
+  region: string | null
+  currency: string
+  lastClose: number | null
+  lastDate: string | null
+  changePct: number | null
+  candleCount: number
 }
 
 interface Props {
   instruments: ExplorerInstrument[]
+  tabs: { id: string; label: string }[]
   initialInstrumentId: number | null
   initialCandles: Candle[]
 }
 
-export function InstrumentExplorer({ instruments, initialInstrumentId, initialCandles }: Props) {
+export function InstrumentExplorer({ instruments, tabs, initialInstrumentId, initialCandles }: Props) {
+  const initial = instruments.find((i) => i.id === initialInstrumentId)
+  const [tab, setTab] = useState(initial?.assetClass ?? tabs[0]?.id ?? 'crypto')
   const [selectedId, setSelectedId] = useState(initialInstrumentId)
   const [candles, setCandles] = useState(initialCandles)
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
 
+  const visible = useMemo(
+    () => instruments.filter((i) => i.assetClass === tab),
+    [instruments, tab],
+  )
+
   const selected = instruments.find((i) => i.id === selectedId) ?? null
 
-  function select(instrument: ExplorerInstrument) {
-    if (instrument.id === selectedId) return
-
+  function load(instrument: ExplorerInstrument) {
     setSelectedId(instrument.id)
     setError(null)
 
     startTransition(async () => {
       try {
-        // Tanpa batas waktu, permintaan yang menggantung membuat grafik berputar
-        // tanpa ujung dan pembacanya tidak tahu harus menunggu atau menyerah.
-        const response = await fetch(`/api/v1/instruments/${instrument.id}/candles`, {
+        const response = await fetch(`/api/v1/instruments/${instrument.id}/candles?from=${yearsAgo(2)}`, {
           signal: AbortSignal.timeout(15_000),
         })
         if (!response.ok) throw new Error(`HTTP ${response.status}`)
@@ -65,8 +80,36 @@ export function InstrumentExplorer({ instruments, initialInstrumentId, initialCa
     })
   }
 
+  function switchTab(next: string) {
+    setTab(next)
+    // Pindah tab langsung memuat instrumen pertamanya. Grafik yang menampilkan
+    // aset dari tab sebelumnya adalah cara termudah salah membaca harga.
+    const first = instruments.find((i) => i.assetClass === next)
+    if (first && first.id !== selectedId) load(first)
+  }
+
   return (
-    <div className="split" style={{ marginTop: 'var(--space-4)' }}>
+    <>
+      <div className="tabs" role="tablist" aria-label="Jenis aset">
+        {tabs.map((t) => {
+          const count = instruments.filter((i) => i.assetClass === t.id).length
+          return (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={t.id === tab}
+              className="tab"
+              onClick={() => switchTab(t.id)}
+              disabled={count === 0}
+            >
+              {t.label}
+              <span className="tab-count">{count}</span>
+            </button>
+          )
+        })}
+      </div>
+
       <section className="panel" style={{ marginTop: 0 }}>
         <div className="panel-head">
           <span className="panel-title">
@@ -74,16 +117,23 @@ export function InstrumentExplorer({ instruments, initialInstrumentId, initialCa
             {selected ? selected.symbol : 'Grafik'}
           </span>
           {selected && (
-            <span style={{ fontSize: 'var(--t-small)', color: 'var(--ink-mute)' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--t-small)', color: 'var(--ink-mute)' }}>
+              <RegionFlag region={selected.region} size={12} />
               {selected.name}
             </span>
           )}
-          <span className="panel-meta">
-            {pending ? 'memuat' : `${candles.length} candle`}
-          </span>
+          {selected?.lastClose != null && (
+            <span className="quote">
+              <span className="quote-price">
+                {formatPrice(selected.lastClose, selected.currency)}
+              </span>
+              <Change value={selected.changePct} />
+            </span>
+          )}
+          <span className="panel-meta">{pending ? 'memuat' : `${candles.length} candle`}</span>
         </div>
 
-        <div className="chart">
+        <div className="chart chart-wide">
           {error ? (
             <Blank icon={<IconAlert size={22} />} title="Grafik gagal dimuat">
               Coba muat ulang halaman. Kalau terus berulang, periksa apakah pipa data masih
@@ -100,39 +150,87 @@ export function InstrumentExplorer({ instruments, initialInstrumentId, initialCa
         </div>
       </section>
 
-      <section className="panel" style={{ marginTop: 0 }}>
+      <section className="panel">
         <div className="panel-head">
           <span className="panel-title">
             <IconRows size={14} />
-            Instrumen
+            {tabs.find((t) => t.id === tab)?.label ?? 'Instrumen'}
           </span>
-          <span className="panel-meta">{instruments.length}</span>
+          <span className="panel-meta">{visible.length} instrumen</span>
         </div>
 
-        {instruments.length === 0 ? (
-          <Blank icon={<IconRows size={22} />} title="Belum ada instrumen">
-            Jalankan <code>npm run db:seed</code> untuk mengisi daftar awal.
+        {visible.length === 0 ? (
+          <Blank icon={<IconRows size={22} />} title="Belum ada instrumen di kelas ini">
+            Jalankan <code>npm run db:seed</code> untuk mengisi katalognya.
           </Blank>
         ) : (
-          <div className="picker">
-            {instruments.map((instrument) => (
+          <div className="cards">
+            {visible.map((instrument) => (
               <button
                 key={instrument.id}
                 type="button"
-                className="pick"
+                className="card-pick"
                 aria-pressed={instrument.id === selectedId}
-                onClick={() => select(instrument)}
+                onClick={() => load(instrument)}
               >
-                <span className="pick-symbol">{instrument.symbol.replace(/USDT$/, '')}</span>
-                <span className="pick-name">{instrument.name}</span>
-                <span className="pick-tail">
-                  <Tag>{instrument.market}</Tag>
+                <span className="card-pick-head">
+                  <RegionFlag region={instrument.region} size={13} />
+                  <span className="card-pick-symbol">{display(instrument.symbol)}</span>
+                  <Change value={instrument.changePct} />
+                </span>
+                <span className="card-pick-name">{instrument.name}</span>
+                <span className="card-pick-foot">
+                  {instrument.lastClose == null ? (
+                    <span style={{ color: 'var(--ink-faint)' }}>belum ada harga</span>
+                  ) : (
+                    <>
+                      <span className="card-pick-price">
+                        {formatPrice(instrument.lastClose, instrument.currency)}
+                      </span>
+                      <span style={{ color: 'var(--ink-faint)' }}>
+                        {instrument.candleCount} candle
+                      </span>
+                    </>
+                  )}
                 </span>
               </button>
             ))}
           </div>
         )}
       </section>
-    </div>
+    </>
   )
+}
+
+// ---------------------------------------------------------------------------
+
+function Change({ value }: { value: number | null }) {
+  if (value === null) return <span className="change" />
+
+  // Nol persen ditulis apa adanya, bukan diwarnai. Hari tanpa perubahan bukan
+  // hari baik maupun buruk.
+  const tone = value > 0 ? 'up' : value < 0 ? 'down' : 'flat'
+  return (
+    <span className={`change ${tone}`}>
+      {value > 0 ? '+' : ''}
+      {value.toFixed(2)}%
+    </span>
+  )
+}
+
+/** Simbol dirapikan untuk dibaca: akhiran bursa dan penanda kontrak dibuang. */
+function display(symbol: string): string {
+  return symbol.replace(/USDT$/, '').replace(/\.JK$/, '').replace(/=F$/, '').replace(/^\^/, '')
+}
+
+function formatPrice(value: number, currency: string): string {
+  // Rupiah tidak pernah ditulis berkoma; dolar dan sejenisnya perlu dua angka.
+  const digits = currency === 'IDR' || currency === 'JPY' || currency === 'KRW' ? 0 : value < 10 ? 4 : 2
+  return `${value.toLocaleString('id-ID', { minimumFractionDigits: digits, maximumFractionDigits: digits })} ${currency}`
+}
+
+function yearsAgo(n: number): string {
+  const d = new Date()
+  d.setUTCFullYear(d.getUTCFullYear() - n)
+  return d.toISOString().slice(0, 10)
 }

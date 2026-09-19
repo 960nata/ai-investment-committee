@@ -32,6 +32,8 @@ const instrument: InstrumentView = {
   symbol: 'TEST',
   name: 'Uji',
   market: 'US',
+  assetClass: 'saham',
+  region: 'Amerika Serikat',
   currency: 'USD',
   sector: null,
   isActive: true,

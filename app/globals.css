@@ -924,3 +924,186 @@ button {
     background-position: -200% 0;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Tab kelas aset
+   --------------------------------------------------------------------------- */
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  margin-top: var(--space-4);
+  padding-bottom: 0;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px var(--space-4);
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: var(--radius) var(--radius) 0 0;
+  font-family: var(--mono);
+  font-size: var(--t-small);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  white-space: nowrap;
+  transition: color 120ms ease, background 120ms ease;
+}
+
+.tab:hover:not(:disabled) {
+  color: var(--ink);
+  background: var(--surface-2);
+}
+
+.tab:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Tab aktif menyambung ke panel di bawahnya lewat satu garis yang terpotong,
+   sehingga terbaca sebagai lembar yang sama, bukan tombol yang menyala. */
+.tab[aria-selected='true'] {
+  border-color: var(--line);
+  background: var(--surface-1);
+  color: var(--ink);
+  box-shadow: inset 0 2px 0 var(--signal), 0 1px 0 var(--surface-1);
+}
+
+.tab-count {
+  font-size: var(--t-micro);
+  color: var(--ink-faint);
+}
+
+.tab[aria-selected='true'] .tab-count {
+  color: var(--ink-mute);
+}
+
+/* Panel tepat di bawah tab menempel tanpa jarak. */
+.tabs + .panel {
+  margin-top: 0;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   Kutipan harga di kepala panel
+   --------------------------------------------------------------------------- */
+
+.quote {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.quote-price {
+  font-family: var(--mono);
+  font-size: var(--t-lead);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.change {
+  min-width: 58px;
+  font-family: var(--mono);
+  font-size: var(--t-small);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--ink-faint);
+}
+
+.change.up {
+  color: var(--measured);
+}
+
+.change.down {
+  color: var(--halted);
+}
+
+.change.flat {
+  color: var(--ink-mute);
+}
+
+.chart-wide {
+  height: 440px;
+}
+
+@media (max-width: 720px) {
+  .chart-wide {
+    height: 300px;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Daftar instrumen di bawah grafik
+   --------------------------------------------------------------------------- */
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border-top: 1px solid var(--line);
+}
+
+.card-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-1);
+  text-align: left;
+  transition: background 120ms ease;
+}
+
+.card-pick:hover {
+  background: var(--surface-2);
+}
+
+.card-pick[aria-pressed='true'] {
+  background: var(--surface-2);
+  box-shadow: inset 2px 0 0 var(--signal);
+}
+
+.card-pick-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.card-pick-symbol {
+  font-family: var(--mono);
+  font-size: var(--t-body);
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.card-pick-head .change {
+  margin-left: auto;
+}
+
+.card-pick-name {
+  font-size: var(--t-small);
+  color: var(--ink-mute);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-pick-foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-family: var(--mono);
+  font-size: var(--t-small);
+}
+
+.card-pick-price {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+}

@@ -6,7 +6,13 @@
  * yang berubah cuma satu file adaptor baru — tidak ada kode analisis yang perlu disentuh.
  */
 
-export type Market = 'IDX' | 'US' | 'CRYPTO';
+/**
+ * Tempat dan kalender perdagangan, bukan jenis asetnya.
+ *
+ * GLOBAL dipakai untuk kontrak berjangka emas dan komoditi, yang tidak terikat
+ * satu bursa saham mana pun dan berdagang hampir sepanjang hari kerja.
+ */
+export type Market = 'IDX' | 'US' | 'CRYPTO' | 'GLOBAL';
 
 export interface Candle {
   date: Date;
@@ -15,6 +21,12 @@ export interface Candle {
   low: number;
   close: number;
   volume: number;
+  /**
+   * Penutupan tersesuaikan dividen dan stock split, bila sumbernya menyediakan.
+   * Wajib dipakai untuk indikator apa pun; tanpa itu split 1:2 terbaca sebagai
+   * kejatuhan lima puluh persen.
+   */
+  adjClose?: number;
 }
 
 export interface HealthStatus {
@@ -76,6 +88,9 @@ export const MAX_DAILY_JUMP: Record<Market, number> = {
   IDX: 0.35,
   US: 0.35,
   CRYPTO: 0.6,
+  // Komoditi berjangka bisa bergerak keras saat pasokan terganggu, tetapi tidak
+  // sekeras crypto.
+  GLOBAL: 0.45,
 }
 
 export interface ValidateOptions {

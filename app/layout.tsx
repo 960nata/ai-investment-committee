@@ -15,8 +15,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="id">
-      <body>{children}</body>
+    <html lang="id" suppressHydrationWarning>
+      {/*
+         * Ekstensi peramban menyuntik atribut ke <html> dan <body> sebelum React
+         * sempat hydrate — bis_skin_checked, webcrx, crxlauncher, dan sejenisnya.
+         * Peredam ini hanya membungkam peringatan pada dua elemen itu; perbedaan
+         * di dalam pohon tetap dilaporkan seperti biasa.
+         */}
+      <body suppressHydrationWarning>{children}</body>
     </html>
   );
 }

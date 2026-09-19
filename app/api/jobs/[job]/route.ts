@@ -29,11 +29,13 @@ export const dynamic = 'force-dynamic'
 /** Nama job = segmen URL worker. Job tak dikenal ditolak, bukan didiamkan. */
 const HANDLERS: Record<string, (payload: JobPayload) => Promise<BatchResult>> = {
   'ingest-crypto-daily': ingestPrice,
-  'ingest-us-daily': ingestPrice,
   'ingest-idx-daily': ingestPrice,
+  'ingest-us-daily': ingestPrice,
+  'ingest-global-daily': ingestPrice,
   'compute-features-crypto': computeFeaturesBatch,
   'compute-features-idx': computeFeaturesBatch,
   'compute-features-us': computeFeaturesBatch,
+  'compute-features-global': computeFeaturesBatch,
   'komite-review': reviewCommittee,
 }
 
