@@ -33,6 +33,7 @@ import {
 } from '../lib/features/indicators'
 import { computeFeatures, FEATURE_SET_VERSION } from '../lib/features/compute'
 import { FEATURES, normalisedFeatureNames } from '../lib/features/registry'
+import { normaliseCrossSection, type CrossSectionRow } from '../lib/features/cross-section'
 
 // ---------------------------------------------------------------------------
 // Kerangka uji minimal
@@ -593,6 +594,101 @@ test('menjalankan ulang atas data yang sama menghasilkan baris identik', () => {
     JSON.stringify(first.rows) === JSON.stringify(second.rows),
     'hasil harus identik bit-per-bit antar-jalan',
   )
+})
+
+// ---------------------------------------------------------------------------
+// Normalisasi lintas penampang
+// ---------------------------------------------------------------------------
+
+function peers(group: string, values: (number | null)[]): CrossSectionRow[] {
+  return values.map((v, i) => ({
+    instrumentId: i + 1 + group.charCodeAt(0) * 1000,
+    peerGroup: group,
+    values: { per: v },
+  }))
+}
+
+test('anggota di tengah kelompok mendapat z mendekati nol', () => {
+  const rows = peers('bank', [10, 12, 14, 16, 18, 20, 22])
+  const out = normaliseCrossSection(rows, ['per'])
+  const middle = out.find((r) => r.instrumentId === rows[3].instrumentId)!
+  near(middle.values.per_zcs, 0, 1e-9)
+})
+
+test('yang termurah dan termahal berada di ujung berlawanan', () => {
+  const rows = peers('bank', [10, 12, 14, 16, 18, 20, 22])
+  const out = normaliseCrossSection(rows, ['per'])
+  const cheapest = out.find((r) => r.instrumentId === rows[0].instrumentId)!
+  const priciest = out.find((r) => r.instrumentId === rows[6].instrumentId)!
+
+  assert(cheapest.values.per_zcs! < 0, 'yang termurah harus di bawah median')
+  assert(priciest.values.per_zcs! > 0, 'yang termahal harus di atas median')
+  assert(cheapest.values.per_pcs! < priciest.values.per_pcs!, 'persentil harus berurutan')
+})
+
+test('persentil lintas penampang berada di rentang nol sampai satu', () => {
+  const rows = peers('bank', [8, 11, 13, 19, 25, 31, 44, 60])
+  for (const r of normaliseCrossSection(rows, ['per'])) {
+    const p = r.values.per_pcs!
+    assert(p > 0 && p < 1, `persentil di luar rentang: ${p}`)
+  }
+})
+
+test('kelompok kecil disatukan, dan tetap kosong bila gabungannya masih tipis', () => {
+  // Dua perilaku yang keduanya benar. Anggota kelompok tipis tidak pernah
+  // dibuang — ia tetap muncul dengan kunci lengkap. Tetapi selama pembandingnya
+  // belum cukup, nilainya kosong, karena median dari dua anggota bukan
+  // pembanding melainkan tebakan dengan langkah tambahan.
+  const tipis = [...peers('bank', [10, 12, 14, 16, 18, 20]), ...peers('tambang', [50, 60])]
+  const a = normaliseCrossSection(tipis, ['per'])
+
+  assert(a.length === tipis.length, 'tidak boleh ada anggota yang hilang')
+  const kecil = a.filter((r) => r.peerGroup !== 'bank')
+  assert(kecil.length === 2, 'kelompok tipis harus pindah ke kelompok gabungan')
+  assert(kecil.every((r) => r.values.per_zcs === null), 'dua pembanding belum cukup')
+
+  // Begitu beberapa kelompok tipis disatukan dan jumlahnya memadai, nilainya
+  // muncul — tanpa mencampurnya ke kelompok besar yang sifatnya berbeda.
+  const cukup = [
+    ...peers('bank', [10, 12, 14, 16, 18, 20]),
+    ...peers('tambang', [50, 60]),
+    ...peers('properti', [30, 35]),
+    ...peers('telko', [22, 26]),
+  ]
+  const b = normaliseCrossSection(cukup, ['per'])
+  const gabungan = b.filter((r) => r.peerGroup !== 'bank')
+  assert(gabungan.length === 6, 'seluruh kelompok tipis masuk satu kelompok gabungan')
+  assert(gabungan.every((r) => r.values.per_zcs !== null), 'enam pembanding sudah cukup')
+})
+
+test('satu pencilan ekstrem tidak menggeser seluruh kelompok', () => {
+  // Inilah alasan memakai median dan MAD, bukan rata-rata dan simpangan baku:
+  // satu emiten dengan rasio empat ribu sudah cukup menggeser rata-rata sektor.
+  const biasa = peers('bank', [10, 12, 14, 16, 18, 20, 22])
+  const dengan = peers('bank', [10, 12, 14, 16, 18, 20, 4000])
+
+  const a = normaliseCrossSection(biasa, ['per'])
+  const b = normaliseCrossSection(dengan, ['per'])
+
+  const tengahA = a.find((r) => r.instrumentId === biasa[3].instrumentId)!.values.per_zcs!
+  const tengahB = b.find((r) => r.instrumentId === dengan[3].instrumentId)!.values.per_zcs!
+  near(tengahA, tengahB, 0.5)
+})
+
+test('anggota tanpa nilai tetap mendapat kuncinya, berisi kosong', () => {
+  const rows = peers('bank', [10, 12, null, 16, 18, 20])
+  const out = normaliseCrossSection(rows, ['per'])
+  const kosong = out.find((r) => r.instrumentId === rows[2].instrumentId)!
+
+  assert('per_zcs' in kosong.values, 'kunci harus tetap ada')
+  assert(kosong.values.per_zcs === null, 'isinya kosong, bukan nol')
+})
+
+test('kelompok tanpa cukup nilai menghasilkan kosong, bukan angka karangan', () => {
+  const rows = peers('bank', [10, null, null, null, null, null])
+  for (const r of normaliseCrossSection(rows, ['per'])) {
+    assert(r.values.per_zcs === null, 'tanpa pembanding, tidak ada nilai yang sah')
+  }
 })
 
 // ---------------------------------------------------------------------------
