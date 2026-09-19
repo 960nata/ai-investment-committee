@@ -35,11 +35,27 @@ const NO_INVENTED_NUMBERS =
 
 const LANGUAGE = 'Jawab dalam bahasa Indonesia yang lugas. Hindari jargon yang tidak perlu.'
 
+/**
+ * Protokol ringkas antar-agen.
+ *
+ * Catatan tiap agen dibaca agen berikutnya, bukan manusia, jadi kalimat pembuka,
+ * pengulangan pertanyaan, dan penutup yang sopan adalah token yang dibayar tiga
+ * kali — sekali saat ditulis, lalu sekali lagi tiap kali catatan itu diteruskan
+ * ke giliran berikutnya. Baris berlabel juga lebih sulit disalahbaca daripada
+ * paragraf: agen berikutnya bisa menemukan bagian yang ia butuhkan tanpa
+ * menafsirkan ulang seluruh teks.
+ */
+const COMPACT =
+  'FORMAT: baris berlabel pendek, satu gagasan per baris, maksimum 12 baris. ' +
+  'Dilarang menulis kalimat pembuka, penutup, basa-basi, atau mengulang ' +
+  'pertanyaan. Langsung isi. Tanpa markdown, tanpa bullet berlapis. ' +
+  'Tiap baris berbentuk LABEL: isi.'
+
 export const ANALIS: AgentRole = {
   name: 'analis',
   title: 'Analis Data',
   temperature: 0.1,
-  maxOutputTokens: 700,
+  maxOutputTokens: 420,
   system: [
     'Kamu analis data kuantitatif di sebuah komite investasi.',
     '',
@@ -56,6 +72,7 @@ export const ANALIS: AgentRole = {
     '   ada batasnya.',
     '',
     NO_INVENTED_NUMBERS,
+    COMPACT,
     LANGUAGE,
   ].join('\n'),
 }
@@ -64,7 +81,7 @@ export const STRATEG: AgentRole = {
   name: 'strateg',
   title: 'Strateg Portofolio',
   temperature: 0.5,
-  maxOutputTokens: 800,
+  maxOutputTokens: 460,
   system: [
     'Kamu strateg portofolio. Kamu baru saja menerima laporan dari analis data.',
     '',
@@ -83,6 +100,7 @@ export const STRATEG: AgentRole = {
     'mengarang keyakinan yang tidak didukung datanya.',
     '',
     NO_INVENTED_NUMBERS,
+    COMPACT,
     LANGUAGE,
   ].join('\n'),
 }
@@ -91,7 +109,7 @@ export const RISIKO: AgentRole = {
   name: 'risiko',
   title: 'Pengawas Risiko',
   temperature: 0.3,
-  maxOutputTokens: 700,
+  maxOutputTokens: 420,
   system: [
     'Kamu pengawas risiko. Tugasmu MENYERANG tesis strateg, bukan menyeimbangkannya.',
     '',
@@ -109,6 +127,7 @@ export const RISIKO: AgentRole = {
     '4. Satu kalimat: apa yang harus benar agar tesis ini layak dijalankan.',
     '',
     NO_INVENTED_NUMBERS,
+    COMPACT,
     LANGUAGE,
   ].join('\n'),
 }
@@ -117,7 +136,7 @@ export const KETUA: AgentRole = {
   name: 'ketua',
   title: 'Ketua Komite',
   temperature: 0.2,
-  maxOutputTokens: 700,
+  maxOutputTokens: 380,
   json: true,
   system: [
     'Kamu ketua komite investasi. Kamu sudah membaca laporan analis, tesis strateg,',
@@ -144,6 +163,7 @@ export const KETUA: AgentRole = {
     '  harus muncul di "key_risk".',
     '',
     NO_INVENTED_NUMBERS,
+    COMPACT,
     LANGUAGE,
   ].join('\n'),
 }

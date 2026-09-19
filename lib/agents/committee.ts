@@ -233,6 +233,23 @@ export async function runCommittee(input: CommitteeInput): Promise<CommitteeResu
  * sebagai ucapannya sendiri dan cenderung menyetujuinya — persis kebalikan dari
  * yang dibutuhkan pengawas risiko.
  */
+/**
+ * Pagu panjang satu catatan saat diteruskan ke giliran berikutnya.
+ *
+ * Protokol ringkas di `roles.ts` seharusnya menjaga catatan tetap pendek, tetapi
+ * prompt adalah permintaan, bukan jaminan. Tanpa pagu, satu model yang
+ * mengabaikannya akan menggandakan biaya setiap giliran sesudahnya — catatan
+ * yang sama ikut terkirim tiga kali sampai ketua.
+ */
+const MAX_FORWARDED_CHARS = 1_200
+
+function clip(text: string): string {
+  const trimmed = text.trim()
+  return trimmed.length <= MAX_FORWARDED_CHARS
+    ? trimmed
+    : `${trimmed.slice(0, MAX_FORWARDED_CHARS)}\n[dipotong]`
+}
+
 function buildMessages(
   role: AgentRole,
   factsBlock: string,
@@ -243,10 +260,10 @@ function buildMessages(
   const parts = [factsBlock]
 
   for (const turn of turns) {
-    parts.push(`--- Catatan dari ${turn.agent.toUpperCase()} ---\n${turn.content}`)
+    parts.push(`[${turn.agent.toUpperCase()}]\n${clip(turn.content)}`)
   }
 
-  parts.push(`--- Giliranmu sekarang: ${role.title} ---`)
+  parts.push(`[GILIRANMU: ${role.title.toUpperCase()}]`)
   messages.push({ role: 'user', content: parts.join('\n\n') })
 
   return messages

@@ -139,3 +139,19 @@ export const deepSeekAdapter = createOpenAiCompatibleAdapter({
   model: process.env.DEEPSEEK_MODEL ?? 'deepseek-chat',
   envPrefix: 'DEEPSEEK_API_KEY',
 })
+
+export const mistralAdapter = createOpenAiCompatibleAdapter({
+  id: 'mistral',
+  name: 'Mistral',
+  baseUrl: 'https://api.mistral.ai/v1',
+  model: process.env.MISTRAL_MODEL ?? 'mistral-large-latest',
+  envPrefix: 'MISTRAL_API_KEY',
+})
+
+export const nvidiaAdapter = createOpenAiCompatibleAdapter({
+  id: 'nvidia',
+  name: 'NVIDIA NIM',
+  baseUrl: 'https://integrate.api.nvidia.com/v1',
+  model: process.env.NVIDIA_MODEL ?? 'meta/llama-3.3-70b-instruct',
+  envPrefix: 'NVIDIA_API_KEY',
+})

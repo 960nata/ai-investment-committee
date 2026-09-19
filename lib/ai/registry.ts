@@ -11,7 +11,13 @@
  */
 
 import { geminiAdapter } from './providers/gemini'
-import { deepSeekAdapter, groqAdapter, openRouterAdapter } from './providers/openai-compatible'
+import {
+  deepSeekAdapter,
+  groqAdapter,
+  mistralAdapter,
+  nvidiaAdapter,
+  openRouterAdapter,
+} from './providers/openai-compatible'
 import { collectKeys, nextKey, penalise, poolStatus, type PooledKey } from './keyring'
 import { LlmError, type LlmAdapter, type LlmRequest, type LlmResponse } from './types'
 
@@ -27,7 +33,23 @@ interface ProviderEntry {
  * Urutan prioritas. Penyedia tanpa satu pun kunci di env langsung dilewati,
  * jadi menambah penyedia baru cukup dengan mengisi variabel env-nya.
  */
-const ADAPTERS: LlmAdapter[] = [geminiAdapter, groqAdapter, openRouterAdapter, deepSeekAdapter]
+const ADAPTERS: LlmAdapter[] = [
+  geminiAdapter, // kolam kunci terbesar
+  groqAdapter, // latensi terendah
+  openRouterAdapter, // model gratis, kuota harian
+  deepSeekAdapter,
+  mistralAdapter,
+  nvidiaAdapter,
+]
+
+/**
+ * GITHUB_TOKEN sengaja TIDAK dipasang di sini meski GitHub Models menerima
+ * format yang sama. Token itu bukan kunci LLM murni — ia fine-grained PAT yang
+ * juga bisa membaca dan menulis repositori. Menaruhnya di env aplikasi web
+ * berarti satu kebocoran env menyerahkan repo, bukan sekadar kuota model.
+ * Kalau GitHub Models memang mau dipakai, buat token terpisah tanpa akses repo
+ * dan daftarkan sebagai GITHUB_MODELS_TOKEN.
+ */
 
 let entries: ProviderEntry[] | null = null
 
