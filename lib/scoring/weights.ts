@@ -94,15 +94,12 @@ export const GROUP_OF: Record<FeatureGroup, ScoreGroup> = {
   volatilitas: 'volume_volatilitas',
   volume: 'volume_volatilitas',
   relatif: 'relatif',
+  valuasi: 'valuasi',
+  kualitas: 'pertumbuhan',
 }
 
 /** Kelompok yang belum punya fitur sama sekali, untuk ditampilkan apa adanya. */
-export const GROUPS_WITHOUT_FEATURES: ScoreGroup[] = [
-  'arus_dana',
-  'sentimen',
-  'valuasi',
-  'pertumbuhan',
-]
+export const GROUPS_WITHOUT_FEATURES: ScoreGroup[] = ['arus_dana', 'sentimen']
 
 /**
  * Versi model, ikut tersimpan di tiap baris skor.

@@ -23,6 +23,8 @@ export type FeatureGroup =
   | 'volume'
   | 'struktur'
   | 'relatif'
+  | 'valuasi'
+  | 'kualitas'
 
 /**
  * Peran fitur di dalam sistem.
@@ -401,6 +403,240 @@ export const FEATURES: FeatureSpec[] = [
     direction: 1,
     label: 'Kekuatan relatif 60 hari',
     rationale: 'Sama, pada rentang yang lebih panjang.',
+    normalise: true,
+  },
+
+  // --- valuasi ------------------------------------------------------------
+  {
+    name: 'per',
+    group: 'valuasi',
+    role: 'score',
+    direction: -1,
+    label: 'Rasio harga terhadap laba',
+    rationale:
+      'Efek nilai adalah anomali yang paling lama bertahan dalam literatur; murah relatif terhadap labanya cenderung memberi imbal hasil lebih baik.',
+    normalise: true,
+  },
+  {
+    name: 'pbv',
+    group: 'valuasi',
+    role: 'score',
+    direction: -1,
+    label: 'Rasio harga terhadap nilai buku',
+    rationale:
+      'Pembanding yang tetap bekerja saat laba sedang negatif, dan itu justru saat rasio harga terhadap laba kehilangan arti.',
+    normalise: true,
+  },
+  {
+    name: 'psr',
+    group: 'valuasi',
+    role: 'score',
+    direction: -1,
+    label: 'Rasio harga terhadap pendapatan',
+    rationale:
+      'Pendapatan jauh lebih sulit dipoles daripada laba, jadi rasio ini bertahan pada emiten yang labanya bergejolak.',
+    normalise: true,
+  },
+  {
+    name: 'ev_ebitda',
+    group: 'valuasi',
+    role: 'score',
+    direction: -1,
+    label: 'Nilai perusahaan terhadap EBITDA',
+    rationale:
+      'Memperhitungkan utang, sehingga dua emiten dengan kapitalisasi sama tetapi beban utang berbeda tidak lagi terlihat sebanding.',
+    normalise: true,
+  },
+  {
+    name: 'earnings_yield',
+    group: 'valuasi',
+    role: 'score',
+    direction: 1,
+    label: 'Imbal hasil laba',
+    rationale:
+      'Separuh dari Magic Formula Greenblatt; laba operasi dibagi nilai perusahaan menjawab berapa yang dihasilkan tiap rupiah yang dibayar.',
+    normalise: true,
+  },
+  {
+    name: 'fcf_yield',
+    group: 'valuasi',
+    role: 'score',
+    direction: 1,
+    label: 'Imbal hasil arus kas bebas',
+    rationale:
+      'Kas yang benar-benar tersisa setelah belanja modal, dan kas jauh lebih sulit dikarang daripada laba akuntansi.',
+    normalise: true,
+  },
+  {
+    name: 'dividend_yield',
+    group: 'valuasi',
+    role: 'score',
+    direction: null,
+    label: 'Imbal hasil dividen',
+    rationale:
+      'Bisa berarti murah, bisa berarti pasar sedang menduga dividennya akan dipotong; tandanya harus datang dari kalibrasi.',
+    normalise: true,
+  },
+
+  // --- pertumbuhan dan kualitas --------------------------------------------
+  {
+    name: 'roe',
+    group: 'kualitas',
+    role: 'score',
+    direction: 1,
+    label: 'Imbal hasil ekuitas',
+    rationale:
+      'Seberapa produktif modal pemegang saham, meski bisa dipoles dengan menumpuk utang.',
+    normalise: true,
+  },
+  {
+    name: 'roa',
+    group: 'kualitas',
+    role: 'score',
+    direction: 1,
+    label: 'Imbal hasil aset',
+    rationale:
+      'Tidak bisa dipoles dengan utang, karena utang ikut masuk penyebutnya.',
+    normalise: true,
+  },
+  {
+    name: 'margin_kotor',
+    group: 'kualitas',
+    role: 'score',
+    direction: 1,
+    label: 'Margin kotor',
+    rationale:
+      'Penanda daya tawar harga yang paling bertahan lama dibanding margin di bawahnya.',
+    normalise: true,
+  },
+  {
+    name: 'margin_bersih',
+    group: 'kualitas',
+    role: 'score',
+    direction: 1,
+    label: 'Margin bersih',
+    rationale:
+      'Berapa yang tersisa dari tiap rupiah pendapatan setelah semuanya dibayar.',
+    normalise: true,
+  },
+  {
+    name: 'margin_operasi',
+    group: 'kualitas',
+    role: 'score',
+    direction: 1,
+    label: 'Margin operasi',
+    rationale:
+      'Menyaring pengaruh pajak dan bunga, jadi lebih murni menggambarkan usahanya sendiri.',
+    normalise: true,
+  },
+  {
+    name: 'der',
+    group: 'kualitas',
+    role: 'score',
+    direction: -1,
+    label: 'Liabilitas terhadap ekuitas',
+    rationale:
+      'Utang memperbesar untung sekaligus rugi, dan yang kedua itulah yang mematikan perusahaan.',
+    normalise: true,
+  },
+  {
+    name: 'current_ratio',
+    group: 'kualitas',
+    role: 'score',
+    direction: 1,
+    label: 'Rasio lancar',
+    rationale:
+      'Kemampuan membayar kewajiban setahun ke depan tanpa menjual aset jangka panjang.',
+    normalise: true,
+  },
+  {
+    name: 'akrual',
+    group: 'kualitas',
+    role: 'score',
+    direction: -1,
+    label: 'Akrual',
+    rationale:
+      'Temuan Sloan: laba yang tidak disertai kas masuk memberi imbal hasil lebih rendah tahun berikutnya, dan bahannya hanya dua angka.',
+    normalise: true,
+  },
+  {
+    name: 'pertumbuhan_pendapatan_yoy',
+    group: 'kualitas',
+    role: 'score',
+    direction: 1,
+    label: 'Pertumbuhan pendapatan',
+    rationale:
+      'Pertumbuhan pendapatan lebih jujur daripada pertumbuhan laba, yang bisa datang dari pemotongan biaya sekali jalan.',
+    normalise: true,
+  },
+  {
+    name: 'pertumbuhan_laba_yoy',
+    group: 'kualitas',
+    role: 'score',
+    direction: 1,
+    label: 'Pertumbuhan laba',
+    rationale:
+      'Pada akhirnya harga mengikuti laba, dan di horizon panjang hubungan itu paling terlihat.',
+    normalise: true,
+  },
+  {
+    name: 'pertumbuhan_pendapatan_3t',
+    group: 'kualitas',
+    role: 'score',
+    direction: 1,
+    label: 'Pertumbuhan pendapatan tiga tahun',
+    rationale:
+      'Meredam satu kuartal yang kebetulan bagus atau buruk.',
+    normalise: true,
+  },
+  {
+    name: 'konsistensi_pertumbuhan',
+    group: 'kualitas',
+    role: 'score',
+    direction: 1,
+    label: 'Konsistensi pertumbuhan',
+    rationale:
+      'Tumbuh stabil sepuluh persen lebih berharga daripada rata-rata sama yang naik turun keras.',
+    normalise: true,
+  },
+  {
+    name: 'sgr',
+    group: 'kualitas',
+    role: 'score',
+    direction: 1,
+    label: 'Laju pertumbuhan berkelanjutan',
+    rationale:
+      'Laju yang bisa dibiayai sendiri; yang tumbuh jauh di atasnya sedang membakar modal luar.',
+    normalise: true,
+  },
+  {
+    name: 'perubahan_saham_yoy',
+    group: 'kualitas',
+    role: 'score',
+    direction: -1,
+    label: 'Perubahan jumlah saham',
+    rationale:
+      'Penerbitan saham baru mengencerkan pemegang lama, dan pembelian kembali melakukan kebalikannya.',
+    normalise: true,
+  },
+  {
+    name: 'altman_z',
+    group: 'kualitas',
+    role: 'score',
+    direction: 1,
+    label: 'Altman Z-score',
+    rationale:
+      'Ukuran jarak dari kesulitan keuangan; ambangnya wajib dikalibrasi ulang sebelum dipakai untuk keputusan.',
+    normalise: true,
+  },
+  {
+    name: 'piotroski',
+    group: 'kualitas',
+    role: 'score',
+    direction: 1,
+    label: 'Piotroski F-Score',
+    rationale:
+      'Tujuh dari sembilan kriterianya mengukur perubahan, bukan tingkat, sehingga ia menangkap arah fundamental yang sedang menguat.',
     normalise: true,
   },
 ]

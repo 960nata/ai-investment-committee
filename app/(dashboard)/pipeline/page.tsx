@@ -21,6 +21,7 @@ import {
 import { Blank, DatabaseNotice, Lamp, Tag, type State } from '@/components/ui'
 import {
   getFeatureCoverage,
+  getFundamentalCoverage,
   getScoreCoverage,
   listAdapterHealth,
   listQuarantined,
@@ -48,19 +49,21 @@ export default async function PipelinePage() {
     quarantined: Awaited<ReturnType<typeof listQuarantined>>
     features: Awaited<ReturnType<typeof getFeatureCoverage>>
     scores: Awaited<ReturnType<typeof getScoreCoverage>>
+    fundamentals: Awaited<ReturnType<typeof getFundamentalCoverage>>
   } | null = null
   let error: string | null = null
 
   try {
-    const [schedules, runs, health, quarantined, features, scores] = await Promise.all([
+    const [schedules, runs, health, quarantined, features, scores, fundamentals] = await Promise.all([
       listSchedules(),
       listRecentJobRuns(15),
       listAdapterHealth(),
       listQuarantined(10),
       getFeatureCoverage(),
       getScoreCoverage(),
+      getFundamentalCoverage(),
     ])
-    data = { schedules, runs, health, quarantined, features, scores }
+    data = { schedules, runs, health, quarantined, features, scores, fundamentals }
   } catch (err) {
     error = err instanceof Error ? err.message : String(err)
   }
@@ -233,6 +236,45 @@ export default async function PipelinePage() {
                         ) : (
                           <Tag>disimpan untuk perbandingan</Tag>
                         )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </Panel>
+
+          <Panel
+            icon={<IconDatabase size={14} />}
+            title="Laporan keuangan"
+            meta={data.fundamentals.length === 0 ? 'kosong' : 'point-in-time'}
+          >
+            {data.fundamentals.length === 0 ? (
+              <Blank icon={<IconDatabase size={22} />} title="Belum ada laporan keuangan">
+                Jalankan <code>npm run job fundamental-us</code> untuk menariknya dari SEC
+                EDGAR. Tanpa ini, bobot valuasi dan pertumbuhan di horizon panjang kosong.
+              </Blank>
+            ) : (
+              <table className="grid">
+                <thead>
+                  <tr>
+                    <th>Sumber</th>
+                    <th className="num">Baris</th>
+                    <th className="num">Emiten</th>
+                    <th>Terbit terakhir</th>
+                    <th>Keterangan</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.fundamentals.map((f) => (
+                    <tr key={f.sourceId}>
+                      <td className="key">{f.sourceId}</td>
+                      <td className="num">{f.rows.toLocaleString('id-ID')}</td>
+                      <td className="num">{f.instruments}</td>
+                      <td className="dim">{f.latestReported ?? '—'}</td>
+                      <td className="wrap">
+                        menyimpan tiap versi penyajian, jadi backtest memakai angka yang
+                        benar-benar diketahui pada tanggalnya
                       </td>
                     </tr>
                   ))}

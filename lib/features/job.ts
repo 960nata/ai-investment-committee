@@ -9,6 +9,7 @@
 
 import {
   getCandles,
+  getFundamentalsAsOf,
   getInstrumentBySymbol,
   upsertFeatures,
   type FeatureInput,
@@ -125,7 +126,12 @@ export async function runFeatureJob(input: FeatureJobInput): Promise<FeatureJobR
         ? series.date.map((d) => benchmarkByDate.get(d) ?? null)
         : undefined
 
-      const computed = computeFeatures({ market, series, benchmarkClose })
+      // Seluruh laporan yang pernah terbit ditarik sekali, lalu engine fitur
+      // memilih per tanggal mana yang sudah tersedia saat itu. Satu kueri per
+      // hari akan berarti ratusan perjalanan bolak-balik untuk satu instrumen.
+      const fundamentals = await getFundamentalsAsOf(instrument.id, to, 80)
+
+      const computed = computeFeatures({ market, series, benchmarkClose, fundamentals })
 
       const rows: FeatureInput[] = computed.rows
         .filter((row) => row.date >= writeFrom)

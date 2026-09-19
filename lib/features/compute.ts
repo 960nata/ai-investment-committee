@@ -42,7 +42,8 @@ import {
   type OhlcvSeries,
   type Series,
 } from './indicators'
-import { normalisedFeatureNames } from './registry'
+import { FEATURES, normalisedFeatureNames } from './registry'
+import { computeFundamentalFeatures, type FundamentalPeriod } from './fundamentals'
 
 /**
  * Versi set fitur, ikut tersimpan di tiap baris.
@@ -56,8 +57,10 @@ import { normalisedFeatureNames } from './registry'
  *   fs-2026-09-b  volatilitas pindah ke imbal hasil logaritmik, histogram MACD
  *                 dibagi harga, ditambah ADX, momentum 12-1, %b, rasio
  *                 volatilitas, akumulasi–distribusi, dan robust z-score
+ *   fs-2026-09-c  lapisan fundamental: valuasi, profitabilitas, kesehatan,
+ *                 kualitas laba, pertumbuhan, Altman, dan Piotroski
  */
-export const FEATURE_SET_VERSION = 'fs-2026-09-b'
+export const FEATURE_SET_VERSION = 'fs-2026-09-c'
 
 /** Hari perdagangan per tahun. Crypto buka setiap hari; bursa saham tidak. */
 const PERIODS_PER_YEAR: Record<MarketCode, number> = {
@@ -93,6 +96,14 @@ export interface ComputeInput {
    * Kosongkan bila tidak ada; fitur kekuatan relatif akan berisi null, bukan nol.
    */
   benchmarkClose?: MaybeSeries
+  /**
+   * Laporan keuangan, diurutkan dari yang terbaru menurut tanggal terbit.
+   *
+   * Dipilih per tanggal menurut `reportedAt`, bukan menurut akhir periode.
+   * Laporan kuartal pertama terbit akhir April sampai Mei, dan memakainya pada
+   * 1 April adalah melihat masa depan.
+   */
+  fundamentals?: FundamentalPeriod[]
 }
 
 export interface ComputeResult {
@@ -240,6 +251,23 @@ export function computeFeatures(input: ComputeInput): ComputeResult {
     relative_strength_60: relativeStrength(close, benchmark, 60),
   }
 
+  // --- fundamental ----------------------------------------------------------
+  // Kuncinya selalu ada, isinya boleh kosong. Kunci yang hilang dan nilai yang
+  // kosong berbeda arti: yang pertama terbaca sebagai fitur yang tidak dikenal
+  // sistem, yang kedua sebagai fitur yang memang belum ada datanya.
+  for (const spec of FEATURES) {
+    if (spec.group !== 'valuasi' && spec.group !== 'kualitas') continue
+    raw[spec.name] = new Array<number | null>(length).fill(null)
+  }
+
+  if (input.fundamentals && input.fundamentals.length > 0) {
+    for (const [name, serie] of Object.entries(
+      fundamentalSeries(date, close, input.fundamentals),
+    )) {
+      raw[name] = serie
+    }
+  }
+
   const window = normalisationWindow(market)
   for (const name of normalisedFeatureNames()) {
     const serie = raw[name]
@@ -296,6 +324,53 @@ export function latestSnapshot(input: ComputeInput): FeatureSnapshot | null {
 }
 
 // ---------------------------------------------------------------------------
+
+/**
+ * Deret fitur fundamental, satu nilai per hari.
+ *
+ * Tiap hari memakai laporan terakhir yang sudah terbit pada hari itu, bukan
+ * laporan yang periodenya sudah lewat. Nilainya bertahan sampai laporan
+ * berikutnya terbit, dan pada hari terbit ia melompat — lompatan itu memang
+ * nyata, karena di situlah informasinya baru sampai ke pasar.
+ */
+function fundamentalSeries(
+  dates: readonly string[],
+  close: Series,
+  periods: FundamentalPeriod[],
+): Record<string, MaybeSeries> {
+  const sorted = [...periods].sort((a, b) => b.reportedAt.localeCompare(a.reportedAt))
+  const out: Record<string, MaybeSeries> = {}
+
+  // Hasil dihitung ulang hanya ketika himpunan laporan yang tersedia berubah,
+  // bukan tiap hari. Rasio yang sama dihitung ratusan kali kalau tidak.
+  let cursor = sorted.length
+  let cached: Record<string, number | null> | null = null
+
+  for (let i = 0; i < dates.length; i++) {
+    const available = sorted.filter((p) => p.reportedAt <= dates[i])
+
+    if (available.length !== cursor) {
+      cursor = available.length
+      cached =
+        available.length === 0
+          ? null
+          : (computeFundamentalFeatures(available, close[i])?.values ?? null)
+    } else if (cached !== null && available.length > 0) {
+      // Harga berubah tiap hari meski laporannya tetap, jadi rasio yang memakai
+      // harga wajib dihitung ulang. Sisanya diambil dari hasil sebelumnya.
+      cached = computeFundamentalFeatures(available, close[i])?.values ?? null
+    }
+
+    if (cached === null) continue
+
+    for (const [name, value] of Object.entries(cached)) {
+      const serie = (out[name] ??= new Array<number | null>(dates.length).fill(null))
+      serie[i] = value
+    }
+  }
+
+  return out
+}
 
 function ratioPct(values: Series, reference: MaybeSeries): MaybeSeries {
   const out: MaybeSeries = new Array<number | null>(values.length).fill(null)
