@@ -29,7 +29,7 @@ export interface CatalogueEntry {
 // Crypto — Binance
 // ---------------------------------------------------------------------------
 
-const CRYPTO: CatalogueEntry[] = [
+const CRYPTO: CatalogueEntry[] = ([
   ['BTCUSDT', 'Bitcoin'],
   ['ETHUSDT', 'Ethereum'],
   ['BNBUSDT', 'BNB'],
@@ -40,9 +40,33 @@ const CRYPTO: CatalogueEntry[] = [
   ['AVAXUSDT', 'Avalanche'],
   ['POLUSDT', 'Polygon'],
   ['LINKUSDT', 'Chainlink'],
-  ['DOGEUSDT', 'Dogecoin'],
   ['TRXUSDT', 'TRON'],
-].map(([symbol, name]) => ({
+  ['LTCUSDT', 'Litecoin'],
+  ['BCHUSDT', 'Bitcoin Cash'],
+  ['ATOMUSDT', 'Cosmos'],
+  ['NEARUSDT', 'NEAR Protocol'],
+  ['APTUSDT', 'Aptos'],
+  ['ARBUSDT', 'Arbitrum'],
+  ['OPUSDT', 'Optimism'],
+  ['FILUSDT', 'Filecoin'],
+  ['ICPUSDT', 'Internet Computer'],
+  ['INJUSDT', 'Injective'],
+  ['SUIUSDT', 'Sui'],
+  ['SEIUSDT', 'Sei'],
+  ['TIAUSDT', 'Celestia'],
+  ['GRTUSDT', 'The Graph'],
+  ['AAVEUSDT', 'Aave'],
+  ['UNIUSDT', 'Uniswap'],
+  ['LDOUSDT', 'Lido DAO'],
+  ['STXUSDT', 'Stacks'],
+  ['ALGOUSDT', 'Algorand'],
+  ['VETUSDT', 'VeChain'],
+  ['HBARUSDT', 'Hedera'],
+  ['XLMUSDT', 'Stellar'],
+  ['ETCUSDT', 'Ethereum Classic'],
+  ['RENDERUSDT', 'Render'],
+  ['FETUSDT', 'Artificial Superintelligence'],
+] as [string, string][]).map(([symbol, name]) => ({
   symbol,
   name,
   market: 'CRYPTO' as Market,
@@ -62,6 +86,42 @@ const CRYPTO: CatalogueEntry[] = [
  * sendiri. Keduanya melacak logam yang sama tetapi tidak pernah sama persis,
  * dan selisihnya sendiri adalah informasi.
  */
+// ---------------------------------------------------------------------------
+// Koin meme
+// ---------------------------------------------------------------------------
+
+/**
+ * Dipisah dari crypto dengan sengaja.
+ *
+ * Koin meme tidak punya pendapatan, jadwal unlock yang bermakna, maupun
+ * aktivitas jaringan yang menjelaskan harganya. Yang menggerakkannya perhatian
+ * orang, dan itu jenis risiko yang berbeda — bukan lebih buruk, tetapi tidak
+ * bisa dinilai dengan pertanyaan yang sama. Menaruhnya satu tab dengan Bitcoin
+ * membuat keduanya terlihat setara, dan itu yang paling menyesatkan.
+ */
+const MEMECOIN: CatalogueEntry[] = ([
+  ['DOGEUSDT', 'Dogecoin'],
+  ['SHIBUSDT', 'Shiba Inu'],
+  ['PEPEUSDT', 'Pepe'],
+  ['WIFUSDT', 'dogwifhat'],
+  ['BONKUSDT', 'Bonk'],
+  ['FLOKIUSDT', 'Floki'],
+  ['BOMEUSDT', 'Book of Meme'],
+  ['MEMEUSDT', 'Memecoin'],
+  ['NEIROUSDT', 'Neiro'],
+  ['TURBOUSDT', 'Turbo'],
+  ['1000SATSUSDT', 'SATS'],
+  ['ORDIUSDT', 'ORDI'],
+  ['PENGUUSDT', 'Pudgy Penguins'],
+  ['ACTUSDT', 'Act I The AI Prophecy'],
+] as [string, string][]).map(([symbol, name]) => ({
+  symbol,
+  name,
+  market: 'CRYPTO' as Market,
+  assetClass: 'memecoin' as AssetClass,
+  currency: 'USDT',
+}))
+
 const EMAS: CatalogueEntry[] = [
   { symbol: 'GC=F', name: 'Emas berjangka', market: 'GLOBAL', assetClass: 'emas', currency: 'USD', region: 'Global' },
   { symbol: 'PAXGUSDT', name: 'PAX Gold', market: 'CRYPTO', assetClass: 'emas', currency: 'USDT', region: 'Global' },
@@ -72,20 +132,32 @@ const EMAS: CatalogueEntry[] = [
 // Komoditi
 // ---------------------------------------------------------------------------
 
-const KOMODITI: CatalogueEntry[] = [
+const KOMODITI: CatalogueEntry[] = ([
   ['SI=F', 'Perak berjangka'],
   ['HG=F', 'Tembaga berjangka'],
   ['PL=F', 'Platina berjangka'],
+  ['PA=F', 'Paladium berjangka'],
   ['CL=F', 'Minyak WTI'],
   ['BZ=F', 'Minyak Brent'],
   ['NG=F', 'Gas alam'],
+  ['RB=F', 'Bensin RBOB'],
+  ['HO=F', 'Minyak pemanas'],
   ['ZC=F', 'Jagung'],
   ['ZW=F', 'Gandum'],
   ['ZS=F', 'Kedelai'],
+  ['ZL=F', 'Minyak kedelai'],
+  ['ZM=F', 'Bungkil kedelai'],
+  ['ZO=F', 'Gandum oat'],
+  ['ZR=F', 'Beras'],
   ['KC=F', 'Kopi'],
   ['SB=F', 'Gula'],
+  ['CC=F', 'Kakao'],
   ['CT=F', 'Kapas'],
-].map(([symbol, name]) => ({
+  ['OJ=F', 'Jus jeruk'],
+  ['LE=F', 'Sapi hidup'],
+  ['HE=F', 'Babi kurus'],
+  ['LBS=F', 'Kayu'],
+] as [string, string][]).map(([symbol, name]) => ({
   symbol,
   name,
   market: 'GLOBAL' as Market,
@@ -472,6 +544,7 @@ const INDEKS: CatalogueEntry[] = [
 
 export const CATALOGUE: CatalogueEntry[] = [
   ...CRYPTO,
+  ...MEMECOIN,
   ...EMAS,
   ...KOMODITI,
   ...SAHAM_IDX,

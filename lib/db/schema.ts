@@ -32,6 +32,11 @@ export const marketEnum = pgEnum('market', ['crypto', 'idx', 'us', 'global'])
  */
 export const assetClassEnum = pgEnum('asset_class', [
   'crypto',
+  // Dipisah dari crypto dengan sengaja. Koin meme tidak punya pendapatan,
+  // jadwal unlock yang bermakna, maupun aktivitas jaringan yang menjelaskan
+  // harganya — yang menggerakkannya perhatian orang, dan itu jenis risiko yang
+  // berbeda. Mencampurnya ke satu tab membuat keduanya terlihat setara.
+  'memecoin',
   'saham',
   'emas',
   'komoditi',
@@ -210,6 +215,7 @@ export type AssetClass = (typeof assetClassEnum.enumValues)[number]
 /** Urutan tampil di antarmuka, dari yang paling banyak datanya. */
 export const ASSET_CLASSES: { id: AssetClass; label: string }[] = [
   { id: 'crypto', label: 'Crypto' },
+  { id: 'memecoin', label: 'Meme Coin' },
   { id: 'saham', label: 'Saham' },
   { id: 'emas', label: 'Emas' },
   { id: 'komoditi', label: 'Komoditi' },

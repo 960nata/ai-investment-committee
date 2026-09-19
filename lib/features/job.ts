@@ -37,15 +37,22 @@ const LOOKBACK_DAYS = 1100
  */
 const WRITE_WINDOW_DAYS = 7
 
-/** Tolok ukur per pasar, dipakai untuk fitur kekuatan relatif. */
-const BENCHMARK: Record<MarketCode, string | null> = {
+/**
+ * Tolok ukur per pasar.
+ *
+ * Indeks tercatat di pasar `global`, bukan di pasar saham yang diwakilinya:
+ * pasar menunjukkan kalender perdagangan, dan indeks dunia tidak terikat satu
+ * bursa saham mana pun. Karena itu tolok ukurnya membawa pasarnya sendiri, dan
+ * pencariannya tidak boleh dilakukan di pasar instrumen yang sedang dihitung.
+ */
+const BENCHMARK: Record<MarketCode, { symbol: string; market: MarketCode } | null> = {
   // Hampir seluruh crypto bergerak mengikuti Bitcoin; tanpa membandingkan
   // terhadapnya, "naik 8% minggu ini" tidak memberi tahu apa pun.
-  CRYPTO: 'BTCUSDT',
+  CRYPTO: { symbol: 'BTCUSDT', market: 'CRYPTO' },
   // Saham dibandingkan terhadap indeks pasarnya sendiri: naik 5% saat pasar
   // naik 8% sebenarnya sedang tertinggal, dan tanpa fitur ini itu tidak terlihat.
-  IDX: '^JKSE',
-  US: '^GSPC',
+  IDX: { symbol: '^JKSE', market: 'GLOBAL' },
+  US: { symbol: '^GSPC', market: 'GLOBAL' },
   // Emas dan komoditi tidak punya indeks induk yang wajar; membandingkan minyak
   // terhadap emas tidak menjawab pertanyaan apa pun.
   GLOBAL: null,
@@ -77,6 +84,24 @@ export interface FeatureJobInput {
  * pendek diam-diam, dan nilainya tidak sebanding dengan baris sesudahnya.
  */
 const WARMUP_DAYS = 1000
+
+/**
+ * Riwayat lama disimpan mingguan, bukan harian.
+ *
+ * Tier gratis memberi setengah gigabyte, dan satu baris fitur memakan sekitar
+ * dua kilobyte. Sebelas tahun harian untuk seratus emiten saja sudah melewati
+ * batas itu sendirian.
+ *
+ * Yang hilang hampir tidak ada. Untuk horizon lima, enam puluh tiga, dan dua
+ * ratus lima puluh dua hari, pengamatan harian saling tumpang tindih di atas
+ * sembilan puluh persen — itu sebabnya jumlah pengamatan bebas dihitung dengan
+ * membagi rentang waktunya. Menyimpan setiap hari berarti membayar lima kali
+ * lipat ruang untuk informasi yang praktis sama.
+ */
+const HISTORY_STRIDE = 5
+
+/** Hari terakhir yang tetap disimpan harian, karena inilah yang dilihat orang. */
+const DENSE_WINDOW_DAYS = 120
 
 export async function runFeatureJob(input: FeatureJobInput): Promise<FeatureJobResult> {
   const { symbols, market } = input
@@ -150,8 +175,14 @@ export async function runFeatureJob(input: FeatureJobInput): Promise<FeatureJobR
 
       const computed = computeFeatures({ market, series, benchmarkClose, fundamentals })
 
-      const rows: FeatureInput[] = computed.rows
-        .filter((row) => row.date >= writeFrom)
+      const dense = isoDaysAgo(DENSE_WINDOW_DAYS)
+      const selected = computed.rows.filter((row, index) => {
+        if (row.date < writeFrom) return false
+        // Jendela terakhir selalu utuh; sebelum itu diambil tiap hari kelima.
+        return row.date >= dense || index % HISTORY_STRIDE === 0
+      })
+
+      const rows: FeatureInput[] = selected
         .map((row) => ({
           instrumentId: instrument.id,
           date: row.date,
@@ -184,12 +215,14 @@ async function loadBenchmark(
   from: string,
   to: string,
 ): Promise<Map<string, number> | null> {
-  const symbol = BENCHMARK[market]
-  if (!symbol) return null
+  const benchmark = BENCHMARK[market]
+  if (!benchmark) return null
 
-  const instrument = await getInstrumentBySymbol(market, symbol)
+  const instrument = await getInstrumentBySymbol(benchmark.market, benchmark.symbol)
   if (!instrument) {
-    console.warn(`[Fitur] Tolok ukur ${symbol} belum terdaftar; kekuatan relatif dilewati.`)
+    console.warn(
+      `[Fitur] Tolok ukur ${benchmark.symbol} belum terdaftar; kekuatan relatif dilewati.`,
+    )
     return null
   }
 

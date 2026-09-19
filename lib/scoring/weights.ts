@@ -118,7 +118,13 @@ export const MODEL_VERSION = 'skor-2026-09-a'
  * datanya akan datang suatu hari, dan itu tidak jujur. Yang benar "tidak
  * berlaku", dan dua kata itu berbeda arti bagi pembacanya.
  */
-export const WITHOUT_FUNDAMENTALS: readonly string[] = ['indeks', 'komoditi', 'emas', 'crypto']
+export const WITHOUT_FUNDAMENTALS: readonly string[] = [
+  'indeks',
+  'komoditi',
+  'emas',
+  'crypto',
+  'memecoin',
+]
 
 export function fundamentalsApply(assetClass: string): boolean {
   return !WITHOUT_FUNDAMENTALS.includes(assetClass)
