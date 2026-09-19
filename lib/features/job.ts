@@ -98,6 +98,11 @@ export async function runFeatureJob(input: FeatureJobInput): Promise<FeatureJobR
         continue
       }
 
+      // Penutupan tersesuaikan hanya disertakan bila memang sudah terisi.
+      // Mengirim deret berisi null akan membuat engine mengira harga sudah
+      // disesuaikan padahal belum.
+      const hasAdjusted = candles.every((c) => c.adjClose !== null)
+
       const series: OhlcvSeries = {
         date: candles.map((c) => c.date),
         open: candles.map((c) => Number(c.open)),
@@ -105,6 +110,7 @@ export async function runFeatureJob(input: FeatureJobInput): Promise<FeatureJobR
         low: candles.map((c) => Number(c.low)),
         close: candles.map((c) => Number(c.close)),
         volume: candles.map((c) => Number(c.volume)),
+        adjClose: hasAdjusted ? candles.map((c) => Number(c.adjClose)) : undefined,
       }
 
       // Tolok ukur disejajarkan menurut tanggal, bukan menurut posisi. Dua deret

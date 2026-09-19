@@ -28,6 +28,14 @@ export interface OhlcvSeries {
   low: Series
   close: Series
   volume: Series
+  /**
+   * Penutupan tersesuaikan aksi korporasi, bila sudah tersedia.
+   *
+   * Wajib dipakai untuk indikator apa pun. Saham yang stock split 1:2 terlihat
+   * anjlok 50 persen kalau tidak disesuaikan, dan model akan membaca itu sebagai
+   * sinyal negatif yang sangat kuat padahal tidak ada yang terjadi.
+   */
+  adjClose?: Series
 }
 
 function filled(length: number): MaybeSeries {
@@ -242,6 +250,8 @@ export interface BollingerResult {
   lower: MaybeSeries
   /** Lebar pita sebagai persen dari pita tengah. */
   widthPct: MaybeSeries
+  /** Posisi harga di dalam pita: 0 di pita bawah, 1 di pita atas. */
+  percentB: MaybeSeries
 }
 
 export function bollinger(values: Series, period = 20, stdDevs = 2): BollingerResult {
@@ -249,6 +259,7 @@ export function bollinger(values: Series, period = 20, stdDevs = 2): BollingerRe
   const upper = filled(values.length)
   const lower = filled(values.length)
   const widthPct = filled(values.length)
+  const percentB = filled(values.length)
 
   for (let i = period - 1; i < values.length; i++) {
     const mean = middle[i]
@@ -263,17 +274,39 @@ export function bollinger(values: Series, period = 20, stdDevs = 2): BollingerRe
     upper[i] = mean + stdDevs * sd
     lower[i] = mean - stdDevs * sd
     if (mean !== 0) widthPct[i] = ((2 * stdDevs * sd) / mean) * 100
+    if (sd > 0) percentB[i] = (values[i] - lower[i]!) / (upper[i]! - lower[i]!)
   }
 
-  return { upper, middle, lower, widthPct }
+  return { upper, middle, lower, widthPct, percentB }
 }
 
-/** Imbal hasil harian sederhana, dipakai sebagai masukan volatilitas. */
+/**
+ * Imbal hasil sederhana. Dipakai saat nilainya dijumlah antar-aset, misalnya
+ * imbal hasil portofolio, dan sebagai target model klasifikasi karena itulah
+ * yang dipahami pembaca sebagai "naik berapa persen".
+ */
 export function dailyReturns(values: Series): MaybeSeries {
   const out = filled(values.length)
   for (let i = 1; i < values.length; i++) {
-    if (values[i - 1] === 0) continue
+    if (values[i - 1] <= 0) continue
     out[i] = (values[i] - values[i - 1]) / values[i - 1]
+  }
+  return out
+}
+
+/**
+ * Imbal hasil logaritmik. Dipakai saat nilainya dijumlah antar-waktu.
+ *
+ * Sifat aditifnya yang membuatnya benar untuk volatilitas: ln(P1/P0) + ln(P2/P1)
+ * sama persis dengan ln(P2/P0), sementara penjumlahan imbal hasil sederhana
+ * tidak. Salah memilih di sini tidak membuat program gagal, hanya membuat
+ * angkanya meleset sedikit, terus-menerus, tanpa ada yang menyadarinya.
+ */
+export function logReturns(values: Series): MaybeSeries {
+  const out = filled(values.length)
+  for (let i = 1; i < values.length; i++) {
+    if (values[i - 1] <= 0 || values[i] <= 0) continue
+    out[i] = Math.log(values[i] / values[i - 1])
   }
   return out
 }
@@ -291,7 +324,7 @@ export function realizedVolatility(
   period = 20,
   periodsPerYear = 365,
 ): MaybeSeries {
-  const returns = dailyReturns(values)
+  const returns = logReturns(values)
   const out = filled(values.length)
 
   for (let i = period; i < values.length; i++) {
@@ -539,4 +572,280 @@ export function rollingPercentile(values: MaybeSeries, window: number): MaybeSer
   }
 
   return out
+}
+
+// ---------------------------------------------------------------------------
+// Kekuatan tren — ADX
+// ---------------------------------------------------------------------------
+
+/**
+ * Penghalusan Wilder bentuk rata-rata.
+ *
+ * Wilder memakai faktor 1/n, bukan 2/(n+1) seperti EMA biasa. Keduanya sering
+ * tertukar, dan hasilnya berbeda cukup jauh untuk membuat indikator yang sama
+ * tidak cocok dengan platform mana pun.
+ */
+function wilderSmooth(values: MaybeSeries, period: number, startIndex: number): MaybeSeries {
+  const out = filled(values.length)
+  if (values.length < startIndex + period) return out
+
+  let sum = 0
+  for (let i = startIndex; i < startIndex + period; i++) sum += values[i] ?? 0
+
+  let previous = sum / period
+  out[startIndex + period - 1] = previous
+
+  for (let i = startIndex + period; i < values.length; i++) {
+    previous = (previous * (period - 1) + (values[i] ?? 0)) / period
+    out[i] = previous
+  }
+  return out
+}
+
+export interface AdxResult {
+  plusDi: MaybeSeries
+  minusDi: MaybeSeries
+  adx: MaybeSeries
+}
+
+/**
+ * Average Directional Index beserta kedua indikator arahnya.
+ *
+ * ADX dipakai sebagai pengubah bobot, bukan sebagai sinyal arah. Di bawah dua
+ * puluh, pasar sedang menyamping dan bobot fitur tren diturunkan; di atas dua
+ * puluh lima, tren itu nyata dan bobotnya dinaikkan. Nilainya sendiri tidak
+ * pernah memberi tahu ke arah mana harga bergerak.
+ */
+export function adx(high: Series, low: Series, close: Series, period = 14): AdxResult {
+  const length = close.length
+  const tr = trueRange(high, low, close)
+  const plusDm = filled(length)
+  const minusDm = filled(length)
+
+  for (let i = 1; i < length; i++) {
+    const up = high[i] - high[i - 1]
+    const down = low[i - 1] - low[i]
+    plusDm[i] = up > down && up > 0 ? up : 0
+    minusDm[i] = down > up && down > 0 ? down : 0
+  }
+
+  // Pembilang dan penyebut memakai bentuk penghalusan yang sama, sehingga
+  // rasionya tidak bergantung pada pilihan bentuk jumlah atau rata-rata.
+  const smoothTr = wilderSmooth(tr, period, 1)
+  const smoothPlus = wilderSmooth(plusDm, period, 1)
+  const smoothMinus = wilderSmooth(minusDm, period, 1)
+
+  const plusDi = filled(length)
+  const minusDi = filled(length)
+  const dx = filled(length)
+
+  for (let i = 0; i < length; i++) {
+    const trValue = smoothTr[i]
+    if (trValue === null || trValue === 0) continue
+
+    const p = (100 * (smoothPlus[i] ?? 0)) / trValue
+    const m = (100 * (smoothMinus[i] ?? 0)) / trValue
+    plusDi[i] = p
+    minusDi[i] = m
+
+    const total = p + m
+    // Kedua arah nol berarti tidak ada gerakan berarah sama sekali, bukan
+    // tren sempurna. DX nol adalah jawaban yang benar, bukan pembagian nol.
+    dx[i] = total === 0 ? 0 : (100 * Math.abs(p - m)) / total
+  }
+
+  const firstDx = dx.findIndex((v) => v !== null)
+  const adxSeries = firstDx === -1 ? filled(length) : wilderSmooth(dx, period, firstDx)
+
+  return { plusDi, minusDi, adx: adxSeries }
+}
+
+// ---------------------------------------------------------------------------
+// Momentum jangka menengah
+// ---------------------------------------------------------------------------
+
+/**
+ * Momentum dua belas bulan dikurangi satu bulan terakhir.
+ *
+ * Versi yang paling konsisten bertahan dalam literatur. Bulan terakhir sengaja
+ * dilewatkan karena ada efek pembalikan jangka sangat pendek yang justru
+ * mengacaukan sinyal momentum bila ikut dihitung.
+ */
+export function momentum12m1m(values: Series, skip = 21, lookback = 252): MaybeSeries {
+  const out = filled(values.length)
+  for (let i = lookback; i < values.length; i++) {
+    const recent = values[i - skip]
+    const base = values[i - lookback]
+    if (base <= 0) continue
+    out[i] = recent / base - 1
+  }
+  return out
+}
+
+/**
+ * Rasio volatilitas jangka pendek terhadap jangka menengah.
+ *
+ * Di atas 1,5 berarti pasar sedang gelisah pada instrumen itu. Dipakai untuk
+ * menurunkan confidence, tidak pernah sebagai penentu arah.
+ */
+export function volatilityRatio(
+  values: Series,
+  shortPeriod = 20,
+  longPeriod = 120,
+  periodsPerYear = 365,
+): MaybeSeries {
+  const shortVol = realizedVolatility(values, shortPeriod, periodsPerYear)
+  const longVol = realizedVolatility(values, longPeriod, periodsPerYear)
+
+  const out = filled(values.length)
+  for (let i = 0; i < values.length; i++) {
+    const s = shortVol[i]
+    const l = longVol[i]
+    if (s === null || l === null || l <= 0) continue
+    out[i] = s / l
+  }
+  return out
+}
+
+// ---------------------------------------------------------------------------
+// Akumulasi dan distribusi
+// ---------------------------------------------------------------------------
+
+/**
+ * Money flow multiplier: di mana penutupan berada di dalam rentang hari itu.
+ *
+ * Mendekati +1 berarti harga ditutup di dekat tertinggi hari itu, yang berarti
+ * pembeli menguasai sampai lonceng penutupan.
+ */
+export function moneyFlowMultiplier(high: Series, low: Series, close: Series): MaybeSeries {
+  const out = filled(close.length)
+  for (let i = 0; i < close.length; i++) {
+    const range = high[i] - low[i]
+    // Hari tanpa rentang sama sekali tidak memberi informasi tentang siapa yang
+    // menguasai; nol di sini berarti netral, dan itu memang benar.
+    out[i] = range === 0 ? 0 : (close[i] - low[i] - (high[i] - close[i])) / range
+  }
+  return out
+}
+
+/** Garis akumulasi–distribusi: money flow multiplier dikalikan volume, kumulatif. */
+export function accumulationDistribution(
+  high: Series,
+  low: Series,
+  close: Series,
+  volume: Series,
+): MaybeSeries {
+  const mfm = moneyFlowMultiplier(high, low, close)
+  const out = filled(close.length)
+
+  let total = 0
+  for (let i = 0; i < close.length; i++) {
+    total += (mfm[i] ?? 0) * volume[i]
+    out[i] = total
+  }
+  return out
+}
+
+// ---------------------------------------------------------------------------
+// Statistik tahan pencilan
+// ---------------------------------------------------------------------------
+
+export function median(values: readonly number[]): number | null {
+  if (values.length === 0) return null
+  const sorted = [...values].sort((a, b) => a - b)
+  const middle = Math.floor(sorted.length / 2)
+  return sorted.length % 2 === 0 ? (sorted[middle - 1] + sorted[middle]) / 2 : sorted[middle]
+}
+
+/** Median absolute deviation, ukuran sebaran yang tidak dirusak satu pencilan. */
+export function medianAbsoluteDeviation(values: readonly number[]): number | null {
+  const centre = median(values)
+  if (centre === null) return null
+  return median(values.map((v) => Math.abs(v - centre)))
+}
+
+/** Konstanta yang menyetarakan MAD dengan simpangan baku pada data normal. */
+export const MAD_TO_SIGMA = 1.4826
+
+/** Batas pemangkasan z-score. Satu pencilan ekstrem tidak boleh mendominasi skor. */
+export const Z_CLIP = 3
+
+/**
+ * Robust z-score satu nilai terhadap satu populasi.
+ *
+ * Memakai median dan MAD, bukan rata-rata dan simpangan baku, karena data
+ * keuangan penuh pencilan yang merusak keduanya. Satu emiten dengan PER empat
+ * ribu, karena labanya nyaris nol, sudah cukup untuk menggeser rata-rata seluruh
+ * sektornya.
+ */
+export function robustZ(value: number, population: readonly number[]): number | null {
+  const centre = median(population)
+  const spread = medianAbsoluteDeviation(population)
+  if (centre === null || spread === null) return null
+
+  // Sebaran nol berarti mayoritas populasi bernilai sama persis. Nilai yang ikut
+  // sama dengan median memang netral, tetapi nilai yang menyimpang justru
+  // seekstrem mungkin: tidak ada satu pun pembanding yang menyerupainya.
+  // Mengembalikan nol untuk kasus kedua akan menyembunyikan pencilan terbesar.
+  if (spread === 0) {
+    if (value === centre) return 0
+    return value > centre ? Z_CLIP : -Z_CLIP
+  }
+
+  const z = (value - centre) / (MAD_TO_SIGMA * spread)
+  return Math.max(-Z_CLIP, Math.min(Z_CLIP, z))
+}
+
+/**
+ * Robust z-score bergulir terhadap riwayat instrumen itu sendiri.
+ *
+ * Menjawab pertanyaan "apakah instrumen ini sedang tidak biasa bagi dirinya
+ * sendiri", yang berbeda dari "apakah ia menonjol dibanding instrumen lain".
+ * Keduanya dihitung dan disimpan terpisah.
+ */
+export function rollingRobustZ(values: MaybeSeries, window: number): MaybeSeries {
+  const out = filled(values.length)
+  const minimumSample = Math.min(window, 60)
+
+  for (let i = 0; i < values.length; i++) {
+    const current = values[i]
+    if (current === null) continue
+
+    const start = Math.max(0, i - window + 1)
+    const population: number[] = []
+    for (let j = start; j <= i; j++) {
+      const past = values[j]
+      if (past !== null) population.push(past)
+    }
+
+    if (population.length < minimumSample) continue
+    out[i] = robustZ(current, population)
+  }
+
+  return out
+}
+
+/**
+ * Winsorisasi: pangkas nilai ekstrem ke persentil batas, jangan dibuang.
+ *
+ * Membuang pencilan juga salah. Emiten dengan rasio aneh tetap ada, tetap
+ * tercatat, dan tetap bisa dibeli orang; yang perlu dibatasi hanya pengaruhnya
+ * terhadap statistik populasi.
+ */
+export function winsorize(
+  values: readonly number[],
+  lowerPercentile = 0.01,
+  upperPercentile = 0.99,
+): number[] {
+  if (values.length === 0) return []
+
+  const sorted = [...values].sort((a, b) => a - b)
+  const at = (p: number) => {
+    const index = Math.min(sorted.length - 1, Math.max(0, Math.round(p * (sorted.length - 1))))
+    return sorted[index]
+  }
+
+  const low = at(lowerPercentile)
+  const high = at(upperPercentile)
+  return values.map((v) => Math.min(high, Math.max(low, v)))
 }

@@ -5,20 +5,25 @@
  * akan pernah ada: angka yang masuk ke skor harus bisa dihitung ulang persis
  * sama bertahun-tahun kemudian, kalau tidak backtest-nya tidak berarti apa-apa.
  *
- * Tiap fitur disimpan dua kali, mentah dan sebagai persentil terhadap riwayat
- * dua tahun instrumen itu sendiri. Nilai mentah tidak bisa dibandingkan antar
- * instrumen: RSI 70 pada aset yang memang selalu bergerak keras bukan peristiwa
- * yang sama dengan RSI 70 pada aset tenang. Persentil-lah yang membuat keduanya
- * bisa masuk ke satu skor.
+ * Tiap fitur yang layak dinormalisasi disimpan tiga kali: nilai mentah, robust
+ * z-score, dan persentil, keduanya terhadap riwayat dua tahun instrumen itu
+ * sendiri. Nilai mentah tidak bisa dibandingkan antar instrumen, karena RSI 70
+ * pada aset yang memang selalu bergerak keras bukan peristiwa yang sama dengan
+ * RSI 70 pada aset tenang. Z-score dipakai untuk perhitungan; persentil dipakai
+ * untuk ditampilkan, karena "di persentil 15" langsung dimengerti orang awam
+ * sementara "z-score −1,2" tidak.
  */
 
 import type { MarketCode } from '@/lib/db/schema'
 import {
+  accumulationDistribution,
+  adx,
   atr,
   atrPct,
   bollinger,
   macd,
   maxDrawdown,
+  momentum12m1m,
   obv,
   pivotLevels,
   rangePosition,
@@ -27,13 +32,17 @@ import {
   relativeVolume,
   roc,
   rollingPercentile,
+  rollingRobustZ,
   rsi,
   sma,
   slopePct,
+  volatilityRatio,
   vwapDeviationPct,
   type MaybeSeries,
   type OhlcvSeries,
+  type Series,
 } from './indicators'
+import { normalisedFeatureNames } from './registry'
 
 /**
  * Versi set fitur, ikut tersimpan di tiap baris.
@@ -41,8 +50,14 @@ import {
  * Begitu formula mana pun di file ini berubah, angka ini wajib naik. Tanpa itu,
  * baris lama dan baris baru terlihat sebanding padahal dihitung dengan rumus
  * berbeda, dan perbandingan performa antar versi kehilangan artinya.
+ *
+ * Riwayat:
+ *   fs-2026-09-a  set awal
+ *   fs-2026-09-b  volatilitas pindah ke imbal hasil logaritmik, histogram MACD
+ *                 dibagi harga, ditambah ADX, momentum 12-1, %b, rasio
+ *                 volatilitas, akumulasi–distribusi, dan robust z-score
  */
-export const FEATURE_SET_VERSION = 'fs-2026-09-a'
+export const FEATURE_SET_VERSION = 'fs-2026-09-b'
 
 /** Hari perdagangan per tahun. Crypto buka setiap hari; bursa saham tidak. */
 const PERIODS_PER_YEAR: Record<MarketCode, number> = {
@@ -51,8 +66,8 @@ const PERIODS_PER_YEAR: Record<MarketCode, number> = {
   US: 252,
 }
 
-/** Jendela persentil: riwayat dua tahun instrumen itu sendiri. */
-function percentileWindow(market: MarketCode): number {
+/** Jendela normalisasi deret waktu: riwayat dua tahun instrumen itu sendiri. */
+function normalisationWindow(market: MarketCode): number {
   return PERIODS_PER_YEAR[market] * 2
 }
 
@@ -84,123 +99,152 @@ export interface ComputeResult {
   rows: FeatureRow[]
   /** Fitur yang tidak bisa dihitung sama sekali, untuk ditampilkan apa adanya. */
   unavailable: string[]
+  /** Benar bila harga sudah disesuaikan aksi korporasi. */
+  priceAdjusted: boolean
 }
 
-/** Fitur yang ikut disimpan sebagai persentil terhadap riwayatnya sendiri. */
-const PERCENTILED = [
-  'rsi_14',
-  'roc_20',
-  'roc_60',
-  'roc_120',
-  'atr_14_pct',
-  'bollinger_width_pct',
-  'realized_vol_20',
-  'volume_relative_20',
-  'obv_change_20',
-  'vwap_deviation_20_pct',
-  'macd_histogram',
-  'price_vs_sma_50_pct',
-  'relative_strength_20',
-  'relative_strength_60',
-] as const
+/**
+ * Sesuaikan seluruh deret harga terhadap aksi korporasi.
+ *
+ * Faktor penyesuaian diturunkan dari perbandingan penutupan tersesuaikan
+ * terhadap penutupan mentah, lalu diterapkan ke pembukaan, tertinggi, dan
+ * terendah. Menyesuaikan penutupan saja akan membuat rentang harian salah, dan
+ * bersamanya seluruh keluarga indikator yang memakai tertinggi dan terendah.
+ *
+ * Tanpa kolom tersesuaikan, deret dikembalikan apa adanya dan pemanggil diberi
+ * tahu lewat `adjusted: false`, bukan dibiarkan menduga.
+ */
+function adjustForCorporateActions(series: OhlcvSeries): {
+  open: Series
+  high: Series
+  low: Series
+  close: Series
+  adjusted: boolean
+} {
+  const { open, high, low, close, adjClose } = series
+
+  const usable =
+    adjClose !== undefined &&
+    adjClose.length === close.length &&
+    adjClose.some((v, i) => v > 0 && v !== close[i])
+
+  if (!usable || adjClose === undefined) {
+    return { open, high, low, close, adjusted: false }
+  }
+
+  const factor = close.map((raw, i) => (raw > 0 ? adjClose[i] / raw : 1))
+
+  return {
+    open: open.map((v, i) => v * factor[i]),
+    high: high.map((v, i) => v * factor[i]),
+    low: low.map((v, i) => v * factor[i]),
+    close: [...adjClose],
+    adjusted: true,
+  }
+}
 
 export function computeFeatures(input: ComputeInput): ComputeResult {
   const { market, series, benchmarkClose } = input
-  const { date, high, low, close, volume } = series
-  const length = close.length
+  const length = series.close.length
 
   if (length === 0) {
-    return { featureSetVersion: FEATURE_SET_VERSION, rows: [], unavailable: [] }
+    return {
+      featureSetVersion: FEATURE_SET_VERSION,
+      rows: [],
+      unavailable: [],
+      priceAdjusted: false,
+    }
   }
 
+  const price = adjustForCorporateActions(series)
+  const { high, low, close } = price
+  const { date, volume } = series
   const periodsPerYear = PERIODS_PER_YEAR[market]
 
   // --- tren -----------------------------------------------------------------
   const sma20 = sma(close, 20)
   const sma50 = sma(close, 50)
   const sma200 = sma(close, 200)
-  const sma50Slope = slopePct(sma50, 20)
+  const directional = adx(high, low, close, 14)
 
   // --- momentum -------------------------------------------------------------
   const rsi14 = rsi(close, 14)
   const macdResult = macd(close)
-  const roc20 = roc(close, 20)
-  const roc60 = roc(close, 60)
-  const roc120 = roc(close, 120)
+  const mom12m1m = momentum12m1m(close)
 
   // --- volatilitas ----------------------------------------------------------
-  const atr14 = atr(high, low, close, 14)
-  const atr14Pct = atrPct(atr14, close)
+  const atr14Pct = atrPct(atr(high, low, close, 14), close)
   const bands = bollinger(close, 20, 2)
   const vol20 = realizedVolatility(close, 20, periodsPerYear)
+  const volRatio = volatilityRatio(close, 20, 120, periodsPerYear)
 
   // --- volume ---------------------------------------------------------------
-  const relVolume20 = relativeVolume(volume, 20)
   const obvSeries = obv(close, volume)
+  const adlSeries = accumulationDistribution(high, low, close, volume)
   const avgVolume20 = sma(volume, 20)
-  const vwapDev20 = vwapDeviationPct(high, low, close, volume, 20)
 
-  // --- struktur -------------------------------------------------------------
+  // --- struktur dan relatif -------------------------------------------------
   const range = rangePosition(high, low, close, periodsPerYear)
   const pivots = pivotLevels(high, low, close)
 
-  // --- relatif --------------------------------------------------------------
   const hasBenchmark = benchmarkClose !== undefined && benchmarkClose.length === length
-  const emptySeries: MaybeSeries = new Array<number | null>(length).fill(null)
-  const benchmark = hasBenchmark ? benchmarkClose : emptySeries
-  const rel20 = relativeStrength(close, benchmark, 20)
-  const rel60 = relativeStrength(close, benchmark, 60)
-
-  // --- turunan --------------------------------------------------------------
-  const priceVsSma20 = ratioPct(close, sma20)
-  const priceVsSma50 = ratioPct(close, sma50)
-  const priceVsSma200 = ratioPct(close, sma200)
-  const maAlignment = alignment(sma20, sma50, sma200)
-
-  // OBV mentah adalah angka kumulatif tanpa satuan yang berarti. Perubahannya
-  // dibagi rata-rata volume harian supaya terbaca sebagai "berapa hari volume".
-  const obvChange20: MaybeSeries = new Array<number | null>(length).fill(null)
-  for (let i = 20; i < length; i++) {
-    const now = obvSeries[i]
-    const then = obvSeries[i - 20]
-    const avg = avgVolume20[i]
-    if (now === null || then === null || avg === null || avg <= 0) continue
-    obvChange20[i] = (now - then) / avg
-  }
+  const benchmark: MaybeSeries = hasBenchmark
+    ? benchmarkClose
+    : new Array<number | null>(length).fill(null)
 
   const raw: Record<string, MaybeSeries> = {
     sma_20: sma20,
     sma_50: sma50,
     sma_200: sma200,
-    sma_50_slope_pct: sma50Slope,
-    price_vs_sma_20_pct: priceVsSma20,
-    price_vs_sma_50_pct: priceVsSma50,
-    price_vs_sma_200_pct: priceVsSma200,
-    ma_alignment: maAlignment,
+    price_vs_sma_20_pct: ratioPct(close, sma20),
+    price_vs_sma_50_pct: ratioPct(close, sma50),
+    price_vs_sma_200_pct: ratioPct(close, sma200),
+    sma_50_slope_pct: slopePct(sma50, 20),
+    ma_alignment: alignment(sma20, sma50, sma200),
+    adx_14: directional.adx,
+    plus_di_14: directional.plusDi,
+    minus_di_14: directional.minusDi,
+
     rsi_14: rsi14,
-    macd: macdResult.macd,
-    macd_signal: macdResult.signal,
-    macd_histogram: macdResult.histogram,
-    roc_20: roc20,
-    roc_60: roc60,
-    roc_120: roc120,
+    // RSI dipecah jadi dua sisi monoton. Menjumlahkan fitur non-monoton secara
+    // langsung menghasilkan skor yang tidak bermakna, dan kesalahan itu mudah
+    // lolos dari perhatian karena tidak pernah muncul sebagai error.
+    rsi_oversold: rsi14.map((v) => (v === null ? null : Math.max(0, 50 - v) / 50)),
+    rsi_overbought: rsi14.map((v) => (v === null ? null : Math.max(0, v - 50) / 50)),
+    // Histogram mentah tidak bisa dibandingkan antar-instrumen dengan tingkat
+    // harga berbeda, jadi yang disimpan sebagai fitur adalah versi relatifnya.
+    macd_histogram_pct: perPrice(macdResult.histogram, close),
+    roc_20: roc(close, 20),
+    roc_60: roc(close, 60),
+    roc_120: roc(close, 120),
+    momentum_12_1: mom12m1m,
+
     atr_14_pct: atr14Pct,
-    bollinger_width_pct: bands.widthPct,
     realized_vol_20: vol20,
-    volume_relative_20: relVolume20,
-    obv_change_20: obvChange20,
-    vwap_deviation_20_pct: vwapDev20,
+    bollinger_width_pct: bands.widthPct,
+    percent_b: bands.percentB,
+    vol_ratio_20_120: volRatio,
+
+    volume_relative_20: relativeVolume(volume, 20),
+    obv_change_20: changeInAverageVolume(obvSeries, avgVolume20, 20),
+    adl_change_20: changeInAverageVolume(adlSeries, avgVolume20, 20),
+    vwap_deviation_20_pct: vwapDeviationPct(high, low, close, volume, 20),
+
     distance_from_high_pct: range.distanceFromHighPct,
     distance_from_low_pct: range.distanceFromLowPct,
     position_in_range: range.positionInRange,
     pivot_position: pivots.positionBetweenLevels,
-    relative_strength_20: rel20,
-    relative_strength_60: rel60,
+
+    relative_strength_20: relativeStrength(close, benchmark, 20),
+    relative_strength_60: relativeStrength(close, benchmark, 60),
   }
 
-  const window = percentileWindow(market)
-  for (const name of PERCENTILED) {
-    raw[`${name}_pctile`] = rollingPercentile(raw[name], window)
+  const window = normalisationWindow(market)
+  for (const name of normalisedFeatureNames()) {
+    const serie = raw[name]
+    if (!serie) continue
+    raw[`${name}_z`] = rollingRobustZ(serie, window)
+    raw[`${name}_pctile`] = rollingPercentile(serie, window)
   }
 
   const rows: FeatureRow[] = []
@@ -216,7 +260,12 @@ export function computeFeatures(input: ComputeInput): ComputeResult {
     .filter(([, serie]) => serie.every((v) => v === null))
     .map(([name]) => name)
 
-  return { featureSetVersion: FEATURE_SET_VERSION, rows, unavailable }
+  return {
+    featureSetVersion: FEATURE_SET_VERSION,
+    rows,
+    unavailable,
+    priceAdjusted: price.adjusted,
+  }
 }
 
 /**
@@ -228,11 +277,10 @@ export interface FeatureSnapshot {
   values: Record<string, number | null>
   maxDrawdown: number | null
   featureSetVersion: string
+  priceAdjusted: boolean
 }
 
-export function latestSnapshot(
-  input: ComputeInput,
-): FeatureSnapshot | null {
+export function latestSnapshot(input: ComputeInput): FeatureSnapshot | null {
   const result = computeFeatures(input)
   const last = result.rows.at(-1)
   if (!last) return null
@@ -240,20 +288,59 @@ export function latestSnapshot(
   return {
     date: last.date,
     values: last.values,
-    maxDrawdown: round(maxDrawdown(input.series.close)),
+    maxDrawdown: round(maxDrawdown(input.series.adjClose ?? input.series.close)),
     featureSetVersion: result.featureSetVersion,
+    priceAdjusted: result.priceAdjusted,
   }
 }
 
 // ---------------------------------------------------------------------------
 
-function ratioPct(values: readonly number[], reference: MaybeSeries): MaybeSeries {
+function ratioPct(values: Series, reference: MaybeSeries): MaybeSeries {
   const out: MaybeSeries = new Array<number | null>(values.length).fill(null)
   for (let i = 0; i < values.length; i++) {
     const ref = reference[i]
     if (ref === null || ref === 0) continue
     out[i] = ((values[i] - ref) / ref) * 100
   }
+  return out
+}
+
+/** Nyatakan sebuah deret sebagai persen harga, supaya bisa dibandingkan lintas instrumen. */
+function perPrice(values: MaybeSeries, close: Series): MaybeSeries {
+  const out: MaybeSeries = new Array<number | null>(values.length).fill(null)
+  for (let i = 0; i < values.length; i++) {
+    const v = values[i]
+    if (v === null || close[i] === 0) continue
+    out[i] = (v / close[i]) * 100
+  }
+  return out
+}
+
+/**
+ * Perubahan deret kumulatif selama `period` hari, dinyatakan dalam satuan
+ * volume harian rata-rata.
+ *
+ * OBV dan garis akumulasi–distribusi adalah angka kumulatif yang titik nolnya
+ * sembarang, jadi tingkatnya tidak berarti apa-apa. Yang bermakna hanya
+ * perubahannya, dan itu pun baru bisa dibandingkan antar-instrumen setelah
+ * dibagi volume hariannya sendiri.
+ */
+function changeInAverageVolume(
+  cumulative: MaybeSeries,
+  averageVolume: MaybeSeries,
+  period: number,
+): MaybeSeries {
+  const out: MaybeSeries = new Array<number | null>(cumulative.length).fill(null)
+
+  for (let i = period; i < cumulative.length; i++) {
+    const now = cumulative[i]
+    const then = cumulative[i - period]
+    const average = averageVolume[i]
+    if (now === null || then === null || average === null || average <= 0) continue
+    out[i] = (now - then) / average
+  }
+
   return out
 }
 

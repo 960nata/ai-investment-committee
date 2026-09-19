@@ -15,17 +15,24 @@
  */
 
 import {
+  adx,
   atr,
   bollinger,
   ema,
+  logReturns,
   maxDrawdown,
+  momentum12m1m,
+  realizedVolatility,
   relativeStrength,
   rollingPercentile,
+  rollingRobustZ,
   rsi,
   sma,
+  winsorize,
   type MaybeSeries,
 } from '../lib/features/indicators'
 import { computeFeatures, FEATURE_SET_VERSION } from '../lib/features/compute'
+import { FEATURES, normalisedFeatureNames } from '../lib/features/registry'
 
 // ---------------------------------------------------------------------------
 // Kerangka uji minimal
@@ -337,6 +344,250 @@ test('volume nol tidak menghasilkan pembagian nol', () => {
 
   assert(last.values.volume_relative_20 === null, 'volume relatif harus null, bukan Infinity')
   assert(last.values.vwap_deviation_20_pct === null, 'simpangan VWAP harus null')
+})
+
+// ---------------------------------------------------------------------------
+// Indikator tambahan
+// ---------------------------------------------------------------------------
+
+test('adx dan indikator arah cocok dengan nilai acuan', () => {
+  const result = adx(HIGHS, LOWS, CLOSES, 14)
+
+  near(result.plusDi[14], 23.146223, 1e-4)
+  near(result.minusDi[14], 9.70201, 1e-4)
+  near(result.plusDi[29], 16.958268, 1e-4)
+  near(result.minusDi[29], 20.313063, 1e-4)
+
+  // ADX adalah penghalusan atas 14 nilai DX, dan DX sendiri baru ada di indeks
+  // 14, jadi nilai ADX pertama jatuh di indeks 27.
+  assert(result.adx[26] === null, 'adx seharusnya belum terisi di indeks 26')
+  assert(result.adx[27] !== null, 'adx seharusnya sudah terisi di indeks 27')
+  near(result.adx[29], 22.009172, 1e-4)
+})
+
+test('adx tidak pernah negatif dan berhenti di 100', () => {
+  const series = syntheticSeries(600)
+  const result = adx(series.high, series.low, series.close, 14)
+  for (const value of result.adx) {
+    if (value === null) continue
+    assert(value >= 0 && value <= 100, `adx di luar rentang: ${value}`)
+  }
+})
+
+test('imbal hasil logaritmik bersifat aditif antar-waktu', () => {
+  const values = [100, 110, 99, 123.75]
+  const lr = logReturns(values)
+
+  const total = (lr[1] ?? 0) + (lr[2] ?? 0) + (lr[3] ?? 0)
+  near(total, Math.log(values[3] / values[0]), 1e-12)
+})
+
+test('volatilitas terealisasi memakai imbal hasil logaritmik', () => {
+  near(realizedVolatility(CLOSES, 20, 252)[29], 0.176416, 1e-5)
+  near(realizedVolatility(CLOSES, 20, 365)[29], 0.212317, 1e-5)
+})
+
+test('pita bollinger dan %b cocok dengan nilai acuan', () => {
+  const result = bollinger(CLOSES, 20, 2)
+  near(result.percentB[29], 0.142969, 1e-5)
+  near(result.widthPct[29], 6.668313, 1e-5)
+})
+
+test('momentum 12-1 melewatkan bulan terakhir', () => {
+  // Harga naik mantap lalu jatuh di dua puluh hari terakhir. Momentum 12-1
+  // harus mengabaikan kejatuhan itu; itulah gunanya melewatkan satu bulan.
+  const values: number[] = []
+  for (let i = 0; i < 300; i++) values.push(100 * (1 + i / 1000))
+  for (let i = 280; i < 300; i++) values[i] = 50
+
+  const result = momentum12m1m(values, 21, 252)
+  const value = result[299]
+
+  assert(value !== null, 'momentum 12-1 seharusnya terisi pada indeks 299')
+  assert(value! > 0, `kejatuhan bulan terakhir seharusnya diabaikan, dapat ${value}`)
+  assert(result[251] === null, 'belum boleh terisi sebelum 252 hari riwayat')
+})
+
+test('robust z-score bergulir cocok dengan nilai acuan', () => {
+  // Jendela 30 atas deret 30 titik: hanya titik terakhir yang punya sampel penuh.
+  const result = rollingRobustZ([...CLOSES], 30)
+  near(result[29], -1.296195, 1e-5)
+  assert(result[28] === null, 'sampel belum cukup di indeks 28')
+})
+
+test('robust z-score dipangkas di tiga simpangan', () => {
+  const values: (number | null)[] = Array.from({ length: 79 }, (_, i) => i + 1)
+  values.push(10_000)
+
+  const result = rollingRobustZ(values, 80)
+  near(result[79], 3, 1e-12)
+})
+
+test('robust z-score nol saat seluruh populasi bernilai sama', () => {
+  const result = rollingRobustZ(new Array(80).fill(42), 80)
+  near(result[79], 0, 1e-12)
+})
+
+test('pencilan tunggal di populasi seragam tetap ditandai ekstrem', () => {
+  // MAD bernilai nol di sini, tetapi nilai terakhir jelas menyimpang. Jawaban
+  // nol akan menyembunyikan justru pencilan yang paling perlu terlihat.
+  const values: (number | null)[] = new Array(79).fill(10)
+  values.push(10_000)
+
+  near(rollingRobustZ(values, 80)[79], 3, 1e-12)
+})
+
+test('winsorisasi memangkas pencilan tanpa membuang barisnya', () => {
+  const values = [...Array.from({ length: 98 }, (_, i) => i + 1), -9999, 9999]
+  const result = winsorize(values, 0.01, 0.99)
+
+  assert(result.length === values.length, 'jumlah baris tidak boleh berubah')
+  assert(Math.max(...result) < 9999, 'pencilan atas seharusnya terpangkas')
+  assert(Math.min(...result) > -9999, 'pencilan bawah seharusnya terpangkas')
+  assert(result[49] === values[49], 'nilai di tengah tidak boleh tersentuh')
+})
+
+// ---------------------------------------------------------------------------
+// Penyesuaian aksi korporasi
+// ---------------------------------------------------------------------------
+
+test('stock split tanpa penyesuaian terbaca sebagai kejatuhan harga', () => {
+  const split = splitSeries()
+
+  const unadjusted = computeFeatures({
+    market: 'CRYPTO',
+    series: { ...split.series, adjClose: undefined },
+  })
+  const row = unadjusted.rows.find((r) => r.date === split.dateAfterSplit)!
+
+  assert(unadjusted.priceAdjusted === false, 'seharusnya dilaporkan belum disesuaikan')
+  assert(
+    row.values.roc_20! < -40,
+    `tanpa penyesuaian, split 1:2 harus tampak seperti kejatuhan besar, dapat ${row.values.roc_20}`,
+  )
+})
+
+test('harga tersesuaikan menghapus lompatan semu akibat split', () => {
+  const split = splitSeries()
+
+  const adjusted = computeFeatures({ market: 'CRYPTO', series: split.series })
+  const row = adjusted.rows.find((r) => r.date === split.dateAfterSplit)!
+
+  assert(adjusted.priceAdjusted === true, 'seharusnya dilaporkan sudah disesuaikan')
+  assert(
+    Math.abs(row.values.roc_20!) < 10,
+    `setelah disesuaikan tidak boleh ada kejatuhan semu, dapat ${row.values.roc_20}`,
+  )
+})
+
+/**
+ * Deret dengan stock split 1:2 di indeks 200: harga kuotasi terbelah dua,
+ * sementara penutupan tersesuaikan menyatakan seluruh riwayat dalam satuan
+ * setelah split sehingga tetap bersambung.
+ */
+function splitSeries() {
+  const base = syntheticSeries(300)
+  const splitAt = 200
+
+  const close = base.close.map((p, i) => (i < splitAt ? p : p / 2))
+  const adjClose = base.close.map((p) => p / 2)
+
+  return {
+    dateAfterSplit: base.date[splitAt + 5],
+    series: {
+      date: base.date,
+      open: close.map((p) => p * 0.999),
+      high: close.map((p) => p * 1.01),
+      low: close.map((p) => p * 0.99),
+      close,
+      volume: base.volume,
+      adjClose,
+    },
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Kontrak dengan daftar fitur
+// ---------------------------------------------------------------------------
+
+test('tiap fitur di daftar benar-benar dihasilkan engine', () => {
+  const result = computeFeatures({ market: 'CRYPTO', series: syntheticSeries(900) })
+  const produced = new Set(Object.keys(result.rows.at(-1)!.values))
+
+  for (const spec of FEATURES) {
+    assert(produced.has(spec.name), `fitur "${spec.name}" ada di daftar tapi tidak dihasilkan`)
+  }
+})
+
+test('tiap fitur ternormalisasi punya pasangan z-score dan persentil', () => {
+  const result = computeFeatures({ market: 'CRYPTO', series: syntheticSeries(900) })
+  const values = result.rows.at(-1)!.values
+
+  for (const name of normalisedFeatureNames()) {
+    assert(`${name}_z` in values, `z-score untuk ${name} tidak ada`)
+    assert(`${name}_pctile` in values, `persentil untuk ${name} tidak ada`)
+
+    const z = values[`${name}_z`]
+    if (z !== null) {
+      assert(z >= -3 && z <= 3, `z-score ${name} di luar batas pemangkasan: ${z}`)
+    }
+  }
+})
+
+test('tiap fitur di daftar membawa alasan ekonominya', () => {
+  for (const spec of FEATURES) {
+    assert(
+      spec.rationale.trim().length > 20,
+      `fitur "${spec.name}" tidak punya alasan ekonomi yang berarti`,
+    )
+  }
+})
+
+test('sisi RSI dipecah jadi dua fitur yang keduanya monoton', () => {
+  const result = computeFeatures({ market: 'CRYPTO', series: syntheticSeries(400) })
+
+  for (const row of result.rows) {
+    const rsiValue = row.values.rsi_14
+    const oversold = row.values.rsi_oversold
+    const overbought = row.values.rsi_overbought
+    if (rsiValue === null) continue
+
+    assert(oversold! >= 0 && overbought! >= 0, 'kedua sisi tidak boleh negatif')
+    assert(
+      oversold === 0 || overbought === 0,
+      `hanya satu sisi boleh aktif pada RSI ${rsiValue}`,
+    )
+    near(oversold! + overbought!, Math.abs(rsiValue - 50) / 50, 1e-6)
+  }
+})
+
+test('histogram MACD tidak berubah saat seluruh harga dikali dua', () => {
+  const base = syntheticSeries(400)
+  const doubled = {
+    ...base,
+    open: base.open.map((v) => v * 2),
+    high: base.high.map((v) => v * 2),
+    low: base.low.map((v) => v * 2),
+    close: base.close.map((v) => v * 2),
+  }
+
+  const a = computeFeatures({ market: 'CRYPTO', series: base }).rows.at(-1)!
+  const b = computeFeatures({ market: 'CRYPTO', series: doubled }).rows.at(-1)!
+
+  // Inilah gunanya membagi histogram dengan harga: tanpa itu, instrumen mahal
+  // dan instrumen murah tidak bisa masuk ke satu skor yang sama.
+  near(b.values.macd_histogram_pct, a.values.macd_histogram_pct!, 1e-6)
+})
+
+test('menjalankan ulang atas data yang sama menghasilkan baris identik', () => {
+  const series = syntheticSeries(500)
+  const first = computeFeatures({ market: 'CRYPTO', series })
+  const second = computeFeatures({ market: 'CRYPTO', series })
+
+  assert(
+    JSON.stringify(first.rows) === JSON.stringify(second.rows),
+    'hasil harus identik bit-per-bit antar-jalan',
+  )
 })
 
 // ---------------------------------------------------------------------------
