@@ -25,7 +25,6 @@
 
 import { FEATURES, applyDirection, type FeatureSpec } from '@/lib/features/registry'
 import {
-  GROUPS_WITHOUT_FEATURES,
   GROUP_OF,
   GROUP_WEIGHTS,
   MODEL_VERSION,
@@ -36,7 +35,12 @@ import {
 /** Z-score dipangkas di ±3, jadi pengali ini memetakannya ke ±10. */
 const Z_TO_SCORE = 10 / 3
 
-export type ConfidenceLabel = 'tinggi' | 'sedang' | 'rendah' | 'tidak memadai'
+export type ConfidenceLabel =
+  | 'tinggi'
+  | 'sedang'
+  | 'rendah'
+  | 'tidak memadai'
+  | 'tidak berlaku'
 
 export interface Driver {
   feature: string
@@ -78,6 +82,14 @@ export interface HorizonScore {
 export interface ScoreInput {
   /** Satu baris `feature_daily.values`. */
   values: Record<string, number | null>
+  /**
+   * Benar bila instrumen ini memang bisa punya laporan keuangan.
+   *
+   * Indeks, komoditi, dan emas tidak akan pernah punya, jadi bobot valuasi dan
+   * pertumbuhan yang kosong pada mereka bukan kekurangan — dan labelnya harus
+   * berbeda dari kekurangan yang memang menunggu diperbaiki.
+   */
+  hasFundamentals?: boolean
   /** Umur data dalam hari perdagangan. Dipakai menurunkan confidence. */
   staleDays: number
   /** Nilai transaksi harian rata-rata, dalam mata uang instrumen. */
@@ -210,10 +222,18 @@ function assessConfidence(
 ): { confidence: ConfidenceLabel; confidenceScore: number; confidenceReasons: string[] } {
   const reasons: string[] = []
 
-  const cData = 1 - missingWeight
-  if (missingWeight > 0.3) {
-    const kosong = GROUPS_WITHOUT_FEATURES.length
-    reasons.push(`${Math.round(missingWeight * 100)}% bobot belum punya data (${kosong} kelompok kosong)`)
+  // Bobot yang memang tidak berlaku tidak dihitung sebagai lubang. Menghukum
+  // indeks karena tidak punya neraca sama saja menghukumnya karena bukan saham.
+  const applicable = input.hasFundamentals !== false
+  const inapplicable = applicable ? 0 : notApplicableWeight(groups)
+  const genuinelyMissing = Math.max(0, missingWeight - inapplicable)
+
+  const cData = 1 - genuinelyMissing
+  if (genuinelyMissing > 0.3) {
+    reasons.push(`${Math.round(genuinelyMissing * 100)}% bobot belum punya data`)
+  }
+  if (inapplicable > 0) {
+    reasons.push(`${Math.round(inapplicable * 100)}% bobot tidak berlaku untuk jenis aset ini`)
   }
 
   let cLikuiditas = 1
@@ -238,11 +258,31 @@ function assessConfidence(
   // belum pernah diuji tidak boleh terdengar yakin.
   reasons.push('belum dikalibrasi, belum ada rekam jejak')
 
+  // Kalau seluruh sisa bobot memang tidak berlaku dan yang tersedia sudah
+  // terpakai, labelnya bukan "tidak memadai" melainkan "tidak berlaku".
+  const nothingLeftToGet = !applicable && genuinelyMissing < 0.05 && raw < 0.15
+
   return {
-    confidence: raw >= 0.6 ? 'tinggi' : raw >= 0.35 ? 'sedang' : raw >= 0.15 ? 'rendah' : 'tidak memadai',
+    confidence: nothingLeftToGet
+      ? 'tidak berlaku'
+      : raw >= 0.6
+        ? 'tinggi'
+        : raw >= 0.35
+          ? 'sedang'
+          : raw >= 0.15
+            ? 'rendah'
+            : 'tidak memadai',
     confidenceScore: round(raw),
     confidenceReasons: reasons,
   }
+}
+
+/** Porsi bobot yang kosong semata karena jenis asetnya, bukan karena data hilang. */
+function notApplicableWeight(groups: GroupBreakdown[]): number {
+  const fundamental: ScoreGroup[] = ['valuasi', 'pertumbuhan']
+  return groups
+    .filter((g) => fundamental.includes(g.group) && g.score === null)
+    .reduce((sum, g) => sum + g.weight, 0)
 }
 
 function round(value: number): number {

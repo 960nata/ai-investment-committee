@@ -358,6 +358,9 @@ export const confidenceEnum = pgEnum('confidence', [
   'sedang',
   'rendah',
   'tidak memadai',
+  // Berbeda arti dari "tidak memadai": yang ini tidak akan pernah terisi,
+  // karena indeks dan komoditi memang tidak menerbitkan laporan keuangan.
+  'tidak berlaku',
 ])
 
 /**
@@ -401,3 +404,73 @@ export const scoreDaily = pgTable(
 )
 
 export type ScoreRow = typeof scoreDaily.$inferSelect
+
+// ---------------------------------------------------------------------------
+// Fakta mentah: laporan keuangan
+// ---------------------------------------------------------------------------
+
+export const periodTypeEnum = pgEnum('period_type', ['kuartal', 'tahunan'])
+
+/**
+ * Laporan keuangan per periode, satu baris per versi penyajian.
+ *
+ * Kunci utamanya memuat `source_accession`, nomor filing asalnya, bukan hanya
+ * instrumen dan periode. Perusahaan menyajikan ulang laporannya: angka 2024 di
+ * laporan 2024 berbeda dari angka 2024 yang muncul sebagai pembanding di
+ * laporan 2025. Menimpa yang lama akan menghapus apa yang benar-benar diketahui
+ * pasar saat itu, dan tanpa itu backtest jadi bohong.
+ *
+ * Menyimpan semua versi juga memberi satu fitur gratis: perusahaan yang sering
+ * menyajikan ulang angkanya secara material punya kualitas pelaporan lebih
+ * rendah, dan itu bisa dihitung.
+ */
+export const fundamentalQuarterly = pgTable(
+  'fundamental_quarterly',
+  {
+    instrumentId: integer('instrument_id')
+      .notNull()
+      .references(() => instrument.id, { onDelete: 'cascade' }),
+    /** Periode fiskal, misalnya "2026-Q3" atau "2026-FY". */
+    period: varchar('period', { length: 12 }).notNull(),
+    /** Nomor filing asal. Bagian kunci, bukan sekadar catatan. */
+    sourceAccession: varchar('source_accession', { length: 40 }).notNull(),
+
+    periodType: periodTypeEnum('period_type').notNull(),
+    periodEnd: date('period_end').notNull(),
+    /**
+     * Tanggal laporan benar-benar terbit.
+     *
+     * Satu-satunya kolom yang membuat backtest jujur. Laporan kuartal pertama
+     * terbit akhir April sampai Mei; memakainya pada 1 April adalah melihat
+     * masa depan, dan itu sumber kebohongan paling umum di backtest amatir.
+     */
+    reportedAt: date('reported_at').notNull(),
+
+    fiscalYear: integer('fiscal_year').notNull(),
+    fiscalPeriod: varchar('fiscal_period', { length: 4 }).notNull(),
+    currency: varchar('currency', { length: 8 }).notNull(),
+
+    /** Pos kanonik dan nilainya. Pos yang tidak ada tidak muncul di sini. */
+    items: jsonb('items').$type<Record<string, number>>().notNull(),
+    /**
+     * Pos wajib yang tidak ditemukan, disebut namanya.
+     *
+     * Membedakan "nilainya nol" dari "tidak ada datanya". Keduanya terlihat sama
+     * kalau disimpan sebagai kosong, padahal artinya sangat berbeda bagi rumus
+     * maupun bagi confidence.
+     */
+    missingItems: jsonb('missing_items').$type<string[]>().notNull(),
+    /** Porsi pos wajib yang terisi, 0..1. Masuk langsung ke rumus confidence. */
+    completeness: numeric('completeness', { precision: 5, scale: 4 }).notNull(),
+
+    sourceId: varchar('source_id', { length: 32 }).notNull(),
+    fetchedAt: timestamp('fetched_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.instrumentId, t.period, t.sourceAccession] }),
+    // Penyaring utama tiap backtest: apa yang sudah terbit pada tanggal itu.
+    index('fundamental_reported_idx').on(t.instrumentId, t.reportedAt),
+  ],
+)
+
+export type FundamentalRow = typeof fundamentalQuarterly.$inferSelect

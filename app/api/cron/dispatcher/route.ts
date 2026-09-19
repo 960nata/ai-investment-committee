@@ -1,9 +1,15 @@
 /**
  * Dispatcher cron
  *
- * Satu-satunya cron di `vercel.json`, jalan tiap jam. Tugasnya bukan memproses
- * data, melainkan membaca `job_schedule`, menentukan job mana yang jatuh tempo,
- * memecah pekerjaan jadi batch kecil, lalu menyerahkannya ke QStash.
+ * Dipicu tiap jam oleh QStash Schedules, dan sekali sehari oleh Vercel Cron
+ * sebagai jaring pengaman. Plan Hobby Vercel hanya mengizinkan cron harian,
+ * sementara `job_schedule` butuh pemeriksaan per jam supaya IDX, AS, dan crypto
+ * bisa punya jam jatuh tempo masing-masing.
+ *
+ * Tugasnya bukan memproses data, melainkan membaca `job_schedule`, menentukan
+ * job mana yang jatuh tempo, memecah pekerjaan jadi batch kecil, lalu
+ * menyerahkannya ke QStash. Dipanggil dua kali dalam satu jam tidak menggandakan
+ * pekerjaan: `markScheduleRan` mencatat jam terakhir tiap job jalan.
  *
  * Tidak ada instrumen yang diproses di sini. Endpoint ini harus selalu selesai
  * dalam hitungan detik, berapa pun jumlah instrumen yang dilacak.

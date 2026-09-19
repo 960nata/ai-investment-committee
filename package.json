@@ -20,7 +20,10 @@
     "db:seed": "tsx scripts/seed.ts",
     "smoke:agents": "tsx scripts/smoke-agents.ts",
     "probe:keys": "tsx scripts/probe-keys.ts",
-    "job": "tsx scripts/run-job.ts"
+    "job": "tsx scripts/run-job.ts",
+    "probe:edgar": "tsx scripts/probe-edgar.ts",
+    "schedule:setup": "tsx scripts/setup-schedule.ts",
+    "schedule:delete": "tsx scripts/setup-schedule.ts --delete"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

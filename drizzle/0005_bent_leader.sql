@@ -1,0 +1,1 @@
+ALTER TYPE "public"."confidence" ADD VALUE 'tidak berlaku';

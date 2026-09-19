@@ -19,6 +19,7 @@ import {
   dataSourceHealth,
   featureDaily,
   fromDbMarket,
+  fundamentalQuarterly,
   ingestQuarantine,
   instrument,
   jobRun,
@@ -927,7 +928,7 @@ export interface ScoreInputRow {
   featureSetVersion: string
   score: number
   probability: number | null
-  confidence: 'tinggi' | 'sedang' | 'rendah' | 'tidak memadai'
+  confidence: 'tinggi' | 'sedang' | 'rendah' | 'tidak memadai' | 'tidak berlaku'
   confidenceScore: number
   missingWeight: number
   drivers: Record<string, unknown>
@@ -986,7 +987,7 @@ export interface LatestScore {
   date: string
   score: number
   probability: number | null
-  confidence: 'tinggi' | 'sedang' | 'rendah' | 'tidak memadai'
+  confidence: 'tinggi' | 'sedang' | 'rendah' | 'tidak memadai' | 'tidak berlaku'
   missingWeight: number
   drivers: Record<string, unknown>
   groups: Record<string, unknown>[]
@@ -1006,7 +1007,7 @@ export async function listLatestScores(modelVersion: string): Promise<LatestScor
     date: string
     score: string
     probability: string | null
-    confidence: 'tinggi' | 'sedang' | 'rendah' | 'tidak memadai'
+    confidence: 'tinggi' | 'sedang' | 'rendah' | 'tidak memadai' | 'tidak berlaku'
     missing_weight: string
     drivers: Record<string, unknown>
     groups: Record<string, unknown>[]
@@ -1049,4 +1050,136 @@ export async function getScoreCoverage(): Promise<
     .from(scoreDaily)
     .groupBy(scoreDaily.modelVersion)
     .orderBy(scoreDaily.modelVersion)
+}
+
+// ---------------------------------------------------------------------------
+// Laporan keuangan
+// ---------------------------------------------------------------------------
+
+export interface FundamentalInput {
+  instrumentId: number
+  period: string
+  sourceAccession: string
+  periodType: 'kuartal' | 'tahunan'
+  periodEnd: string
+  reportedAt: string
+  fiscalYear: number
+  fiscalPeriod: string
+  currency: string
+  items: Record<string, number>
+  missingItems: string[]
+  completeness: number
+  sourceId: string
+}
+
+export async function upsertFundamentals(rows: FundamentalInput[], chunkSize = 200): Promise<number> {
+  if (rows.length === 0) return 0
+
+  let written = 0
+  for (let i = 0; i < rows.length; i += chunkSize) {
+    const slice = rows.slice(i, i + chunkSize)
+    const inserted = await db
+      .insert(fundamentalQuarterly)
+      .values(
+        slice.map((r) => ({
+          ...r,
+          completeness: String(r.completeness),
+          fetchedAt: new Date(),
+        })),
+      )
+      .onConflictDoUpdate({
+        target: [
+          fundamentalQuarterly.instrumentId,
+          fundamentalQuarterly.period,
+          fundamentalQuarterly.sourceAccession,
+        ],
+        set: {
+          periodType: sql`excluded.period_type`,
+          periodEnd: sql`excluded.period_end`,
+          reportedAt: sql`excluded.reported_at`,
+          currency: sql`excluded.currency`,
+          items: sql`excluded.items`,
+          missingItems: sql`excluded.missing_items`,
+          completeness: sql`excluded.completeness`,
+          fetchedAt: sql`excluded.fetched_at`,
+        },
+      })
+      .returning({ period: fundamentalQuarterly.period })
+
+    written += inserted.length
+  }
+  return written
+}
+
+/**
+ * Laporan yang sudah terbit pada tanggal tertentu, versi terbaru per periode.
+ *
+ * Penyaringnya `reported_at`, bukan `period_end`. Laporan kuartal pertama terbit
+ * akhir April sampai Mei; menyaring dengan akhir periode berarti memakainya
+ * sejak 1 April, dan itu melihat masa depan.
+ *
+ * Bila satu periode punya beberapa versi karena penyajian ulang, yang diambil
+ * versi terbaru yang sudah terbit pada tanggal itu — bukan versi terbaru hari
+ * ini, yang belum ada saat itu.
+ */
+export async function getFundamentalsAsOf(
+  instrumentId: number,
+  asOf: string,
+  limit = 20,
+): Promise<
+  {
+    period: string
+    periodType: 'kuartal' | 'tahunan'
+    periodEnd: string
+    reportedAt: string
+    currency: string
+    items: Record<string, number>
+    completeness: number
+  }[]
+> {
+  const rows = await db.execute<{
+    period: string
+    period_type: 'kuartal' | 'tahunan'
+    period_end: string
+    reported_at: string
+    currency: string
+    items: Record<string, number>
+    completeness: string
+  }>(sql`
+    select period, period_type, period_end::text, reported_at::text, currency, items, completeness
+    from (
+      select *, row_number() over (
+        partition by period order by reported_at desc, source_accession desc
+      ) as rn
+      from fundamental_quarterly
+      where instrument_id = ${instrumentId} and reported_at <= ${asOf}
+    ) f
+    where rn = 1
+    order by period_end desc
+    limit ${limit}
+  `)
+
+  return rows.map((r) => ({
+    period: r.period,
+    periodType: r.period_type,
+    periodEnd: r.period_end,
+    reportedAt: r.reported_at,
+    currency: r.currency,
+    items: r.items,
+    completeness: Number(r.completeness),
+  }))
+}
+
+export async function getFundamentalCoverage(): Promise<
+  { sourceId: string; rows: number; instruments: number; latestReported: string | null }[]
+> {
+  return db
+    .select({
+      sourceId: fundamentalQuarterly.sourceId,
+      rows: sql<number>`count(*)::int`,
+      instruments: sql<number>`count(distinct ${fundamentalQuarterly.instrumentId})::int`,
+      latestReported: sql<string | null>`max(${fundamentalQuarterly.reportedAt})`,
+    })
+    .from(fundamentalQuarterly)
+    .groupBy(fundamentalQuarterly.sourceId)
 }

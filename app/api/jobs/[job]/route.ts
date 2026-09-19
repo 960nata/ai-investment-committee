@@ -23,6 +23,7 @@ import { badRequest, failure, notFound, unauthorized, NO_STORE } from '@/lib/htt
 import { runIngestJob } from '@/lib/jobs/ingest'
 import { runFeatureJob } from '@/lib/features/job'
 import { runScoreJob } from '@/lib/scoring/job'
+import { runFundamentalJob } from '@/lib/fundamentals/job'
 import { runCommittee } from '@/lib/agents/committee'
 
 export const dynamic = 'force-dynamic'
@@ -41,6 +42,7 @@ const HANDLERS: Record<string, (payload: JobPayload) => Promise<BatchResult>> = 
   'score-idx': scoreBatch,
   'score-us': scoreBatch,
   'score-global': scoreBatch,
+  'fundamental-us': fundamentalBatch,
   'komite-review': reviewCommittee,
 }
 
@@ -284,5 +286,24 @@ async function scoreBatch(payload: JobPayload): Promise<BatchResult> {
     quarantined: 0,
     errors: outcome.errors,
     extra: { scoresWritten: outcome.scoresWritten, skipped: outcome.skipped },
+  }
+}
+
+/**
+ * Tarik laporan keuangan dari EDGAR.
+ *
+ * Batch-nya kecil dan jadwalnya jarang: laporan terbit empat kali setahun, dan
+ * SEC meminta laju permintaan yang sopan.
+ */
+async function fundamentalBatch(payload: JobPayload): Promise<BatchResult> {
+  const outcome = await runFundamentalJob({ symbols: payload.symbols, market: payload.market })
+
+  return {
+    itemsProcessed: outcome.itemsProcessed,
+    itemsFailed: outcome.itemsFailed,
+    candlesWritten: 0,
+    quarantined: outcome.quarantined,
+    errors: outcome.errors,
+    extra: { fundamentalRows: outcome.rowsWritten, skipped: outcome.skipped },
   }
 }

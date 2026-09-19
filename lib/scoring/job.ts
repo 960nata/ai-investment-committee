@@ -17,6 +17,7 @@ import {
 import type { MarketCode } from '@/lib/db/schema'
 import { FEATURE_SET_VERSION } from '@/lib/features/compute'
 import { scoreInstrument } from './engine'
+import { fundamentalsApply } from './weights'
 
 /**
  * Ambang likuiditas per pasar, dalam mata uang instrumennya.
@@ -77,6 +78,7 @@ export async function runScoreJob(input: ScoreJobInput): Promise<ScoreJobResult>
 
       const scored = scoreInstrument({
         values: feature.values,
+        hasFundamentals: fundamentalsApply(instrument.assetClass),
         staleDays,
         turnover,
         turnoverThreshold: TURNOVER_THRESHOLD[market],

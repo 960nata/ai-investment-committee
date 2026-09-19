@@ -15,6 +15,7 @@ import { listInstruments } from '../lib/db/queries'
 import { runIngestJob } from '../lib/jobs/ingest'
 import { runFeatureJob } from '../lib/features/job'
 import { runScoreJob } from '../lib/scoring/job'
+import { runFundamentalJob } from '../lib/fundamentals/job'
 import type { MarketCode } from '../lib/db/schema'
 
 const JOBS = [
@@ -30,6 +31,7 @@ const JOBS = [
   'score-idx',
   'score-us',
   'score-global',
+  'fundamental-us',
 ] as const
 
 type JobName = (typeof JOBS)[number]
@@ -69,7 +71,13 @@ async function main(): Promise<void> {
 
   const started = Date.now()
 
-  if (job.startsWith('score-')) {
+  if (job.startsWith('fundamental-')) {
+    const result = await runFundamentalJob({ symbols, market })
+    console.log(`  ${result.itemsProcessed} berhasil, ${result.itemsFailed} gagal`)
+    console.log(`  ${result.rowsWritten} baris laporan ditulis, ${result.quarantined} dikarantina`)
+    for (const s of result.skipped.slice(0, 10)) console.log(`  - ${s.symbol}: ${s.reason}`)
+    for (const e of result.errors.slice(0, 10)) console.log(`  ! ${e}`)
+  } else if (job.startsWith('score-')) {
     const result = await runScoreJob({ symbols, market })
     console.log(`  ${result.itemsProcessed} berhasil, ${result.itemsFailed} gagal`)
     console.log(`  ${result.scoresWritten} baris skor ditulis`)

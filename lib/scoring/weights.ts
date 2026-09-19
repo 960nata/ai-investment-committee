@@ -111,3 +111,18 @@ export const GROUPS_WITHOUT_FEATURES: ScoreGroup[] = [
  * skor baru terlihat sebanding padahal dihasilkan model yang berbeda.
  */
 export const MODEL_VERSION = 'skor-2026-09-a'
+
+/**
+ * Kelas aset yang tidak akan pernah punya laporan keuangan.
+ *
+ * Untuk kelompok ini, kosongnya bobot valuasi dan pertumbuhan bukan kekurangan
+ * yang menunggu diperbaiki — indeks negara, kontrak berjangka, dan emas memang
+ * tidak menerbitkan neraca. Menampilkannya sebagai "tidak memadai" menyiratkan
+ * datanya akan datang suatu hari, dan itu tidak jujur. Yang benar "tidak
+ * berlaku", dan dua kata itu berbeda arti bagi pembacanya.
+ */
+export const WITHOUT_FUNDAMENTALS: readonly string[] = ['indeks', 'komoditi', 'emas', 'crypto']
+
+export function fundamentalsApply(assetClass: string): boolean {
+  return !WITHOUT_FUNDAMENTALS.includes(assetClass)
+}
