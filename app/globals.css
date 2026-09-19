@@ -76,6 +76,7 @@
   --radius: 3px;
 
   --rail: 232px;
+  --topbar: 52px;
 }
 
 /* ---------------------------------------------------------------------------
@@ -168,30 +169,84 @@ button {
    Kerangka
    --------------------------------------------------------------------------- */
 
+.app {
+  min-height: 100vh;
+}
+
+/*
+ * Bar atas menjawab tiga hal dan tidak lebih: di mana kita sekarang, seberapa
+ * segar datanya, dan satu tindakan yang paling sering dipakai. Ia menempel di
+ * puncak layar karena kesegaran data adalah hal yang harus selalu terlihat,
+ * bukan yang perlu digulir untuk dicari.
+ */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  height: var(--topbar);
+  padding-right: var(--space-4);
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-1);
+}
+
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  width: var(--rail);
+  height: 100%;
+  padding: 0 var(--space-4);
+  border-right: 1px solid var(--line);
+}
+
+/* Judul di bar atas dan judul besar di halaman sengaja dibedakan beratnya.
+   Dua judul identik di satu layar membuat keduanya berhenti menunjukkan arah. */
+.topbar-title {
+  font-family: var(--mono);
+  font-size: var(--t-small);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.topbar-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: var(--t-small);
+  color: var(--ink-mute);
+}
+
+.topbar-status svg {
+  color: var(--ink-faint);
+}
+
+.topbar-action {
+  flex: none;
+}
+
 .shell {
   display: grid;
   grid-template-columns: var(--rail) 1fr;
-  min-height: 100vh;
+  min-height: calc(100vh - var(--topbar));
 }
 
 .rail {
   position: sticky;
-  top: 0;
+  top: var(--topbar);
   align-self: start;
-  height: 100vh;
+  height: calc(100vh - var(--topbar));
   display: flex;
   flex-direction: column;
   padding: var(--space-4);
   border-right: 1px solid var(--line);
   background: var(--surface-1);
-}
-
-.mark {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding-bottom: var(--space-4);
-  border-bottom: 1px solid var(--line);
 }
 
 .mark-glyph {
@@ -221,7 +276,7 @@ button {
   color: var(--ink-faint);
 }
 
-.rail-group {
+.rail-group + .rail-group {
   margin-top: var(--space-4);
 }
 
@@ -285,6 +340,16 @@ button {
 }
 
 @media (max-width: 900px) {
+  .topbar-brand {
+    width: auto;
+    padding-left: var(--space-3);
+    padding-right: var(--space-3);
+  }
+  /* Judul halaman sudah terbaca dari rel yang ditandai, jadi di layar sempit ia
+     mengalah demi status kesegaran yang tidak ada duanya di tempat lain. */
+  .topbar-title {
+    display: none;
+  }
   .shell {
     grid-template-columns: 1fr;
   }
@@ -293,16 +358,14 @@ button {
     height: auto;
     flex-direction: row;
     align-items: center;
-    gap: var(--space-4);
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
     border-right: none;
     border-bottom: 1px solid var(--line);
     overflow-x: auto;
   }
-  .mark {
-    padding-bottom: 0;
-    border-bottom: none;
-  }
-  .rail-group {
+  .rail-group,
+  .rail-group + .rail-group {
     display: flex;
     gap: var(--space-1);
     margin-top: 0;
@@ -310,6 +373,9 @@ button {
   .rail-label,
   .rail-foot {
     display: none;
+  }
+  .rail-link {
+    white-space: nowrap;
   }
   .main {
     padding: var(--space-4) var(--space-4) var(--space-5);

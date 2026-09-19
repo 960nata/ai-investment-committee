@@ -514,6 +514,39 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   }
 }
 
+export interface DataFreshness {
+  latestCandleDate: string | null
+  ageMinutes: number | null
+  freshness: Freshness
+}
+
+/**
+ * Kesegaran data saja, satu kueri.
+ *
+ * Bar atas muncul di tiap halaman, jadi ia tidak boleh ikut menarik seluruh
+ * ringkasan dashboard hanya untuk menampilkan satu stempel waktu.
+ */
+export async function getDataFreshness(): Promise<DataFreshness> {
+  const rows = await db
+    .select({
+      maxDate: sql<string | null>`max(${candleDaily.date})`,
+      maxFetchedAt: sql<string | null>`max(${candleDaily.fetchedAt})`,
+    })
+    .from(candleDaily)
+
+  const latestFetchedAt = rows[0]?.maxFetchedAt ?? null
+  const ageMinutes = latestFetchedAt
+    ? Math.floor((Date.now() - new Date(latestFetchedAt).getTime()) / 60_000)
+    : null
+
+  return {
+    latestCandleDate: rows[0]?.maxDate ?? null,
+    ageMinutes,
+    freshness:
+      ageMinutes === null ? 'empty' : ageMinutes > STALE_AFTER_MINUTES ? 'stale' : 'fresh',
+  }
+}
+
 /** Ubah umur data jadi kalimat pendek untuk ditampilkan. */
 export function describeAge(ageMinutes: number | null): string {
   if (ageMinutes === null) return 'belum ada data'

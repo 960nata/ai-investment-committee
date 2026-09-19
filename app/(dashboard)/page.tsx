@@ -11,7 +11,6 @@
  */
 
 import { InstrumentExplorer } from '@/components/instrument-explorer'
-import { IngestButton } from '@/components/ingest-button'
 import type { Candle } from '@/components/candlestick-chart'
 import {
   IconCandles,
@@ -87,11 +86,10 @@ export default async function OverviewPage() {
               antrian {data.queueConfigured ? 'aktif' : 'belum diset'}
             </span>
 
-            {data.showManualIngest && (
-              <span className="status-spacer">
-                <IngestButton job="ingest-crypto-daily" />
-              </span>
-            )}
+            <span className="status-item status-spacer">
+              <Lamp state={data.cacheAvailable ? 'ok' : 'unknown'} />
+              cache {data.cacheAvailable ? 'aktif' : 'belum diset'}
+            </span>
           </div>
 
           <div className="readouts">
@@ -232,8 +230,6 @@ async function load() {
     initialCandles,
     queueConfigured: isQStashConfigured(),
     cacheAvailable: cache.isAvailable(),
-    // Pemicu manual hanya masuk akal di luar produksi; endpointnya pun tertutup.
-    showManualIngest: process.env.NODE_ENV !== 'production',
   }
 }
 

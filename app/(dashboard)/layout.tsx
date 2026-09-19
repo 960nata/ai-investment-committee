@@ -1,71 +1,61 @@
-'use client'
-
 /**
  * Kerangka aplikasi.
  *
- * Rel kiri diberi label mono huruf kecil rapat seperti penanda pada panel alat,
- * bukan menu aplikasi. Halaman yang sedang dibuka ditandai pita tipis di tepi,
- * bukan blok warna penuh: pita membaca seperti penunjuk, blok membaca seperti
- * tombol yang bisa ditekan lagi.
+ * Server Component. Kesegaran data dibaca di sini supaya bar atas bisa
+ * menampilkannya di tiap halaman tanpa satu pun effect di klien. Hanya rel
+ * navigasi dan bar atas yang berjalan di peramban, dan keduanya hanya karena
+ * butuh mengetahui alamat halaman yang sedang dibuka.
+ *
+ * Kegagalan basis data tidak boleh menjatuhkan seluruh kerangka. Kalau kueri
+ * gagal, bar atas berkata "terputus" dan halaman di dalamnya tetap tergambar
+ * beserta keterangan cara memperbaikinya.
  */
 
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { IconFlow, IconGauge, IconPulse, IconRows } from '@/components/icons'
+import { IngestButton } from '@/components/ingest-button'
+import { Rail } from '@/components/rail'
+import { Topbar, type TopbarStatus } from '@/components/topbar'
+import { describeAge, getDataFreshness } from '@/lib/db/queries'
 
-const SECTIONS = [
-  {
-    label: 'Pasar',
-    links: [
-      { href: '/', label: 'Ringkasan', icon: IconGauge },
-      { href: '/instruments', label: 'Instrumen', icon: IconRows },
-    ],
-  },
-  {
-    label: 'Mesin',
-    links: [{ href: '/pipeline', label: 'Pipeline', icon: IconFlow }],
-  },
-]
+export const dynamic = 'force-dynamic'
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname()
+export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const status = await freshnessStatus()
 
   return (
-    <div className="shell">
-      <aside className="rail">
-        <Link href="/" className="mark">
-          <span className="mark-glyph">
-            <IconPulse size={15} />
-          </span>
-          <span className="mark-name">Komite</span>
-          <span className="mark-phase">f1</span>
-        </Link>
-
-        {SECTIONS.map((section) => (
-          <nav key={section.label} className="rail-group">
-            <span className="rail-label">{section.label}</span>
-            {section.links.map(({ href, label, icon: Icon }) => (
-              <Link
-                key={href}
-                href={href}
-                className="rail-link"
-                aria-current={pathname === href ? 'page' : undefined}
-              >
-                <Icon size={16} />
-                {label}
-              </Link>
-            ))}
-          </nav>
-        ))}
-
-        <div className="rail-foot">
-          <strong>Alat ukur</strong>
-          Menampilkan peluang dan data mentahnya. Tidak pernah menganjurkan satu pun
-          keputusan.
-        </div>
-      </aside>
-
-      <main className="main">{children}</main>
+    <div className="app">
+      <Topbar
+        status={status}
+        action={
+          process.env.NODE_ENV !== 'production' ? (
+            <IngestButton job="ingest-crypto-daily" />
+          ) : undefined
+        }
+      />
+      <div className="shell">
+        <Rail />
+        <main className="main">{children}</main>
+      </div>
     </div>
   )
+}
+
+async function freshnessStatus(): Promise<TopbarStatus> {
+  try {
+    const { latestCandleDate, ageMinutes, freshness } = await getDataFreshness()
+
+    if (freshness === 'empty') {
+      return { state: 'unknown', summary: 'belum ada data' }
+    }
+
+    // Data basi diberi nama terang-terangan. Pembaca yang tidak tahu datanya
+    // mati akan mengambil keputusan berdasarkan angka mati.
+    return {
+      state: freshness === 'fresh' ? 'ok' : 'halted',
+      summary:
+        `data per ${latestCandleDate} · ${describeAge(ageMinutes)}` +
+        (freshness === 'stale' ? ' · basi' : ''),
+    }
+  } catch {
+    return { state: 'halted', summary: 'basis data terputus' }
+  }
 }
