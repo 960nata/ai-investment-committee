@@ -13,7 +13,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { IconFlow, IconGauge, IconRows } from './icons'
+import { IconFlow, IconGauge, IconPulse, IconRows } from './icons'
 
 export const SECTIONS = [
   {
@@ -25,7 +25,10 @@ export const SECTIONS = [
   },
   {
     label: 'Mesin',
-    links: [{ href: '/pipeline', label: 'Pipeline', icon: IconFlow }],
+    links: [
+      { href: '/backtest', label: 'Backtest', icon: IconPulse },
+      { href: '/pipeline', label: 'Pipeline', icon: IconFlow },
+    ],
   },
 ]
 

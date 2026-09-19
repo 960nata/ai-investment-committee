@@ -71,12 +71,18 @@ export interface EvaluationResult {
   /** Jumlah pengamatan mentah. */
   n: number
   /**
-   * Jumlah pengamatan yang benar-benar bebas.
+   * Jumlah periode waktu yang benar-benar bebas.
    *
    * Prediksi 63 hari yang dibuat tiap hari berbagi 62 dari 63 hari yang sama.
    * Seribu pengamatan seperti itu tidak memberi informasi sebanyak seribu
    * pengamatan bebas, dan menampilkan yang mentah adalah penipuan statistik
    * sekalipun tidak disengaja.
+   *
+   * Dihitung hanya dari rentang waktunya, sengaja tidak dikalikan jumlah
+   * instrumen. Menambah instrumen memang menambah informasi, tetapi saham
+   * bergerak bersama-sama, sehingga seratus nama tidak pernah setara seratus
+   * pengamatan bebas. Angka ini sisi konservatifnya, dan untuk keputusan
+   * "boleh percaya atau belum", sisi konservatif yang benar.
    */
   effectiveN: number
   hitRate: number | null
@@ -90,7 +96,35 @@ export interface EvaluationResult {
   topMinusBottom: number | null
   /** Hit rate tebakan naif: seberapa sering pasar naik, apa pun skornya. */
   baseRate: number | null
+  /** Kesimpulan yang boleh ditarik dari sampel sebesar ini. */
+  verdict: Verdict
 }
+
+/**
+ * Kesimpulan, dan yang terpenting kapan tidak boleh ada kesimpulan.
+ *
+ * Ambang seratus pengamatan bebas bukan angka sembarangan: di bawah itu,
+ * selisih hit rate beberapa poin tidak bisa dibedakan dari kebetulan. Melaporkan
+ * "unggul 0,7 poin" atas dua pengamatan bebas adalah cara paling halus
+ * menyesatkan orang, karena angkanya benar dan kesimpulannya tidak ada.
+ */
+export type Verdict =
+  | { kind: 'belum teruji'; reason: string }
+  | { kind: 'kalah dari naif'; reason: string }
+  | { kind: 'setara naif'; reason: string }
+  | { kind: 'unggul'; reason: string }
+
+/**
+ * Ambang periode bebas sebelum kesimpulan boleh ditarik.
+ *
+ * Lebih rendah dari seratus pengamatan yang disebut blueprint, karena yang
+ * dihitung di sini periode waktu dan bukan pengamatan: seratus periode bebas
+ * pada horizon menengah berarti dua puluh lima tahun riwayat, yang tidak akan
+ * pernah tersedia untuk sebagian besar instrumen. Tiga puluh periode sudah cukup
+ * untuk membedakan keunggulan nyata dari kebetulan, dan tetap menolak sampel
+ * sependek satu tahun.
+ */
+const MIN_EFFECTIVE_N = 30
 
 /**
  * Evaluasi satu horizon.
@@ -115,6 +149,7 @@ export function evaluate(
       icir: null,
       topMinusBottom: null,
       baseRate: null,
+      verdict: { kind: 'belum teruji', reason: 'tidak ada pengamatan' },
     }
   }
 
@@ -162,18 +197,44 @@ export function evaluate(
   const mean = (xs: ForwardObservation[]) => xs.reduce((s, o) => s + o.forwardReturn, 0) / xs.length
   const topMinusBottom = n < 20 ? null : mean(top) - mean(bottom)
 
+  // Jumlah hari kalender yang tercakup dibagi panjang horizon. Ukuran kasar,
+  // tetapi arahnya benar dan jauh lebih jujur daripada N mentah.
+  const effectiveN = Math.max(1, Math.floor(byDate.size / horizonDays))
+
   return {
     n,
-    // Jumlah hari kalender yang tercakup dibagi panjang horizon. Ini ukuran
-    // kasar tetapi arahnya benar, dan jauh lebih jujur daripada N mentah.
-    effectiveN: Math.max(1, Math.floor(byDate.size / horizonDays)),
+    effectiveN,
     hitRate,
     expectancy,
     ic,
     icir,
     topMinusBottom,
     baseRate,
+    verdict: judge(effectiveN, hitRate, baseRate),
   }
+}
+
+function judge(effectiveN: number, hitRate: number | null, baseRate: number | null): Verdict {
+  if (effectiveN < MIN_EFFECTIVE_N) {
+    return {
+      kind: 'belum teruji',
+      reason: `${effectiveN} pengamatan bebas, di bawah ambang ${MIN_EFFECTIVE_N}`,
+    }
+  }
+  if (hitRate === null || baseRate === null) {
+    return { kind: 'belum teruji', reason: 'hit rate tidak bisa dihitung' }
+  }
+
+  const edge = hitRate - baseRate
+  // Selisih di bawah satu poin persen tidak berarti apa-apa, bahkan pada sampel
+  // yang memadai; biaya transaksi saja sudah lebih besar dari itu.
+  if (edge < -0.01) {
+    return { kind: 'kalah dari naif', reason: `tertinggal ${(-edge * 100).toFixed(1)} poin` }
+  }
+  if (edge <= 0.01) {
+    return { kind: 'setara naif', reason: 'selisihnya di bawah satu poin' }
+  }
+  return { kind: 'unggul', reason: `unggul ${(edge * 100).toFixed(1)} poin dari tebakan naif` }
 }
 
 /**

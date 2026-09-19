@@ -32,10 +32,10 @@ async function main(): Promise<void> {
   console.log(`  ${result.instruments} instrumen · ${result.from} sampai ${result.to}`)
   console.log(`  model ${result.modelVersion} · fitur ${result.featureSetVersion}`)
 
-  console.log('\nHorizon        N      N efektif  hit rate  naif    IC      ICIR   desil atas-bawah')
+  console.log('\nHorizon        N      periode bebas  hit rate  naif    IC      ICIR   desil atas-bawah')
   for (const [horizon, m] of Object.entries(result.horizons)) {
     console.log(
-      `  ${horizon.padEnd(11)} ${String(m.n).padStart(6)} ${String(m.effectiveN).padStart(10)}` +
+      `  ${horizon.padEnd(11)} ${String(m.n).padStart(6)} ${String(m.effectiveN).padStart(14)}` +
         `  ${pct(m.hitRate).padStart(8)}  ${pct(m.baseRate).padStart(6)}` +
         `  ${(m.ic === null ? '—' : m.ic.toFixed(3)).padStart(6)}` +
         `  ${(m.icir === null ? '—' : m.icir.toFixed(2)).padStart(5)}` +
@@ -43,15 +43,16 @@ async function main(): Promise<void> {
     )
   }
 
-  console.log('\nApakah mengalahkan tebakan naif?')
+  console.log('\nKesimpulan')
   for (const [horizon, m] of Object.entries(result.horizons)) {
-    const verdict =
-      m.hitRate === null || m.baseRate === null
-        ? 'belum bisa dinilai'
-        : m.hitRate > m.baseRate
-          ? `ya, unggul ${((m.hitRate - m.baseRate) * 100).toFixed(1)} poin`
-          : `TIDAK, tertinggal ${((m.baseRate - m.hitRate) * 100).toFixed(1)} poin`
-    console.log(`  ${horizon.padEnd(11)} ${verdict}`)
+    console.log(`  ${horizon.padEnd(11)} ${m.verdict.kind.toUpperCase().padEnd(16)} ${m.verdict.reason}`)
+  }
+
+  const untested = Object.values(result.horizons).filter((m) => m.verdict.kind === 'belum teruji')
+  if (untested.length > 0) {
+    console.log('\n  Angka IC dan hit rate di atas TIDAK boleh dipakai mengambil keputusan')
+    console.log('  selama sampelnya belum memadai. Perpanjang riwayat harganya dulu:')
+    console.log('    npm run job ingest-us-daily -- --from 2010-01-01')
   }
 
   console.log('\nLima fitur ber-IC tertinggi, horizon menengah')
