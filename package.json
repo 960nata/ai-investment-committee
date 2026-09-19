@@ -19,7 +19,8 @@
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx scripts/seed.ts",
     "smoke:agents": "tsx scripts/smoke-agents.ts",
-    "probe:keys": "tsx scripts/probe-keys.ts"
+    "probe:keys": "tsx scripts/probe-keys.ts",
+    "job": "tsx scripts/run-job.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

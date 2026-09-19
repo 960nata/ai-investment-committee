@@ -78,6 +78,21 @@ npm run dev
 langkah: memeriksa kedua URL, membuat tabel yang belum ada, menyelaraskan
 jurnal migrasi, lalu mengisi jadwal job dan daftar instrumen.
 
+Setelah itu isi riwayat pertamanya tanpa menunggu cron:
+
+```bash
+npm run job ingest-crypto-daily
+npm run job compute-features-crypto
+```
+
+### Kalau Binance diblokir jaringanmu
+
+`api.binance.com` tidak bisa dibuka dari sebagian besar ISP Indonesia. Adaptornya
+otomatis pindah ke `data-api.binance.vision`, endpoint data pasar publik resmi
+Binance dengan bentuk API yang sama persis, hanya baca dan tanpa kunci. Tidak ada
+yang perlu diatur; host yang berhasil dicatat di log dan diingat selama proses
+berjalan.
+
 Yang benar-benar wajib hanya `DATABASE_URL`. Tanpa Redis aplikasi tetap jalan
 tanpa cache; tanpa QStash, dispatcher memanggil worker langsung, yang cukup untuk
 mesin sendiri tetapi tidak untuk produksi karena tidak ada retry di jalur itu.
@@ -92,6 +107,7 @@ mesin sendiri tetapi tidak untuk produksi karena tidak ada retry di jalur itu.
 | `npm run db:generate` | Buat migrasi dari perubahan skema |
 | `npm run db:migrate` | Terapkan migrasi |
 | `npm run db:seed` | Isi jadwal job dan instrumen awal |
+| `npm run job <nama>` | Jalankan satu job tanpa HTTP, untuk mengisi riwayat |
 
 ## Job terjadwal
 

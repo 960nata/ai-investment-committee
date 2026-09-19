@@ -15,7 +15,62 @@
 import type { PriceAdapter, Market, Candle, HealthStatus } from './types';
 import { fetchWithTimeout } from '@/lib/http/fetch';
 
-const BINANCE_BASE_URL = 'https://api.binance.com';
+/**
+ * Host Binance, dicoba berurutan.
+ *
+ * `api.binance.com` diblokir di sebagian jaringan, termasuk sebagian besar ISP
+ * Indonesia. `data-api.binance.vision` adalah endpoint data pasar publik resmi
+ * Binance dengan bentuk API yang sama persis, hanya baca, tanpa kunci — dan ia
+ * lolos di tempat domain utamanya tidak.
+ *
+ * Tanpa daftar ini, seluruh Fase 0 mati di mesin pengembang meski kodenya benar,
+ * dan penyebabnya tidak terlihat dari pesan galat mana pun.
+ */
+const BINANCE_HOSTS = [
+  'https://api.binance.com',
+  'https://data-api.binance.vision',
+] as const;
+
+/**
+ * Host yang terbukti bisa dihubungi, diingat selama proses hidup.
+ *
+ * Tanpa ini tiap panggilan membayar ulang batas waktu host pertama yang
+ * diblokir, dan ingest satu batch jadi berkali lipat lebih lama.
+ */
+let activeHost: string | null = null;
+
+/**
+ * Panggil Binance dengan perpindahan host otomatis.
+ *
+ * Perpindahan hanya terjadi pada kegagalan jaringan. Jawaban HTTP 4xx dan 5xx
+ * adalah jawaban sungguhan dari bursa — mencoba host lain untuk "simbol tidak
+ * dikenal" hanya menggandakan pekerjaan tanpa mengubah hasilnya.
+ */
+async function binanceFetch(path: string, timeoutMs?: number): Promise<Response> {
+  const ordered = activeHost
+    ? [activeHost, ...BINANCE_HOSTS.filter((h) => h !== activeHost)]
+    : [...BINANCE_HOSTS];
+
+  const failures: string[] = [];
+
+  for (const host of ordered) {
+    try {
+      const response = await fetchWithTimeout(`${host}${path}`, {
+        label: `Binance (${new URL(host).hostname})`,
+        timeoutMs,
+      });
+      if (activeHost !== host) {
+        activeHost = host;
+        console.log(`[Binance] memakai ${new URL(host).hostname}`);
+      }
+      return response;
+    } catch (err) {
+      failures.push(`${new URL(host).hostname}: ${err instanceof Error ? err.message : err}`);
+    }
+  }
+
+  throw new Error(`Semua host Binance tidak terjangkau. ${failures.join('; ')}`);
+}
 const MAX_KLINES_PER_REQUEST = 1000; // Binance limit
 
 interface BinanceKline {
@@ -74,14 +129,15 @@ export class BinanceAdapter implements PriceAdapter {
 
     // Paginate through Binance's 1000-candle limit
     while (startTime < endTime) {
-      const url = new URL('/api/v3/klines', BINANCE_BASE_URL);
-      url.searchParams.set('symbol', symbol);
-      url.searchParams.set('interval', '1d');
-      url.searchParams.set('startTime', startTime.toString());
-      url.searchParams.set('endTime', endTime.toString());
-      url.searchParams.set('limit', MAX_KLINES_PER_REQUEST.toString());
+      const query = new URLSearchParams({
+        symbol,
+        interval: '1d',
+        startTime: startTime.toString(),
+        endTime: endTime.toString(),
+        limit: MAX_KLINES_PER_REQUEST.toString(),
+      });
 
-      const response = await fetchWithTimeout(url.toString(), { label: 'Binance' });
+      const response = await binanceFetch(`/api/v3/klines?${query}`);
 
       if (!response.ok) {
         const errorText = await response.text().catch(() => 'Unknown error');
@@ -127,10 +183,7 @@ export class BinanceAdapter implements PriceAdapter {
   async fetchSymbols(): Promise<{ symbol: string; name: string }[]> {
     // exchangeInfo mengembalikan beberapa megabyte; batas waktunya dilonggarkan
     // dari bawaan, tetapi tetap ada batasnya.
-    const response = await fetchWithTimeout(`${BINANCE_BASE_URL}/api/v3/exchangeInfo`, {
-      label: 'Binance exchangeInfo',
-      timeoutMs: 20_000,
-    });
+    const response = await binanceFetch('/api/v3/exchangeInfo', 30_000);
 
     if (!response.ok) {
       throw new Error(`Binance exchangeInfo gagal: HTTP ${response.status}`);
@@ -147,10 +200,7 @@ export class BinanceAdapter implements PriceAdapter {
   async health(): Promise<HealthStatus> {
     const start = Date.now();
     try {
-      const response = await fetchWithTimeout(`${BINANCE_BASE_URL}/api/v3/ping`, {
-        label: 'Binance',
-        timeoutMs: 5_000,
-      });
+      const response = await binanceFetch('/api/v3/ping', 8_000);
       const latencyMs = Date.now() - start;
 
       return {
