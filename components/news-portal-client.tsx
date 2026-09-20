@@ -4,7 +4,6 @@ import React, { useState } from 'react'
 import Link from 'next/link'
 import type { MarketNewsRow } from '@/lib/db/schema'
 import { IconClose, IconNews } from './icons'
-import { NewsSidebar } from './news-sidebar'
 
 interface Props {
   initialArticles: MarketNewsRow[]
@@ -431,10 +430,7 @@ export function NewsPortalClient({ initialArticles }: Props) {
         </div>
       )}
 
-      {/* --- Layout Utama: Feed Berita + Sidebar Kanan (Berita Terkini, Tag, Iklan) --- */}
-      <div className="news-layout-with-sidebar">
-        <div className="news-main-column">
-          {/* --- Fokus Intelijen (Hero Card) --- */}
+      {/* --- Fokus Intelijen (Hero Card) --- */}
           {heroArticle && (
             <article className="news-hero">
               <div className="news-hero-img-wrap">
@@ -671,15 +667,6 @@ export function NewsPortalClient({ initialArticles }: Props) {
               </div>
             )
           )}
-        </div>
-
-        {/* --- Kolom Samping Kanan: Berita Terkini + Tag Populer + Slot Iklan --- */}
-        <NewsSidebar
-          recentArticles={articles}
-          activeTag={searchQuery}
-          onSelectTag={(tag) => setSearchQuery(tag)}
-        />
-      </div>
 
 
       {/* --- Akses Terbuka untuk AI Lain --- */}
