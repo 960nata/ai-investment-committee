@@ -14,9 +14,10 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { IconClock, IconPulse } from './icons'
+import { IconClock, IconPulse, IconMenu } from './icons'
 import { Lamp, type State } from './ui'
 import { SECTIONS } from './rail'
+import { useSidebar } from './sidebar-context'
 
 const TITLES = new Map(
   SECTIONS.flatMap((s) => s.links).map((l) => [l.href, l.label] as const),
@@ -37,9 +38,20 @@ export function Topbar({
 }) {
   const pathname = usePathname()
   const title = TITLES.get(pathname) ?? 'Komite'
+  const { toggle } = useSidebar()
 
   return (
     <header className="topbar">
+      <button
+        type="button"
+        className="topbar-rail-toggle"
+        onClick={toggle}
+        aria-label="Buka navigasi rel"
+        title="Menu Navigasi"
+      >
+        <IconMenu size={16} />
+      </button>
+
       <Link href="/" className="topbar-brand">
         <span className="mark-glyph">
           <IconPulse size={14} />

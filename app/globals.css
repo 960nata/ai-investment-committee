@@ -339,11 +339,54 @@ button {
   padding: var(--space-5) var(--space-6) var(--space-6);
 }
 
+/* Navigasi Rel & Mobile Sidebar Drawer */
+.topbar-rail-toggle {
+  display: none;
+}
+
+.rail-backdrop {
+  display: none;
+}
+
+.rail-mobile-head {
+  display: none;
+}
+
+body.rail-lock {
+  overflow: hidden;
+  touch-action: none;
+}
+
 @media (max-width: 900px) {
-  .topbar-brand {
-    width: auto;
+  .topbar {
     padding-left: var(--space-3);
     padding-right: var(--space-3);
+    gap: var(--space-2);
+  }
+  .topbar-rail-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    color: var(--ink-soft);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+  }
+  .topbar-rail-toggle:hover {
+    background: var(--surface-2);
+    color: var(--ink);
+    border-color: var(--line-strong);
+  }
+  .topbar-brand {
+    width: auto;
+    padding-left: 0;
+    padding-right: var(--space-2);
+    border-right: none;
   }
   /* Judul halaman sudah terbaca dari rel yang ditandai, jadi di layar sempit ia
      mengalah demi status kesegaran yang tidak ada duanya di tempat lain. */
@@ -353,30 +396,90 @@ button {
   .shell {
     grid-template-columns: 1fr;
   }
+
+  /* Backdrop redup saat sidebar mobile terbuka */
+  .rail-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 12, 11, 0.75);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    z-index: 299;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 200ms ease;
+  }
+  .rail-backdrop.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* Sidebar tetap menjadi sidebar vertikal utuh di mobile */
   .rail {
-    position: static;
-    height: auto;
-    flex-direction: row;
-    align-items: center;
-    gap: var(--space-2);
-    padding: var(--space-2) var(--space-3);
-    border-right: none;
-    border-bottom: 1px solid var(--line);
-    overflow-x: auto;
-  }
-  .rail-group,
-  .rail-group + .rail-group {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    max-width: 85vw;
+    height: 100vh;
+    height: 100dvh;
+    background: var(--surface-1);
+    border-right: 1px solid var(--line);
+    z-index: 300;
     display: flex;
-    gap: var(--space-1);
-    margin-top: 0;
+    flex-direction: column;
+    padding: var(--space-4);
+    transform: translateX(-100%);
+    transition: transform 260ms cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 12px 0 40px rgba(0, 0, 0, 0.85);
+    overflow-y: auto;
   }
-  .rail-label,
-  .rail-foot {
-    display: none;
+  .rail.open {
+    transform: translateX(0);
   }
+
+  /* Kepala sidebar mobile dengan tombol tutup */
+  .rail-mobile-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: var(--space-3);
+    margin-bottom: var(--space-4);
+    border-bottom: 1px solid var(--line);
+    flex-shrink: 0;
+  }
+
+  .rail-group + .rail-group {
+    margin-top: var(--space-4);
+  }
+
+  .rail-label {
+    display: block;
+    margin-bottom: var(--space-2);
+    font-family: var(--mono);
+    font-size: var(--t-micro);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
   .rail-link {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: 8px var(--space-2);
     white-space: nowrap;
   }
+
+  .rail-foot {
+    display: block;
+    margin-top: auto;
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--line);
+  }
+
   .main {
     padding: var(--space-4) var(--space-4) var(--space-5);
   }
@@ -963,16 +1066,32 @@ button {
 }
 
 /* ---------------------------------------------------------------------------
-   Tab kelas aset
+   Tab kelas aset & navigasi (Scroll horizontal mulus, UI scrollbar tersembunyi)
    --------------------------------------------------------------------------- */
 
-.tabs {
+.tabs,
+.tabs-scroll,
+.no-scrollbar {
   display: flex;
   gap: 2px;
   margin-top: var(--space-4);
   padding-bottom: 0;
   border-bottom: 1px solid var(--line);
   overflow-x: auto;
+  overflow-y: hidden;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE dan Edge */
+}
+
+.tabs::-webkit-scrollbar,
+.tabs-scroll::-webkit-scrollbar,
+.no-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+  width: 0;
+  height: 0;
 }
 
 .tab {
@@ -989,6 +1108,7 @@ button {
   text-transform: uppercase;
   color: var(--ink-mute);
   white-space: nowrap;
+  flex-shrink: 0;
   transition: color 120ms ease, background 120ms ease;
 }
 

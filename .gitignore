@@ -30,13 +30,11 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# Berkas rahasia — jangan pernah di-commit.
-# Pola menyapu apa pun yang diawali .env, termasuk salinan sementara seperti
-# .env.backup atau .env.local.old yang paling sering lolos tanpa disadari.
+# Berkas konfigurasi lingkungan & kredensial — DILARANG KERAS di-commit/push.
 .env
+.env*
 .env.*
 *.env
-!.env.example
 
 # Kunci, sertifikat, dan berkas kredensial lain
 *.pem

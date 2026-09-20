@@ -346,3 +346,14 @@ export function IconPlay(props: IconProps) {
   )
 }
 
+/** Tiga garis mendatar — menu hamburger / pembuka rel navigasi. */
+export function IconMenu(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <line x1="3.5" y1="6.5" x2="20.5" y2="6.5" />
+      <line x1="3.5" y1="12" x2="20.5" y2="12" />
+      <line x1="3.5" y1="17.5" x2="20.5" y2="17.5" />
+    </Svg>
+  )
+}
+

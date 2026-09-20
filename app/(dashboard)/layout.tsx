@@ -14,6 +14,7 @@
 import { IngestButton } from '@/components/ingest-button'
 import { Rail } from '@/components/rail'
 import { Topbar, type TopbarStatus } from '@/components/topbar'
+import { SidebarProvider } from '@/components/sidebar-context'
 import { describeAge, getDataFreshness } from '@/lib/db/queries'
 
 export const dynamic = 'force-dynamic'
@@ -22,20 +23,22 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const status = await freshnessStatus()
 
   return (
-    <div className="app">
-      <Topbar
-        status={status}
-        action={
-          process.env.NODE_ENV !== 'production' ? (
-            <IngestButton job="ingest-crypto-daily" />
-          ) : undefined
-        }
-      />
-      <div className="shell">
-        <Rail />
-        <main className="main">{children}</main>
+    <SidebarProvider>
+      <div className="app">
+        <Topbar
+          status={status}
+          action={
+            process.env.NODE_ENV !== 'production' ? (
+              <IngestButton job="ingest-crypto-daily" />
+            ) : undefined
+          }
+        />
+        <div className="shell">
+          <Rail />
+          <main className="main">{children}</main>
+        </div>
       </div>
-    </div>
+    </SidebarProvider>
   )
 }
 
