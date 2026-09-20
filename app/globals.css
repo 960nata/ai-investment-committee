@@ -367,20 +367,24 @@ body.rail-lock {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
-    background: transparent;
-    border: 1px solid var(--line);
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    min-height: 36px;
+    background: var(--surface-2);
+    border: 1px solid var(--line-strong);
     border-radius: var(--radius);
-    color: var(--ink-soft);
+    color: var(--ink);
     cursor: pointer;
     flex-shrink: 0;
+    touch-action: manipulation;
     transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
   }
-  .topbar-rail-toggle:hover {
-    background: var(--surface-2);
-    color: var(--ink);
-    border-color: var(--line-strong);
+  .topbar-rail-toggle:hover,
+  .topbar-rail-toggle:active {
+    background: var(--surface-3);
+    color: var(--signal);
+    border-color: var(--signal);
   }
   .topbar-brand {
     width: auto;
@@ -388,10 +392,12 @@ body.rail-lock {
     padding-right: var(--space-2);
     border-right: none;
   }
-  /* Judul halaman sudah terbaca dari rel yang ditandai, jadi di layar sempit ia
-     mengalah demi status kesegaran yang tidak ada duanya di tempat lain. */
   .topbar-title {
     display: none;
+  }
+  /* Status kesegaran data disembunyikan di layar mobile sesuai preferensi antarmuka */
+  .topbar-status {
+    display: none !important;
   }
   .shell {
     grid-template-columns: 1fr;
