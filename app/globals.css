@@ -3785,11 +3785,12 @@ body.rail-lock {
   color: var(--ink-faint);
 }
 
-/* 3. Quick Subnav Strip */
+/* 3. Baris Harga Aset & Warta Berita Bawah Navbar */
 .landing-subnav-strip {
   border-top: 1px solid var(--line);
   background: var(--surface-0);
   padding: 6px 0;
+  font-family: var(--mono);
 }
 
 .landing-subnav-container {
@@ -3802,19 +3803,55 @@ body.rail-lock {
   gap: 16px;
 }
 
-.subnav-left-group {
+.subnav-news-group {
   display: flex;
   align-items: center;
-  gap: 10px;
-  flex: 1;
+  gap: 8px;
+  max-width: 440px;
+  min-width: 180px;
   overflow: hidden;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
-.subnav-label {
-  font-size: 10px;
-  color: var(--ink-faint);
-  letter-spacing: 0.05em;
+.news-pulse-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--signal);
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
+  padding: 1px 6px;
+  border-radius: var(--radius-xs);
   flex-shrink: 0;
+  letter-spacing: 0.05em;
+}
+
+.subnav-news-title {
+  font-size: 11px;
+  color: var(--ink-soft);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 0.15s ease;
+}
+
+.subnav-news-title:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+.subnav-ticker-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  justify-content: flex-end;
 }
 
 .subnav-scrollable {
@@ -3825,10 +3862,10 @@ body.rail-lock {
   white-space: nowrap;
 }
 
-.subnav-chip {
+.subnav-price-chip {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   font-size: 11px;
   color: var(--ink-soft);
   text-decoration: none;
@@ -3840,44 +3877,36 @@ body.rail-lock {
   flex-shrink: 0;
 }
 
-.subnav-chip:hover {
+.subnav-price-chip:hover {
   color: var(--ink);
   background: var(--surface-2);
   border-color: var(--line-strong);
 }
 
-.chip-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-}
-
-.subnav-right-meter {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-  border-left: 1px solid var(--line);
-  padding-left: 14px;
-}
-
-.mini-meter-track {
-  width: 56px;
-  height: 4px;
-  background: var(--surface-2);
+.subnav-cat-badge {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--ink-faint);
+  background: var(--surface-0);
+  padding: 1px 4px;
   border-radius: 2px;
-  overflow: hidden;
-  display: flex;
+  letter-spacing: 0.03em;
 }
 
-.mini-meter-bull {
-  background: var(--green);
-  height: 100%;
+.subnav-sym {
+  font-weight: 600;
+  color: var(--ink);
+  font-size: 11px;
 }
 
-.mini-meter-bear {
-  background: var(--red);
-  height: 100%;
+.subnav-price {
+  color: var(--ink-soft);
+  font-size: 11px;
+}
+
+.subnav-chg {
+  font-size: 10px;
+  font-weight: 600;
 }
 
 /* Nav Actions Right */

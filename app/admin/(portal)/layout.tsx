@@ -27,10 +27,10 @@ export default async function AdminPortalLayout({
   }
 
   return (
-    <div className="admin-shell">
+    <div className="admin-shell" suppressHydrationWarning>
       {/* Topbar Admin */}
-      <header className="admin-topbar">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+      <header className="admin-topbar" suppressHydrationWarning>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }} suppressHydrationWarning>
           <Link href="/admin" className="landing-brand">
             <span className="mark-glyph">
               <IconPulse size={15} />
@@ -45,7 +45,7 @@ export default async function AdminPortalLayout({
           </span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }} suppressHydrationWarning>
           <Link
             href="/ringkasan"
             target="_blank"
@@ -60,9 +60,9 @@ export default async function AdminPortalLayout({
       </header>
 
       {/* Body dengan Sidebar Khusus Admin */}
-      <div className="admin-body">
-        <aside className="admin-sidebar">
-          <div style={{ padding: '0 var(--space-3) var(--space-2)' }}>
+      <div className="admin-body" suppressHydrationWarning>
+        <aside className="admin-sidebar" suppressHydrationWarning>
+          <div style={{ padding: '0 var(--space-3) var(--space-2)' }} suppressHydrationWarning>
             <span
               className="mono"
               style={{ fontSize: '10px', color: 'var(--ink-faint)', textTransform: 'uppercase' }}
@@ -74,6 +74,7 @@ export default async function AdminPortalLayout({
           <AdminNavLinks />
 
           <div
+            suppressHydrationWarning
             style={{
               marginTop: 'auto',
               padding: 'var(--space-3)',
@@ -82,16 +83,16 @@ export default async function AdminPortalLayout({
               color: 'var(--ink-faint)',
             }}
           >
-            <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '4px' }} suppressHydrationWarning>
               <IconLock size={12} />
               <span>Sesi Terautentikasi</span>
             </div>
-            <div style={{ marginTop: '4px', fontSize: '10px' }}>Hak akses penuh basis data</div>
+            <div style={{ marginTop: '4px', fontSize: '10px' }} suppressHydrationWarning>Hak akses penuh basis data</div>
           </div>
         </aside>
 
         {/* Area Kerja Utama Admin */}
-        <main className="admin-main">{children}</main>
+        <main className="admin-main" suppressHydrationWarning>{children}</main>
       </div>
     </div>
   )

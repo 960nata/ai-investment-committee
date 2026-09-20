@@ -16,17 +16,22 @@ import { Rail } from '@/components/rail'
 import { Topbar, type TopbarStatus } from '@/components/topbar'
 import { SidebarProvider } from '@/components/sidebar-context'
 import { describeAge, getDataFreshness } from '@/lib/db/queries'
+import { verifyAdminSession } from '@/lib/auth/admin-auth'
 
 export const dynamic = 'force-dynamic'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const status = await freshnessStatus()
+  const [status, isAdmin] = await Promise.all([
+    freshnessStatus(),
+    verifyAdminSession().catch(() => false),
+  ])
 
   return (
     <SidebarProvider>
       <div className="app" suppressHydrationWarning>
         <Topbar
           status={status}
+          isAdmin={isAdmin}
           action={
             process.env.NODE_ENV !== 'production' ? (
               <IngestButton job="ingest-crypto-daily" />

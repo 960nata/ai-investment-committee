@@ -27,7 +27,7 @@ export default async function AdminOverviewPage() {
   const activeAdsCount = ads.filter((a) => a.isEnabled).length
 
   return (
-    <div>
+    <div suppressHydrationWarning>
       <header className="masthead" style={{ marginBottom: 'var(--space-4)' }}>
         <p className="eyebrow">Pusat Kendali Administrasi</p>
         <h1 className="headline">Panel Administrator Komite</h1>

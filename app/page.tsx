@@ -18,37 +18,42 @@ import { listInstrumentQuotes, getDataFreshness, describeAge, type InstrumentQuo
 import { getMarketNewsList } from '@/lib/db/news-queries'
 import { Lamp } from '@/components/ui'
 import { AssetIcon } from '@/components/asset-icons'
+import { verifyAdminSession } from '@/lib/auth/admin-auth'
 import { LandingNav } from '@/components/landing-nav'
 import { LandingDeliberationConsole } from '@/components/landing-deliberation-console'
 
 export const dynamic = 'force-dynamic'
 
 export default async function LandingPage() {
-  const [instruments, latestNews, freshness] = await Promise.all([
+  const [instruments, latestNews, freshness, isAdmin] = await Promise.all([
     listInstrumentQuotes().catch(() => []),
-    getMarketNewsList({ limit: 3, minImpact: 6 }).catch(() => []),
+    getMarketNewsList({ limit: 5, minImpact: 6 }).catch(() => []),
     getDataFreshness().catch(() => null),
+    verifyAdminSession().catch(() => false),
   ])
 
-  // Ambil aset-aset representatif untuk ticker
+  // Ambil aset-aset representatif untuk ticker lintas kategori (Kripto, Saham, Emas, Komoditas)
   const topAssets = [
     instruments.find((i) => i.symbol === 'BTCUSDT'),
     instruments.find((i) => i.symbol === 'ETHUSDT'),
     instruments.find((i) => i.symbol === 'SOLUSDT'),
-    instruments.find((i) => i.symbol === 'XAUUSD' || i.symbol === 'PAXGUSDT'),
     instruments.find((i) => i.symbol === 'BBCA' || i.symbol === 'BBRI'),
+    instruments.find((i) => i.symbol === 'XAUUSD' || i.symbol === 'PAXGUSDT'),
+    instruments.find((i) => i.symbol === 'BZ=F' || i.symbol === 'CL=F'),
   ].filter(Boolean) as InstrumentQuote[]
 
   const freshnessLabel = freshness?.freshness === 'fresh' ? 'DATA SEGAR · TERHUBUNG' : 'DATA TERCATAT'
 
   return (
     <div className="landing-shell">
-      {/* Header Navigasi Publik Kaya Fitur (Mega-Menu 3-Kolom, ⌘K Command Search, Live Ticker Tape & Subnav Strip) */}
+      {/* Header Navigasi Publik (Menu Bersih, Ticker Lintas Aset & Warta Berita di Bawah Navbar) */}
       <LandingNav
         instruments={instruments}
         topAssets={topAssets}
+        latestNews={latestNews}
         freshnessLabel={freshnessLabel}
         isFresh={freshness?.freshness === 'fresh'}
+        isAdmin={isAdmin}
       />
 
       {/* Hero Section */}

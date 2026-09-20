@@ -14,7 +14,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { IconClock, IconPulse, IconMenu } from './icons'
+import { IconClock, IconPulse, IconMenu, IconLock } from './icons'
 import { Lamp, type State } from './ui'
 import { SECTIONS } from './rail'
 import { useSidebar } from './sidebar-context'
@@ -32,9 +32,11 @@ export interface TopbarStatus {
 export function Topbar({
   status,
   action,
+  isAdmin = false,
 }: {
   status: TopbarStatus
   action?: React.ReactNode
+  isAdmin?: boolean
 }) {
   const pathname = usePathname()
   const title = TITLES.get(pathname) ?? 'Komite'
@@ -67,6 +69,27 @@ export function Topbar({
         <IconClock size={13} />
         {status.summary}
       </span>
+
+      {isAdmin && (
+        <Link
+          href="/admin"
+          className="btn btn-quiet mono"
+          style={{
+            padding: '3px 8px',
+            fontSize: '11px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+            borderColor: 'var(--signal)',
+            color: 'var(--signal)',
+            textDecoration: 'none',
+          }}
+          title="Buka Dashboard Admin"
+        >
+          <IconLock size={12} />
+          <span>Dashboard Admin</span>
+        </Link>
+      )}
 
       {action && <span className="topbar-action">{action}</span>}
     </header>

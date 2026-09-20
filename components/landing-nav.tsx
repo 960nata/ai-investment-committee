@@ -17,22 +17,32 @@ import {
   IconMenu,
   IconClose,
   IconSearch,
+  IconTrendUp,
+  IconTrendDown,
 } from '@/components/icons'
 import { AssetIcon } from '@/components/asset-icons'
 import type { InstrumentQuote } from '@/lib/db/queries'
 
 interface LandingNavProps {
   instruments?: InstrumentQuote[]
-  topAssets: InstrumentQuote[]
+  topAssets?: InstrumentQuote[]
+  latestNews?: Array<{
+    id: number | string
+    title: string
+    slug: string
+    category?: string
+    impactScore?: number
+  }>
   freshnessLabel?: string
   isFresh?: boolean
+  isAdmin?: boolean
 }
 
 export function LandingNav({
   instruments = [],
   topAssets = [],
-  freshnessLabel = 'Data Segar',
-  isFresh = true,
+  latestNews = [],
+  isAdmin = false,
 }: LandingNavProps) {
   const [activeMenu, setActiveMenu] = useState<string | null>(null)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -91,11 +101,59 @@ export function LandingNav({
     }
   }, [searchOpen])
 
-  // Ticker items
-  const tickerList = useMemo(() => {
-    if (topAssets.length >= 4) return topAssets
-    return instruments.slice(0, 6)
-  }, [topAssets, instruments])
+  // Ticker items across multiple asset classes (Crypto, Saham IDX, Emas, Komoditi)
+  const multiAssetTickers = useMemo(() => {
+    const list: { category: string; asset: InstrumentQuote }[] = []
+
+    // 1. Kripto
+    const cryptos = instruments.filter(
+      (i) => i.assetClass === 'crypto' || i.assetClass === 'memecoin',
+    )
+    const btc = cryptos.find((i) => i.symbol === 'BTCUSDT') || cryptos[0]
+    const eth = cryptos.find((i) => i.symbol === 'ETHUSDT') || cryptos[1]
+    const sol = cryptos.find((i) => i.symbol === 'SOLUSDT') || cryptos[2]
+    if (btc) list.push({ category: 'KRIPTO', asset: btc })
+    if (eth) list.push({ category: 'KRIPTO', asset: eth })
+    if (sol) list.push({ category: 'KRIPTO', asset: sol })
+
+    // 2. Saham IDX
+    const stocks = instruments.filter((i) => i.assetClass === 'saham')
+    const bbca = stocks.find((i) => i.symbol.includes('BBCA')) || stocks[0]
+    const bbri = stocks.find((i) => i.symbol.includes('BBRI')) || stocks[1]
+    const bren = stocks.find((i) => i.symbol.includes('BREN') || i.symbol.includes('TLKM')) || stocks[2]
+    if (bbca) list.push({ category: 'SAHAM', asset: bbca })
+    if (bbri) list.push({ category: 'SAHAM', asset: bbri })
+    if (bren) list.push({ category: 'SAHAM', asset: bren })
+
+    // 3. Emas & Logam Mulia
+    const metals = instruments.filter((i) => i.assetClass === 'emas')
+    const emas = metals.find((i) => i.symbol === 'PAXGUSDT' || i.symbol === 'GC=F' || i.symbol === 'XAUUSD') || metals[0]
+    if (emas) list.push({ category: 'EMAS', asset: emas })
+
+    // 4. Komoditas (Minyak, Gas, Nikel)
+    const commodities = instruments.filter((i) => i.assetClass === 'komoditi')
+    const oil = commodities.find((i) => i.symbol.includes('BZ') || i.symbol.includes('CL')) || commodities[0]
+    if (oil) list.push({ category: 'KOMODITI', asset: oil })
+
+    // Fallback if DB list is small
+    if (list.length < 4 && topAssets.length > 0) {
+      topAssets.forEach((ta) => {
+        if (!list.some((item) => item.asset.symbol === ta.symbol)) {
+          list.push({ category: ta.assetClass.toUpperCase(), asset: ta })
+        }
+      })
+    }
+
+    return list
+  }, [instruments, topAssets])
+
+  // Headline berita terkini untuk subbar
+  const latestNewsHeadline = useMemo(() => {
+    if (latestNews && latestNews.length > 0) {
+      return latestNews[0]
+    }
+    return null
+  }, [latestNews])
 
   // Top gainers and losers calculation for the mega menu radar
   const { topGainers, topLosers } = useMemo(() => {
@@ -128,71 +186,20 @@ export function LandingNav({
 
   return (
     <>
-      {/* 1. TOP STATUS TICKER TAPE (Pita Status Pasar & Realtime Quotes) */}
-      <div className="landing-top-ribbon">
-        <div className="landing-ribbon-container">
-          <div className="ribbon-left">
-            <span className="badge-live-pulse" style={{ width: '6px', height: '6px' }} />
-            <span className="mono bold ribbon-title">
-              ZERO HALLUCINATION ENGINE
-            </span>
-            <span className="ribbon-sep">|</span>
-            <span className="mono ribbon-sub">
-              {instruments.length > 0 ? `${instruments.length} INSTRUMEN` : '448 INSTRUMEN'}
-            </span>
-            <span className="ribbon-sep">|</span>
-            <span className="mono" style={{ fontSize: '10px', color: isFresh ? 'var(--green)' : 'var(--signal)' }}>
-              {freshnessLabel}
-            </span>
-            <span className="ribbon-sep">|</span>
-            <span className="mono ribbon-latency" style={{ fontSize: '10px', color: 'var(--ink-faint)' }}>
-              KYOTO · 18ms
-            </span>
-          </div>
-
-          <div className="ribbon-right mono">
-            {tickerList.map((asset) => {
-              const isPositive = (asset.changePct ?? 0) >= 0
-              return (
-                <Link
-                  key={asset.id}
-                  href={`/ringkasan?symbol=${asset.symbol}`}
-                  className="ribbon-ticker-item"
-                >
-                  <AssetIcon symbol={asset.symbol} size={12} />
-                  <span style={{ color: 'var(--ink)', fontWeight: 600 }}>{asset.symbol}</span>
-                  <span style={{ color: 'var(--ink-soft)' }}>
-                    {asset.lastClose
-                      ? (asset.assetClass === 'saham' ? 'Rp' : '$') +
-                        Number(asset.lastClose).toLocaleString('id-ID')
-                      : '-'}
-                  </span>
-                  <span className={isPositive ? 'trend-up' : 'trend-down'}>
-                    {isPositive ? '+' : ''}
-                    {asset.changePct ? asset.changePct.toFixed(1) + '%' : '0.0%'}
-                  </span>
-                </Link>
-              )
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* 2. MAIN NAVIGATION HEADER */}
+      {/* 1. MAIN NAVIGATION HEADER */}
       <header className="landing-header">
         <div className="landing-nav-container">
-          {/* Brand Logo with Version Tag */}
+          {/* Brand Logo */}
           <Link href="/" className="landing-brand">
             <span className="mark-glyph">
               <IconPulse size={16} />
             </span>
             <span className="mark-name">Komite</span>
-            <span className="mark-phase">PRO v2.4</span>
           </Link>
 
-          {/* Center Navigation Links with Mega Dropdown Paneling */}
+          {/* Center Navigation Links with Friendly Mega Dropdowns */}
           <nav className="landing-nav-links" onMouseLeave={handleMouseLeave}>
-            {/* Menu 1: Pasar & 448 Instrumen */}
+            {/* Menu 1: Pasar */}
             <div
               className="nav-dropdown-trigger"
               onMouseEnter={() => handleMouseEnter('pasar')}
@@ -203,26 +210,23 @@ export function LandingNav({
                 onClick={() => setActiveMenu(activeMenu === 'pasar' ? null : 'pasar')}
               >
                 <IconRows size={14} />
-                <span>Pasar &amp; Instrumen</span>
-                <span className="tag mono nav-badge" style={{ fontSize: '9px', padding: '1px 4px' }}>
-                  448
-                </span>
+                <span>Pasar</span>
                 <span className="nav-chevron">▾</span>
               </button>
 
               {activeMenu === 'pasar' && (
                 <div className="mega-menu mega-menu-wide-3col">
                   <div className="mega-menu-grid-3col">
-                    {/* Col 1: Terminal Hub */}
+                    {/* Col 1: Menu Pasar */}
                     <div className="mega-col">
-                      <span className="mega-col-title mono">Modul Terminal</span>
+                      <span className="mega-col-title mono">Pusat Pasar</span>
                       <Link href="/ringkasan" className="mega-item" onClick={() => setActiveMenu(null)}>
                         <div className="mega-item-icon">
                           <IconGauge size={16} />
                         </div>
                         <div>
-                          <div className="mega-item-name">Ringkasan Pasar &amp; Deliberasi</div>
-                          <div className="mega-item-desc">Grafik candlestick harian, dialektika 4 agen &amp; putusan terikat</div>
+                          <div className="mega-item-name">Ringkasan Pasar</div>
+                          <div className="mega-item-desc">Grafik harga harian, tren pasar, dan evaluasi 4 AI</div>
                         </div>
                       </Link>
 
@@ -231,8 +235,8 @@ export function LandingNav({
                           <IconRows size={16} />
                         </div>
                         <div>
-                          <div className="mega-item-name">Katalog 448 Instrumen</div>
-                          <div className="mega-item-desc">Kripto, Saham IDX, Logam Mulia, dan Komoditas Global lengkap</div>
+                          <div className="mega-item-name">Daftar Aset Lengkap</div>
+                          <div className="mega-item-desc">Kripto, saham IDX, emas, dan komoditas global</div>
                         </div>
                       </Link>
 
@@ -241,20 +245,20 @@ export function LandingNav({
                           <IconShield size={16} />
                         </div>
                         <div>
-                          <div className="mega-item-name">Radar Volatilitas &amp; Veto</div>
-                          <div className="mega-item-desc">Instrumen dalam status peringatan koreksi dan deadlock risiko</div>
+                          <div className="mega-item-name">Peringatan Risiko</div>
+                          <div className="mega-item-desc">Aset rawan koreksi dan mendapat sinyal penahanan risiko</div>
                         </div>
                       </Link>
                     </div>
 
-                    {/* Col 2: Live Asset Classes */}
+                    {/* Col 2: Kategori Pilihan */}
                     <div className="mega-col mega-col-border">
-                      <span className="mega-col-title mono">Kelas Aset Unggulan</span>
+                      <span className="mega-col-title mono">Kategori Pilihan</span>
                       <div className="mega-asset-list">
                         <Link href="/ringkasan?tab=crypto" className="mega-asset-row" onClick={() => setActiveMenu(null)}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span className="chip-dot" style={{ background: 'var(--amber)' }} />
-                            <span className="mono bold">Kripto &amp; Meme</span>
+                            <span className="mono bold">Kripto Populer</span>
                           </div>
                           <span className="tag mono" style={{ fontSize: '9px' }}>BTC, ETH, SOL</span>
                         </Link>
@@ -270,7 +274,7 @@ export function LandingNav({
                         <Link href="/ringkasan?tab=emas" className="mega-asset-row" onClick={() => setActiveMenu(null)}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span className="chip-dot" style={{ background: 'var(--signal)' }} />
-                            <span className="mono bold">Emas Fisik (Bullion)</span>
+                            <span className="mono bold">Emas &amp; Logam Mulia</span>
                           </div>
                           <span className="tag mono" style={{ fontSize: '9px' }}>XAUUSD, PAXG</span>
                         </Link>
@@ -278,7 +282,7 @@ export function LandingNav({
                         <Link href="/ringkasan?tab=komoditi" className="mega-asset-row" onClick={() => setActiveMenu(null)}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span className="chip-dot" style={{ background: 'var(--red)' }} />
-                            <span className="mono bold">Komoditi Energi</span>
+                            <span className="mono bold">Komoditas Energi</span>
                           </div>
                           <span className="tag mono" style={{ fontSize: '9px' }}>Minyak Brent, Gas</span>
                         </Link>
@@ -287,9 +291,12 @@ export function LandingNav({
 
                     {/* Col 3: Radar Top Movers */}
                     <div className="mega-col mega-col-border">
-                      <span className="mega-col-title mono">Radar Pergerakan 24 Jam</span>
+                      <span className="mega-col-title mono">Pergerakan 24 Jam</span>
                       <div className="mega-radar-box">
-                        <div className="radar-subhead mono">🔥 TOP GAINERS</div>
+                        <div className="radar-subhead mono" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <IconTrendUp size={12} style={{ color: 'var(--green)' }} />
+                          <span>TOP NAIK</span>
+                        </div>
                         <div className="radar-list">
                           {topGainers.map((g) => (
                             <Link
@@ -304,7 +311,10 @@ export function LandingNav({
                           ))}
                         </div>
 
-                        <div className="radar-subhead mono" style={{ marginTop: '8px' }}>❄️ TOP LOSERS</div>
+                        <div className="radar-subhead mono" style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <IconTrendDown size={12} style={{ color: 'var(--red)' }} />
+                          <span>TOP TURUN</span>
+                        </div>
                         <div className="radar-list">
                           {topLosers.map((l) => (
                             <Link
@@ -325,7 +335,7 @@ export function LandingNav({
               )}
             </div>
 
-            {/* Menu 2: Ruang Sidang 4 Agen AI */}
+            {/* Menu 2: Sidang AI */}
             <div
               className="nav-dropdown-trigger"
               onMouseEnter={() => handleMouseEnter('sidang')}
@@ -336,10 +346,7 @@ export function LandingNav({
                 onClick={() => setActiveMenu(activeMenu === 'sidang' ? null : 'sidang')}
               >
                 <IconScales size={14} />
-                <span>Ruang Sidang AI</span>
-                <span className="tag mono nav-badge" style={{ fontSize: '9px', padding: '1px 4px', color: 'var(--amber)' }}>
-                  ZERO-HAL
-                </span>
+                <span>Sidang AI</span>
                 <span className="nav-chevron">▾</span>
               </button>
 
@@ -348,10 +355,10 @@ export function LandingNav({
                   <div className="mega-agents-header">
                     <div>
                       <span className="mono bold" style={{ fontSize: '11px', color: 'var(--amber)' }}>
-                        DIALEKTIKA 4 AGEN SPESIALIS (ZERO HALLUCINATION ARCHITECTURE)
+                        4 ASISTEN AI ANALISIS ASET
                       </span>
                       <div className="mono" style={{ fontSize: '10px', color: 'var(--ink-mute)', marginTop: '2px' }}>
-                        Hak Veto Pengawas Risiko Memastikan Proteksi Modal Sebelum Alokasi
+                        Setiap AI memiliki peran khusus untuk menilai potensi keuntungan dan mencegah risiko kerugian
                       </div>
                     </div>
                     <span className="tag mono" style={{ fontSize: '9px' }}>4 AGENTS</span>
@@ -363,26 +370,26 @@ export function LandingNav({
                         <IconCandles size={13} />
                         <span>Fakta Terukur</span>
                       </div>
-                      <div className="agent-title-text">Analis Data Kuantitatif</div>
-                      <div className="agent-desc-text">Rasio volume 20v100, jarak SMA20/50/200, volatilitas, drawdown</div>
+                      <div className="agent-title-text">Analis Data</div>
+                      <div className="agent-desc-text">Membaca data grafik, pergerakan tren harga, dan volume perdagangan</div>
                     </div>
 
                     <div className="mega-agent-item">
                       <div className="agent-badge-pill" style={{ color: 'var(--green)' }}>
                         <IconTarget size={13} />
-                        <span>Sudut Bull</span>
+                        <span>Peluang Profit</span>
                       </div>
-                      <div className="agent-title-text">Strateg Portofolio</div>
-                      <div className="agent-desc-text">Tesis pertumbuhan asimetris, momentum tren &amp; horizon posisi</div>
+                      <div className="agent-title-text">Ahli Peluang (Bull)</div>
+                      <div className="agent-desc-text">Mencari potensi kenaikan harga dan momentum pembelian terbaik</div>
                     </div>
 
                     <div className="mega-agent-item">
                       <div className="agent-badge-pill" style={{ color: 'var(--red)' }}>
                         <IconShield size={13} />
-                        <span>Sudut Bear (Veto)</span>
+                        <span>Proteksi Modal</span>
                       </div>
                       <div className="agent-title-text">Pengawas Risiko</div>
-                      <div className="agent-desc-text">Batas koreksi, stop-loss wajib &amp; hak veto deadlock modal</div>
+                      <div className="agent-desc-text">Memasang batas aman kerugian dan melindungi modal dari kejatuhan harga</div>
                     </div>
 
                     <div className="mega-agent-item">
@@ -391,7 +398,7 @@ export function LandingNav({
                         <span>Putusan Terikat</span>
                       </div>
                       <div className="agent-title-text">Ketua Komite</div>
-                      <div className="agent-desc-text">Beli, Tahan, Jual, atau Abstain dengan skor keyakinan bukti %</div>
+                      <div className="agent-desc-text">Merangkum putusan akhir: Beli, Tahan, atau Hindari dengan skor bukti</div>
                     </div>
                   </div>
 
@@ -399,13 +406,13 @@ export function LandingNav({
                   <div className="mega-deliberation-preview">
                     <div className="preview-status-pill mono">
                       <span className="badge-live-pulse" style={{ width: '5px', height: '5px' }} />
-                      <span>PUTUSAN TERAKHIR: BTCUSDT</span>
+                      <span>CONTOH PUTUSAN: BTCUSDT</span>
                       <span className="tag mono" style={{ background: 'rgba(245,158,11,0.2)', color: 'var(--amber)', fontSize: '9px' }}>
-                        ABSTAIN · 25% BUKTI
+                        TAHAN / HINDARI
                       </span>
                     </div>
                     <p className="preview-text">
-                      &ldquo;Deadlock: Pengawas Risiko memblokir tesis karena ruang koreksi -12,4% ke SMA200 melebihi toleransi risiko sedang.&rdquo;
+                      &ldquo;Pengawas Risiko memblokir pembelian agresif karena potensi koreksi harga melebihi batas aman.&rdquo;
                     </p>
                     <Link
                       href="/ringkasan?symbol=BTCUSDT"
@@ -413,14 +420,14 @@ export function LandingNav({
                       onClick={() => setActiveMenu(null)}
                       style={{ padding: '4px 10px', fontSize: '11px', textDecoration: 'none' }}
                     >
-                      Buka Transkrip Lengkap &rarr;
+                      Buka Terminal Analisis &rarr;
                     </Link>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Menu 3: Warta & Intelijen Makro */}
+            {/* Menu 3: Berita */}
             <div
               className="nav-dropdown-trigger"
               onMouseEnter={() => handleMouseEnter('intelijen')}
@@ -431,10 +438,7 @@ export function LandingNav({
                 onClick={() => setActiveMenu(activeMenu === 'intelijen' ? null : 'intelijen')}
               >
                 <IconNews size={14} />
-                <span>Warta &amp; Intelijen</span>
-                <span className="tag mono nav-badge" style={{ fontSize: '9px', padding: '1px 4px' }}>
-                  DAMPAK &ge;6
-                </span>
+                <span>Berita</span>
                 <span className="nav-chevron">▾</span>
               </button>
 
@@ -442,14 +446,14 @@ export function LandingNav({
                 <div className="mega-menu mega-menu-wide">
                   <div className="mega-menu-grid">
                     <div className="mega-col">
-                      <span className="mega-col-title mono">Kurasi Dampak Harga Makro</span>
+                      <span className="mega-col-title mono">Kategori Berita</span>
                       <Link href="/berita" className="mega-item" onClick={() => setActiveMenu(null)}>
                         <div className="mega-item-icon">
                           <IconNews size={16} />
                         </div>
                         <div>
-                          <div className="mega-item-name">Indeks Warta Intelijen AI</div>
-                          <div className="mega-item-desc">Semua laporan terstruktur dengan dampak harga riil (Skor &ge; 6/10)</div>
+                          <div className="mega-item-name">Kabar Pasar &amp; Ekonomi</div>
+                          <div className="mega-item-desc">Berita terkini yang berdampak langsung ke pergerakan harga aset</div>
                         </div>
                       </Link>
 
@@ -458,8 +462,8 @@ export function LandingNav({
                           <IconShield size={16} />
                         </div>
                         <div>
-                          <div className="mega-item-name">Geopolitik &amp; Perang Global</div>
-                          <div className="mega-item-desc">Disrupsi jalur maritim, Selat Hormuz &amp; lonjakan harga minyak mentah</div>
+                          <div className="mega-item-name">Isu Perang &amp; Minyak Dunia</div>
+                          <div className="mega-item-desc">Dampak konflik global terhadap pasokan energi dan harga komoditas</div>
                         </div>
                       </Link>
 
@@ -468,31 +472,31 @@ export function LandingNav({
                           <IconTarget size={16} />
                         </div>
                         <div>
-                          <div className="mega-item-name">Komoditi Emas &amp; Valuta</div>
-                          <div className="mega-item-desc">Akumulasi emas bank sentral global &amp; volatilitas kurs USD/IDR</div>
+                          <div className="mega-item-name">Emas &amp; Nilai Tukar Rupiah</div>
+                          <div className="mega-item-desc">Pantau kurs mata uang, inflasi global, dan tren harga emas fisik</div>
                         </div>
                       </Link>
                     </div>
 
                     <div className="mega-col mega-col-border">
-                      <span className="mega-col-title mono">Warta Pilihan Utama</span>
+                      <span className="mega-col-title mono">Berita Pilihan Hari Ini</span>
                       <div className="mega-news-featured">
                         <div className="news-featured-tag mono">
                           <span>GEOPOLITIK</span>
-                          <span style={{ color: 'var(--amber)' }}>DAMPAK: 9/10</span>
+                          <span style={{ color: 'var(--amber)' }}>PENTING</span>
                         </div>
                         <h4 className="news-featured-title">
                           Eskalasi Geopolitik Selat Hormuz: Dampak Pasokan Minyak &amp; Reli Emas
                         </h4>
                         <p className="news-featured-desc">
-                          Analisis kuantitatif dampak penutupan jalur tanker terhadap kontrak Brent crude dan lonjakan premi lindung nilai emas batangan.
+                          Analisis pergerakan kontrak minyak mentah dunia dan lonjakan permintaan lindung nilai emas batangan.
                         </p>
                         <Link
                           href="/berita/geopolitik-minyak-mentah-emas-2026"
                           className="news-featured-link mono"
                           onClick={() => setActiveMenu(null)}
                         >
-                          Baca Intelijen Lengkap &rarr;
+                          Baca Berita Lengkap &rarr;
                         </Link>
                       </div>
                     </div>
@@ -501,7 +505,7 @@ export function LandingNav({
               )}
             </div>
 
-            {/* Menu 4: Mesin Kuantitatif */}
+            {/* Menu 4: Riset */}
             <div
               className="nav-dropdown-trigger"
               onMouseEnter={() => handleMouseEnter('mesin')}
@@ -512,7 +516,7 @@ export function LandingNav({
                 onClick={() => setActiveMenu(activeMenu === 'mesin' ? null : 'mesin')}
               >
                 <IconFlow size={14} />
-                <span>Mesin Analitik</span>
+                <span>Riset</span>
                 <span className="nav-chevron">▾</span>
               </button>
 
@@ -520,14 +524,14 @@ export function LandingNav({
                 <div className="mega-menu mega-menu-wide">
                   <div className="mega-menu-grid">
                     <div className="mega-col">
-                      <span className="mega-col-title mono">Infrastruktur &amp; Validasi</span>
+                      <span className="mega-col-title mono">Fitur Riset</span>
                       <Link href="/backtest" className="mega-item" onClick={() => setActiveMenu(null)}>
                         <div className="mega-item-icon">
                           <IconCandles size={16} />
                         </div>
                         <div>
-                          <div className="mega-item-name">Laboratorium Backtest</div>
-                          <div className="mega-item-desc">Uji historis multi-horizon tanpa survivorship bias (30H, 90H, 180H)</div>
+                          <div className="mega-item-name">Uji Strategi (Backtest)</div>
+                          <div className="mega-item-desc">Cek performa sinyal AI berdasarkan pergerakan data masa lalu</div>
                         </div>
                       </Link>
 
@@ -536,30 +540,30 @@ export function LandingNav({
                           <IconFlow size={16} />
                         </div>
                         <div>
-                          <div className="mega-item-name">Pipeline &amp; Ingesti Data</div>
-                          <div className="mega-item-desc">Status kesehatan adaptor bursa, antrean QStash, Redis &amp; DB Postgres</div>
+                          <div className="mega-item-name">Koneksi Data Bursa</div>
+                          <div className="mega-item-desc">Sumber data resmi bursa kripto, saham IDX, dan komoditi</div>
                         </div>
                       </Link>
                     </div>
 
                     <div className="mega-col mega-col-border">
-                      <span className="mega-col-title mono">Status Adaptor Bursa</span>
+                      <span className="mega-col-title mono">Status Koneksi Bursa</span>
                       <div className="mega-engine-status mono">
                         <div className="engine-status-row">
-                          <span className="status-name">Binance Spot API</span>
+                          <span className="status-name">Binance Spot API (Kripto)</span>
                           <span className="status-badge-ok">● TERHUBUNG</span>
                         </div>
                         <div className="engine-status-row">
-                          <span className="status-name">Yahoo Finance Engine</span>
-                          <span className="status-badge-ok">● TERHUBUNG</span>
-                        </div>
-                        <div className="engine-status-row">
-                          <span className="status-name">IDX GoAPI Feeder</span>
+                          <span className="status-name">Bursa Efek Indonesia (IDX)</span>
                           <span className="status-badge-ok">● AKTIF</span>
                         </div>
                         <div className="engine-status-row">
-                          <span className="status-name">Zero-Hal Engine</span>
-                          <span className="status-badge-ok" style={{ color: 'var(--amber)' }}>● TERKUNCI v2.4</span>
+                          <span className="status-name">Yahoo Finance (Emas &amp; Minyak)</span>
+                          <span className="status-badge-ok">● AKTIF</span>
+                        </div>
+                        <div className="engine-status-row">
+                          <span className="status-name">Mesin Evaluasi AI</span>
+                          <span className="status-badge-ok" style={{ color: 'var(--amber)' }}>● SIAP</span>
                         </div>
                       </div>
                     </div>
@@ -569,41 +573,63 @@ export function LandingNav({
             </div>
           </nav>
 
-          {/* Integrated Search Input Trigger in Navbar */}
+          {/* Integrated Search Trigger */}
           <div className="landing-search-trigger">
             <button
               type="button"
               className="navbar-search-btn"
               onClick={() => setSearchOpen(true)}
-              title="Cari 448 Instrumen Keuangan (Tekan ⌘K atau /)"
+              title="Cari Aset (Tekan ⌘K atau /)"
             >
               <IconSearch size={14} />
-              <span className="search-placeholder">Cari 448 aset (BTC, BBCA, Emas...)...</span>
+              <span className="search-placeholder">Cari aset...</span>
               <kbd className="search-kbd mono">⌘K</kbd>
             </button>
           </div>
 
-          {/* Action Buttons Right Dock */}
+          {/* Action Buttons Right: Unified Login / Admin Switcher */}
           <div className="landing-nav-actions">
-            <Link
-              href="/ringkasan"
-              className="btn btn-primary landing-action-btn"
-              title="Masuk ke Terminal Komite"
-            >
-              <span className="badge-live-pulse" style={{ width: '6px', height: '6px' }} />
-              <IconGauge size={14} />
-              <span>Masuk Terminal</span>
-              <IconArrowRight size={13} />
-            </Link>
-
-            <Link
-              href="/admin"
-              className="btn btn-quiet landing-admin-btn"
-              title="Portal Khusus Administrator"
-            >
-              <IconLock size={13} />
-              <span className="admin-btn-label">Admin</span>
-            </Link>
+            {isAdmin ? (
+              <>
+                <Link
+                  href="/admin"
+                  className="btn btn-primary landing-action-btn"
+                  style={{ background: 'var(--signal)', color: '#000', fontWeight: 600 }}
+                  title="Buka Dashboard Administrator"
+                >
+                  <IconLock size={13} />
+                  <span>Dashboard Admin</span>
+                </Link>
+                <Link
+                  href="/ringkasan"
+                  className="btn btn-quiet landing-action-btn"
+                  title="Buka Terminal Pengguna"
+                >
+                  <IconGauge size={13} />
+                  <span>Terminal User</span>
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  className="btn btn-quiet landing-action-btn"
+                  title="Masuk ke Akun atau Akses Admin"
+                >
+                  <span>Masuk</span>
+                </Link>
+                <Link
+                  href="/ringkasan"
+                  className="btn btn-primary landing-action-btn"
+                  title="Buka Terminal Komite"
+                >
+                  <span className="badge-live-pulse" style={{ width: '6px', height: '6px' }} />
+                  <IconGauge size={14} />
+                  <span>Buka Terminal</span>
+                  <IconArrowRight size={13} />
+                </Link>
+              </>
+            )}
 
             {/* Mobile Menu Hamburger Toggle */}
             <button
@@ -617,66 +643,65 @@ export function LandingNav({
           </div>
         </div>
 
-        {/* 3. QUICK NAVIGATION STRIP (Pita Akses Cepat Bawah Header) */}
-        <div className="landing-subnav-strip">
+        {/* 2. BARIS HARGA ASET & WARTA PASAR DI BAWAH NAVBAR */}
+        <div className="landing-subnav-strip" suppressHydrationWarning>
           <div className="landing-subnav-container">
-            <div className="subnav-left-group">
-              <span className="subnav-label mono">PINTASAN CEPAT:</span>
-              <div className="subnav-scrollable hide-scroll">
-                <Link href="/ringkasan" className="subnav-chip mono">
-                  <IconGauge size={12} />
-                  <span>Semua Deliberasi ({instruments.length || 448})</span>
+            {/* Berita Kecil / Warta Terkini */}
+            <div className="subnav-news-group">
+              <span className="news-pulse-tag mono">
+                <span className="badge-live-pulse" style={{ width: '5px', height: '5px' }} />
+                <span>WARTA</span>
+              </span>
+              {latestNewsHeadline ? (
+                <Link
+                  href={`/berita/${latestNewsHeadline.slug}`}
+                  className="subnav-news-title"
+                  title={latestNewsHeadline.title}
+                >
+                  {latestNewsHeadline.title}
                 </Link>
-                <Link href="/ringkasan?tab=crypto" className="subnav-chip mono">
-                  <span className="chip-dot" style={{ background: 'var(--amber)' }} />
-                  <span>Kripto (BTC, ETH, SOL)</span>
+              ) : (
+                <Link href="/berita" className="subnav-news-title">
+                  Pantau pergerakan harga 400+ aset kripto, saham IDX, emas, dan komoditas global
                 </Link>
-                <Link href="/ringkasan?tab=saham" className="subnav-chip mono">
-                  <span className="chip-dot" style={{ background: 'var(--blue)' }} />
-                  <span>Saham IDX (BBCA, BBRI, BREN)</span>
-                </Link>
-                <Link href="/ringkasan?tab=emas" className="subnav-chip mono">
-                  <span className="chip-dot" style={{ background: 'var(--signal)' }} />
-                  <span>Emas &amp; Logam (XAUUSD)</span>
-                </Link>
-                <Link href="/ringkasan?tab=veto" className="subnav-chip mono" style={{ borderColor: 'rgba(239,68,68,0.4)' }}>
-                  <IconShield size={12} style={{ color: 'var(--red)' }} />
-                  <span style={{ color: 'var(--red)' }}>Sinyal Veto Aktif</span>
-                </Link>
-                <Link href="/berita" className="subnav-chip mono">
-                  <IconNews size={12} />
-                  <span>Warta Makro &amp; Perang</span>
-                </Link>
-                <Link href="/backtest" className="subnav-chip mono">
-                  <IconCandles size={12} />
-                  <span>Laboratorium Backtest</span>
-                </Link>
-                <Link href="/pipeline" className="subnav-chip mono">
-                  <IconFlow size={12} />
-                  <span>Status Pipeline</span>
-                </Link>
-                <Link href="/admin" className="subnav-chip mono" style={{ borderColor: 'var(--line-strong)' }}>
-                  <IconLock size={12} />
-                  <span>Portal Admin</span>
-                </Link>
-              </div>
+              )}
             </div>
 
-            {/* Right side: Committee Sentiment Breadth Bar */}
-            <div className="subnav-right-meter mono">
-              <span style={{ color: 'var(--ink-faint)', fontSize: '10px' }}>TENSI PASAR:</span>
-              <span className="trend-up" style={{ fontSize: '10px' }}>54% BULL</span>
-              <div className="mini-meter-track">
-                <div className="mini-meter-bull" style={{ width: '54%' }} />
-                <div className="mini-meter-bear" style={{ width: '46%' }} />
+            {/* Ticker Harga Lintas Aset: Kripto, Saham, Emas, Komoditi */}
+            <div className="subnav-ticker-group">
+              <div className="subnav-scrollable hide-scroll">
+                {multiAssetTickers.map(({ category, asset }) => {
+                  const isPositive = (asset.changePct ?? 0) >= 0
+                  return (
+                    <Link
+                      key={asset.id}
+                      href={`/ringkasan?symbol=${asset.symbol}`}
+                      className="subnav-price-chip"
+                      title={`${asset.name} (${asset.symbol})`}
+                    >
+                      <span className="subnav-cat-badge mono">{category}</span>
+                      <AssetIcon symbol={asset.symbol} size={12} />
+                      <span className="subnav-sym mono">{asset.symbol}</span>
+                      <span className="subnav-price mono">
+                        {asset.lastClose
+                          ? (asset.assetClass === 'saham' ? 'Rp' : '$') +
+                            Number(asset.lastClose).toLocaleString('id-ID')
+                          : '-'}
+                      </span>
+                      <span className={`subnav-chg mono ${isPositive ? 'trend-up' : 'trend-down'}`}>
+                        {isPositive ? '+' : ''}
+                        {asset.changePct ? asset.changePct.toFixed(1) + '%' : '0.0%'}
+                      </span>
+                    </Link>
+                  )
+                })}
               </div>
-              <span className="trend-down" style={{ fontSize: '10px' }}>46% BEAR</span>
             </div>
           </div>
         </div>
       </header>
 
-      {/* 4. COMMAND SEARCH PALETTE MODAL (⌘K) */}
+      {/* 3. COMMAND SEARCH PALETTE MODAL (⌘K) */}
       {searchOpen && (
         <div className="command-palette-backdrop" onClick={closeSearch}>
           <div
@@ -737,63 +762,54 @@ export function LandingNav({
                 className={`filter-btn ${searchFilter === 'komoditi' ? 'active' : ''}`}
                 onClick={() => setSearchFilter('komoditi')}
               >
-                Komoditi &amp; Emas
+                Emas &amp; Komoditi
               </button>
             </div>
 
-            {/* Search Results List */}
-            <div className="command-results-scroll hide-scroll">
-              {searchResults.map((item) => {
-                const isPositive = (item.changePct ?? 0) >= 0
-                return (
-                  <Link
-                    key={item.id}
-                    href={`/ringkasan?symbol=${item.symbol}`}
-                    className="command-result-item"
-                    onClick={() => setSearchOpen(false)}
-                  >
-                    <div className="result-left">
-                      <AssetIcon symbol={item.symbol} size={20} />
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span className="mono bold" style={{ fontSize: '13px', color: 'var(--ink)' }}>
-                            {item.symbol}
-                          </span>
-                          <span className="tag mono" style={{ fontSize: '9px' }}>
-                            {item.assetClass}
-                          </span>
-                          <span className="mono" style={{ fontSize: '10px', color: 'var(--ink-faint)' }}>
-                            {item.market}
-                          </span>
-                        </div>
-                        <div className="result-name">{item.name}</div>
-                      </div>
-                    </div>
-
-                    <div className="result-right mono">
-                      <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--ink)' }}>
-                        {item.lastClose
-                          ? (item.assetClass === 'saham' ? 'Rp' : '$') +
-                            Number(item.lastClose).toLocaleString('id-ID')
-                          : '-'}
-                      </div>
-                      <div className={`result-change ${isPositive ? 'trend-up' : 'trend-down'}`}>
-                        {isPositive ? '+' : ''}
-                        {item.changePct ? item.changePct.toFixed(2) + '%' : '0.00%'}
-                      </div>
-                    </div>
-                  </Link>
-                )
-              })}
-
-              {searchResults.length === 0 && (
+            {/* Live Search Results List */}
+            <div className="command-results-list">
+              {searchResults.length === 0 ? (
                 <div className="command-empty mono">
-                  <IconSearch size={24} style={{ opacity: 0.4 }} />
-                  <div>Tidak ditemukan instrumen dengan kata kunci &ldquo;{searchQuery}&rdquo;</div>
-                  <div style={{ fontSize: '11px', color: 'var(--ink-faint)', marginTop: '4px' }}>
-                    Coba cari simbol lain seperti BTC, ETH, BBCA, BREN, atau XAUUSD.
-                  </div>
+                  Tidak ditemukan instrumen yang cocok dengan &ldquo;{searchQuery}&rdquo;.
                 </div>
+              ) : (
+                searchResults.map((asset) => {
+                  const isPositive = (asset.changePct ?? 0) >= 0
+                  return (
+                    <Link
+                      key={asset.id}
+                      href={`/ringkasan?symbol=${asset.symbol}`}
+                      className="command-result-item"
+                      onClick={closeSearch}
+                    >
+                      <div className="command-item-left">
+                        <AssetIcon symbol={asset.symbol} size={22} />
+                        <div>
+                          <div className="command-item-symbol mono bold">{asset.symbol}</div>
+                          <div className="command-item-name">{asset.name}</div>
+                        </div>
+                      </div>
+
+                      <div className="command-item-right mono">
+                        <span className="command-item-price">
+                          {asset.lastClose
+                            ? (asset.assetClass === 'saham' ? 'Rp' : '$') +
+                              Number(asset.lastClose).toLocaleString('id-ID')
+                            : '-'}
+                        </span>
+                        <span
+                          className={`command-item-chg ${isPositive ? 'trend-up' : 'trend-down'}`}
+                        >
+                          {isPositive ? '+' : ''}
+                          {asset.changePct ? asset.changePct.toFixed(1) + '%' : '0.0%'}
+                        </span>
+                        <span className="tag" style={{ fontSize: '9px', textTransform: 'uppercase' }}>
+                          {asset.assetClass}
+                        </span>
+                      </div>
+                    </Link>
+                  )
+                })
               )}
             </div>
 
@@ -802,7 +818,7 @@ export function LandingNav({
               <span>Navigasi instrumen kuantitatif tanpa jeda</span>
               <div style={{ display: 'flex', gap: '12px' }}>
                 <Link href="/ringkasan" onClick={() => setSearchOpen(false)} className="foot-quick-link">
-                  Terminal Deliberasi &rarr;
+                  Terminal Pasar &rarr;
                 </Link>
                 <Link href="/berita" onClick={() => setSearchOpen(false)} className="foot-quick-link">
                   Warta Intelijen &rarr;
@@ -813,7 +829,7 @@ export function LandingNav({
         </div>
       )}
 
-      {/* 5. MOBILE DRAWER OVERLAY & MENU */}
+      {/* 4. MOBILE DRAWER OVERLAY & MENU */}
       {mobileOpen && (
         <>
           <div
@@ -828,7 +844,6 @@ export function LandingNav({
                   <IconPulse size={16} />
                 </span>
                 <span className="mark-name">Komite</span>
-                <span className="mark-phase">PRO v2.4</span>
               </div>
               <button
                 type="button"
@@ -853,23 +868,23 @@ export function LandingNav({
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <IconSearch size={14} />
-                  <span>Cari instrumen...</span>
+                  <span>Cari aset...</span>
                 </div>
                 <kbd className="search-kbd mono">⌘K</kbd>
               </button>
             </div>
 
             <div className="mobile-drawer-body">
-              {/* Section: Terminal & Pasar */}
+              {/* Section: Pasar */}
               <div className="mobile-menu-section">
-                <div className="mobile-menu-title mono">PASAR &amp; INSTRUMEN</div>
+                <div className="mobile-menu-title mono">PASAR</div>
                 <Link
                   href="/ringkasan"
                   className="mobile-menu-link"
                   onClick={() => setMobileOpen(false)}
                 >
                   <IconGauge size={16} />
-                  <span>Ringkasan Pasar &amp; Deliberasi</span>
+                  <span>Ringkasan Pasar</span>
                 </Link>
                 <Link
                   href="/instruments"
@@ -877,14 +892,14 @@ export function LandingNav({
                   onClick={() => setMobileOpen(false)}
                 >
                   <IconRows size={16} />
-                  <span>Katalog 448 Instrumen</span>
+                  <span>Katalog Aset Lengkap</span>
                 </Link>
                 <Link
                   href="/ringkasan?tab=crypto"
                   className="mobile-menu-link sub-link mono"
                   onClick={() => setMobileOpen(false)}
                 >
-                  <span>&bull; Kripto &amp; Meme (BTC, ETH, SOL)</span>
+                  <span>&bull; Kripto (BTC, ETH, SOL)</span>
                 </Link>
                 <Link
                   href="/ringkasan?tab=saham"
@@ -898,13 +913,20 @@ export function LandingNav({
                   className="mobile-menu-link sub-link mono"
                   onClick={() => setMobileOpen(false)}
                 >
-                  <span>&bull; Emas &amp; Logam Mulia (XAUUSD)</span>
+                  <span>&bull; Emas &amp; Logam Mulia</span>
+                </Link>
+                <Link
+                  href="/ringkasan?tab=komoditi"
+                  className="mobile-menu-link sub-link mono"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  <span>&bull; Komoditas Global</span>
                 </Link>
               </div>
 
-              {/* Section: 4 Agen Spesialis */}
+              {/* Section: 4 Asisten AI */}
               <div className="mobile-menu-section">
-                <div className="mobile-menu-title mono">RUANG SIDANG 4 AGEN</div>
+                <div className="mobile-menu-title mono">SIDANG 4 AI</div>
                 <div className="mobile-agents-preview">
                   <div className="mobile-agent-chip mono" style={{ color: 'var(--blue)' }}>
                     <IconCandles size={12} />
@@ -912,7 +934,7 @@ export function LandingNav({
                   </div>
                   <div className="mobile-agent-chip mono" style={{ color: 'var(--green)' }}>
                     <IconTarget size={12} />
-                    <span>Strateg Bull</span>
+                    <span>Ahli Peluang</span>
                   </div>
                   <div className="mobile-agent-chip mono" style={{ color: 'var(--red)' }}>
                     <IconShield size={12} />
@@ -925,16 +947,16 @@ export function LandingNav({
                 </div>
               </div>
 
-              {/* Section: Warta Makro & Mesin */}
+              {/* Section: Berita & Riset */}
               <div className="mobile-menu-section">
-                <div className="mobile-menu-title mono">INTELIJEN &amp; INFRASTRUKTUR</div>
+                <div className="mobile-menu-title mono">BERITA &amp; RISET</div>
                 <Link
                   href="/berita"
                   className="mobile-menu-link"
                   onClick={() => setMobileOpen(false)}
                 >
                   <IconNews size={16} />
-                  <span>Warta Intelijen AI (Dampak &ge; 6)</span>
+                  <span>Kabar Pasar &amp; Ekonomi</span>
                 </Link>
                 <Link
                   href="/backtest"
@@ -942,7 +964,7 @@ export function LandingNav({
                   onClick={() => setMobileOpen(false)}
                 >
                   <IconCandles size={16} />
-                  <span>Laboratorium Backtest</span>
+                  <span>Uji Strategi AI (Backtest)</span>
                 </Link>
                 <Link
                   href="/pipeline"
@@ -950,22 +972,45 @@ export function LandingNav({
                   onClick={() => setMobileOpen(false)}
                 >
                   <IconFlow size={16} />
-                  <span>Pipeline &amp; Database</span>
+                  <span>Koneksi Data Bursa</span>
                 </Link>
               </div>
 
-              {/* Section: Administrasi */}
-              <div className="mobile-menu-section">
-                <div className="mobile-menu-title mono">ADMINISTRATOR</div>
-                <Link
-                  href="/admin"
-                  className="mobile-menu-link"
-                  onClick={() => setMobileOpen(false)}
-                >
-                  <IconLock size={16} />
-                  <span>Portal Admin Komite</span>
-                </Link>
-              </div>
+              {/* Section: Sesi & Akun */}
+              {isAdmin ? (
+                <div className="mobile-menu-section">
+                  <div className="mobile-menu-title mono">SESI ADMINISTRATOR</div>
+                  <Link
+                    href="/admin"
+                    className="mobile-menu-link"
+                    onClick={() => setMobileOpen(false)}
+                    style={{ color: 'var(--signal)', fontWeight: 600 }}
+                  >
+                    <IconLock size={16} />
+                    <span>Dashboard Admin</span>
+                  </Link>
+                  <Link
+                    href="/ringkasan"
+                    className="mobile-menu-link"
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    <IconGauge size={16} />
+                    <span>Terminal User</span>
+                  </Link>
+                </div>
+              ) : (
+                <div className="mobile-menu-section">
+                  <div className="mobile-menu-title mono">AKUN</div>
+                  <Link
+                    href="/login"
+                    className="mobile-menu-link"
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    <IconLock size={16} />
+                    <span>Masuk ke Akun</span>
+                  </Link>
+                </div>
+              )}
             </div>
 
             <div className="mobile-drawer-foot">
