@@ -2027,7 +2027,7 @@ button {
 }
 
 /* ---------------------------------------------------------------------------
-   Warta & Intelijen Pasar AI
+   Warta & Intelijen Pasar AI (Tema Institusional Minimalis)
    --------------------------------------------------------------------------- */
 
 .news-portal {
@@ -2044,12 +2044,11 @@ button {
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   overflow: hidden;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition: border-color 0.15s ease;
 }
 
 .news-hero:hover {
-  border-color: rgba(56, 189, 248, 0.4);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  border-color: var(--line-focus, #383838);
 }
 
 @media (max-width: 860px) {
@@ -2069,11 +2068,6 @@ button {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.4s ease;
-}
-
-.news-hero:hover .news-hero-img {
-  transform: scale(1.03);
 }
 
 .news-hero-content {
@@ -2098,18 +2092,16 @@ button {
   overflow: hidden;
   text-decoration: none;
   color: inherit;
-  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color 0.15s ease;
 }
 
 .news-card:hover {
-  transform: translateY(-2px);
-  border-color: rgba(56, 189, 248, 0.4);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  border-color: var(--line-focus, #383838);
 }
 
 .news-card-img-wrap {
   position: relative;
-  height: 180px;
+  height: 170px;
   overflow: hidden;
   background: var(--bg-subtle);
 }
@@ -2118,11 +2110,6 @@ button {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.3s ease;
-}
-
-.news-card:hover .news-card-img {
-  transform: scale(1.04);
 }
 
 .news-card-body {
@@ -2134,7 +2121,7 @@ button {
 
 .news-card-title {
   font-size: var(--t-body);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.4;
   color: var(--ink);
   margin-bottom: var(--space-2);
@@ -2157,60 +2144,59 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 7px;
-  border-radius: 4px;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
   font-size: var(--t-micro);
-  font-weight: 600;
   font-family: var(--mono);
+  border: 1px solid var(--line);
+  background: var(--bg-subtle);
+  color: var(--ink-soft);
 }
 
 .badge-category {
-  background: rgba(56, 189, 248, 0.12);
-  color: #38bdf8;
-  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-color: var(--line);
+  background: var(--bg-card);
+  color: var(--ink-mute);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .badge-sentiment-bullish {
-  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(52, 211, 153, 0.25);
+  background: rgba(52, 211, 153, 0.06);
   color: #34d399;
-  border: 1px solid rgba(16, 185, 129, 0.25);
 }
 
 .badge-sentiment-bearish {
-  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(248, 113, 113, 0.25);
+  background: rgba(248, 113, 113, 0.06);
   color: #f87171;
-  border: 1px solid rgba(239, 68, 68, 0.25);
 }
 
-.badge-sentiment-neutral {
-  background: rgba(245, 158, 11, 0.12);
-  color: #fbbf24;
-  border: 1px solid rgba(245, 158, 11, 0.25);
-}
-
+.badge-sentiment-neutral,
 .badge-sentiment-mixed {
-  background: rgba(168, 85, 247, 0.12);
-  color: #c084fc;
-  border: 1px solid rgba(168, 85, 247, 0.25);
+  border-color: var(--line);
+  background: var(--bg-subtle);
+  color: var(--ink-mute);
 }
 
 .badge-ticker {
   background: var(--bg-subtle);
-  color: var(--ink);
+  color: var(--ink-soft);
   border: 1px solid var(--line);
   padding: 1px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-family: var(--mono);
   font-size: var(--t-micro);
-  font-weight: 600;
+  font-weight: 500;
   text-decoration: none;
   transition: all 0.12s ease;
 }
 
 .badge-ticker:hover {
-  background: var(--tint-brand);
-  color: var(--brand);
-  border-color: var(--brand);
+  background: var(--bg-card);
+  color: var(--ink);
+  border-color: var(--ink-mute);
 }
 
 .youtube-wrapper {
@@ -2235,23 +2221,24 @@ button {
 }
 
 .takeaways-box {
-  background: linear-gradient(145deg, rgba(30, 41, 59, 0.5) 0%, rgba(15, 23, 42, 0.7) 100%);
-  border: 1px solid rgba(56, 189, 248, 0.3);
-  border-radius: var(--radius-md);
+  background: var(--bg-subtle);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--brand);
+  border-radius: var(--radius-sm);
   padding: var(--space-4);
   margin: var(--space-4) 0;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
 }
 
 .takeaways-title {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: var(--t-small);
+  font-size: var(--t-micro);
   font-weight: 700;
-  color: #38bdf8;
+  font-family: var(--mono);
+  color: var(--ink-soft);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   margin-bottom: var(--space-3);
 }
 
@@ -2266,28 +2253,28 @@ button {
 
 .takeaways-item {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   font-size: var(--t-small);
   line-height: 1.5;
   color: var(--ink);
 }
 
 .takeaways-bullet {
-  color: #38bdf8;
-  font-weight: bold;
+  color: var(--ink-mute);
+  font-family: var(--mono);
 }
 
 .article-header {
-  margin-bottom: var(--space-5);
+  margin-bottom: var(--space-4);
 }
 
 .article-title {
-  font-size: clamp(22px, 3.5vw, 32px);
-  font-weight: 800;
-  line-height: 1.25;
+  font-size: clamp(20px, 3vw, 28px);
+  font-weight: 700;
+  line-height: 1.3;
   color: var(--ink);
-  letter-spacing: -0.02em;
-  margin: var(--space-3) 0 var(--space-3);
+  letter-spacing: -0.01em;
+  margin: var(--space-3) 0;
 }
 
 .article-meta {
@@ -2297,7 +2284,7 @@ button {
   gap: var(--space-3);
   font-size: var(--t-small);
   color: var(--ink-mute);
-  padding-bottom: var(--space-4);
+  padding-bottom: var(--space-3);
   border-bottom: 1px solid var(--line);
 }
 
@@ -2308,14 +2295,14 @@ button {
 }
 
 .article-body-content h2 {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 700;
   color: var(--ink);
   margin: var(--space-5) 0 var(--space-2);
 }
 
 .article-body-content h3 {
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--ink);
   margin: var(--space-4) 0 var(--space-2);
@@ -2336,13 +2323,17 @@ button {
   background: var(--bg-card);
   padding: 8px 12px;
   text-align: left;
-  border-bottom: 2px solid var(--line);
+  border-bottom: 1px solid var(--line);
   color: var(--ink-mute);
+  font-family: var(--mono);
+  font-size: var(--t-micro);
+  text-transform: uppercase;
 }
 
 .article-body-content td {
   padding: 8px 12px;
   border-bottom: 1px solid var(--line);
 }
+
 
 

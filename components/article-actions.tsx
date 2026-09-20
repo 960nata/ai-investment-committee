@@ -48,75 +48,52 @@ Tugas untuk LLM: Berdasarkan intelijen di atas, berikan rekomendasi alokasi port
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: 12,
-        padding: '12px 16px',
+        padding: '10px 14px',
         background: 'var(--bg-subtle)',
-        borderRadius: 'var(--radius-md)',
+        borderRadius: 'var(--radius-sm)',
         border: '1px solid var(--line)',
-        margin: 'var(--space-5) 0',
+        margin: 'var(--space-4) 0',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <button
           type="button"
+          className="seg"
           onClick={handleCopyPrompt}
           style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '6px 14px',
-            fontSize: 'var(--t-small)',
             fontWeight: 600,
-            borderRadius: 'var(--radius-sm)',
-            border: '1px solid rgba(56, 189, 248, 0.4)',
-            background: copiedPrompt ? 'rgba(16, 185, 129, 0.2)' : 'rgba(56, 189, 248, 0.1)',
-            color: copiedPrompt ? '#34d399' : '#38bdf8',
-            cursor: 'pointer',
-            transition: 'all 0.15s ease',
+            color: copiedPrompt ? 'var(--brand)' : 'var(--ink)',
           }}
         >
-          <span>🤖</span>
-          <span>{copiedPrompt ? 'Tersalin ke Clipboard!' : 'Salin Format untuk AI / Prompt'}</span>
+          {copiedPrompt ? 'Konteks Tersalin' : 'Salin Konteks AI'}
         </button>
 
         <button
           type="button"
+          className="seg"
           onClick={handleCopyLink}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '6px 12px',
-            fontSize: 'var(--t-small)',
-            fontWeight: 600,
-            borderRadius: 'var(--radius-sm)',
-            border: '1px solid var(--line)',
-            background: 'var(--bg-card)',
-            color: 'var(--ink)',
-            cursor: 'pointer',
-          }}
         >
-          <span>🔗</span>
-          <span>{copiedLink ? 'Tautan Tersalin!' : 'Salin Tautan'}</span>
+          {copiedLink ? 'Tautan Tersalin' : 'Salin Tautan'}
         </button>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ fontSize: 'var(--t-micro)', color: 'var(--ink-mute)' }}>Bagikan:</span>
+        <span style={{ fontSize: 'var(--t-micro)', color: 'var(--ink-mute)', fontFamily: 'var(--mono)' }}>Bagikan:</span>
         <a
           href={`https://twitter.com/intent/tweet?text=${shareText}&url=${encodedUrl}`}
           target="_blank"
           rel="noreferrer"
-          className="badge-tag"
-          style={{ background: 'var(--bg-card)', color: 'var(--ink)', textDecoration: 'none' }}
+          className="seg"
+          style={{ padding: '3px 8px', fontSize: 'var(--t-micro)', textDecoration: 'none' }}
         >
-          𝕏 / Twitter
+          X
         </a>
         <a
           href={`https://api.whatsapp.com/send?text=${shareText}%20${encodedUrl}`}
           target="_blank"
           rel="noreferrer"
-          className="badge-tag"
-          style={{ background: 'var(--bg-card)', color: '#34d399', textDecoration: 'none' }}
+          className="seg"
+          style={{ padding: '3px 8px', fontSize: 'var(--t-micro)', textDecoration: 'none' }}
         >
           WhatsApp
         </a>
@@ -124,8 +101,8 @@ Tugas untuk LLM: Berdasarkan intelijen di atas, berikan rekomendasi alokasi port
           href={`https://t.me/share/url?url=${encodedUrl}&text=${shareText}`}
           target="_blank"
           rel="noreferrer"
-          className="badge-tag"
-          style={{ background: 'var(--bg-card)', color: '#38bdf8', textDecoration: 'none' }}
+          className="seg"
+          style={{ padding: '3px 8px', fontSize: 'var(--t-micro)', textDecoration: 'none' }}
         >
           Telegram
         </a>

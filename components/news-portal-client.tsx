@@ -1,16 +1,16 @@
 'use client'
 
-import React, { useState, useTransition } from 'react'
+import React, { useState } from 'react'
 import Link from 'next/link'
 import type { MarketNewsRow } from '@/lib/db/schema'
-import { IconAlert, IconNews, IconPulse } from './icons'
+import { IconNews } from './icons'
 
 interface Props {
   initialArticles: MarketNewsRow[]
 }
 
 const CATEGORIES = [
-  { id: 'semua', label: 'Semua Kategori' },
+  { id: 'semua', label: 'Semua' },
   { id: 'teknologi-ai', label: 'Teknologi & AI' },
   { id: 'energi-komoditas', label: 'Energi & Komoditas' },
   { id: 'ekonomi-makro', label: 'Ekonomi Makro' },
@@ -51,9 +51,7 @@ export function NewsPortalClient({ initialArticles }: Props) {
   const [isGenerating, setIsGenerating] = useState<boolean>(false)
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [pending, startTransition] = useTransition()
 
-  // Filter artikel berdasarkan kategori dan pencarian
   const filteredArticles = articles.filter((a) => {
     const matchCategory =
       selectedCategory === 'semua' || a.category === selectedCategory
@@ -70,7 +68,6 @@ export function NewsPortalClient({ initialArticles }: Props) {
   const heroArticle = filteredArticles[0] ?? null
   const gridArticles = heroArticle ? filteredArticles.slice(1) : []
 
-  // Salin ringkasan siap-pakai untuk AI / LLM
   function copyLlmContext() {
     const context = articles
       .slice(0, 10)
@@ -81,11 +78,10 @@ export function NewsPortalClient({ initialArticles }: Props) {
       .join('\n\n---\n\n')
 
     navigator.clipboard.writeText(context)
-    setCopyFeedback('Prompt konteks AI berhasil disalin!')
+    setCopyFeedback('Konteks AI tersalin')
     setTimeout(() => setCopyFeedback(null), 3000)
   }
 
-  // Pemicu pembuatan artikel baru oleh AI
   async function handleTriggerGenerate() {
     setIsGenerating(true)
     setError(null)
@@ -133,19 +129,18 @@ export function NewsPortalClient({ initialArticles }: Props) {
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span className="panel-title" style={{ fontSize: 'var(--t-body)' }}>
-              <IconNews size={18} />
-              Warta & Intelijen Pasar AI
+            <span className="panel-title">
+              <IconNews size={16} />
+              Warta &amp; Intelijen Pasar
             </span>
             <span
-              className="pill-inline"
               style={{
-                background: 'rgba(56, 189, 248, 0.15)',
-                color: '#38bdf8',
-                fontSize: 11,
+                fontFamily: 'var(--mono)',
+                fontSize: 'var(--t-micro)',
+                color: 'var(--ink-mute)',
               }}
             >
-              SEO & AI-Ready
+              {articles.length} telaah
             </span>
           </div>
 
@@ -154,23 +149,9 @@ export function NewsPortalClient({ initialArticles }: Props) {
               type="button"
               className="seg"
               onClick={copyLlmContext}
-              title="Salin ringkasan data terstruktur untuk disuntikkan ke ChatGPT / Claude / Bot lain"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '6px 12px',
-                fontSize: 'var(--t-small)',
-                fontWeight: 600,
-                borderRadius: 'var(--radius-sm)',
-                border: '1px solid var(--line)',
-                background: 'var(--bg-subtle)',
-                color: 'var(--ink)',
-                cursor: 'pointer',
-              }}
+              title="Salin ringkasan data untuk disuntikkan ke model AI"
             >
-              <span>🤖</span>
-              <span>{copyFeedback ?? 'Format untuk AI / Prompt'}</span>
+              {copyFeedback ?? 'Salin Konteks AI'}
             </button>
 
             <a
@@ -178,45 +159,23 @@ export function NewsPortalClient({ initialArticles }: Props) {
               target="_blank"
               rel="noreferrer"
               className="seg"
-              title="Akses feed RSS 2.0 XML resmi"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '6px 12px',
-                fontSize: 'var(--t-small)',
-                fontWeight: 600,
-                borderRadius: 'var(--radius-sm)',
-                border: '1px solid var(--line)',
-                background: 'var(--bg-subtle)',
-                color: 'var(--ink-mute)',
-                textDecoration: 'none',
-              }}
+              title="Akses feed RSS 2.0 XML"
             >
-              <span>📡</span>
-              <span>RSS</span>
+              RSS
             </a>
 
             <button
               type="button"
+              className="seg"
               onClick={() => setShowGenerateModal(true)}
               style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '6px 14px',
-                fontSize: 'var(--t-small)',
-                fontWeight: 700,
-                borderRadius: 'var(--radius-sm)',
-                border: '1px solid rgba(56, 189, 248, 0.4)',
-                background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-                color: '#fff',
-                cursor: 'pointer',
-                boxShadow: '0 2px 10px rgba(2, 132, 199, 0.3)',
+                background: 'var(--bg-card)',
+                color: 'var(--ink)',
+                borderColor: 'var(--ink-mute)',
+                fontWeight: 600,
               }}
             >
-              <span>⚡</span>
-              <span>Minta AI Analisis Baru</span>
+              + Buat Analisis Baru
             </button>
           </div>
         </div>
@@ -231,7 +190,6 @@ export function NewsPortalClient({ initialArticles }: Props) {
             gap: 12,
             padding: 'var(--space-3) var(--space-4)',
             borderTop: '1px solid var(--line)',
-            background: 'var(--bg-subtle)',
           }}
         >
           <div className="segmented" role="group" aria-label="Kategori Berita">
@@ -258,7 +216,7 @@ export function NewsPortalClient({ initialArticles }: Props) {
           <div style={{ position: 'relative', width: 220 }}>
             <input
               type="text"
-              placeholder="Cari topik / simbol ($NVDA)..."
+              placeholder="Saring topik atau simbol..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{
@@ -281,8 +239,7 @@ export function NewsPortalClient({ initialArticles }: Props) {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0, 0, 0, 0.7)',
-            backdropFilter: 'blur(4px)',
+            background: 'rgba(0, 0, 0, 0.75)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -293,12 +250,11 @@ export function NewsPortalClient({ initialArticles }: Props) {
           <div
             style={{
               background: 'var(--bg-card)',
-              border: '1px solid rgba(56, 189, 248, 0.4)',
+              border: '1px solid var(--line)',
               borderRadius: 'var(--radius-md)',
-              maxWidth: 580,
+              maxWidth: 560,
               width: '100%',
               padding: 'var(--space-5)',
-              boxShadow: '0 20px 50px rgba(0,0,0,0.6)',
               display: 'flex',
               flexDirection: 'column',
               gap: 16,
@@ -314,15 +270,12 @@ export function NewsPortalClient({ initialArticles }: Props) {
               <h3
                 style={{
                   margin: 0,
-                  fontSize: 18,
-                  fontWeight: 700,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
+                  fontSize: 16,
+                  fontWeight: 600,
+                  color: 'var(--ink)',
                 }}
               >
-                <span>⚡</span>
-                <span>Pemicu Agen Intelijen Jurnalis AI</span>
+                Buat Analisis Pasar Baru
               </h3>
               <button
                 type="button"
@@ -332,7 +285,7 @@ export function NewsPortalClient({ initialArticles }: Props) {
                   background: 'none',
                   border: 'none',
                   color: 'var(--ink-mute)',
-                  fontSize: 20,
+                  fontSize: 18,
                   cursor: 'pointer',
                 }}
               >
@@ -348,21 +301,21 @@ export function NewsPortalClient({ initialArticles }: Props) {
                 lineHeight: 1.5,
               }}
             >
-              Pilih salah satu tema hangat atau tulis topik khusus. Agen Jurnalis AI
-              akan langsung meriset angka pasar, membedah korelasi saham, mengurasi
-              media foto &amp; video YouTube, lalu menerbitkannya ke portal.
+              Pilih tema atau ketik topik spesifik. Komite AI akan menyusun telaah
+              makro dan korelasi saham terkait.
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <label
                 style={{
                   fontSize: 'var(--t-micro)',
-                  fontWeight: 700,
+                  fontWeight: 600,
                   color: 'var(--ink-mute)',
                   textTransform: 'uppercase',
+                  fontFamily: 'var(--mono)',
                 }}
               >
-                Pilihan Tema Riset Hangat:
+                Pilihan Tema Riset:
               </label>
               {HOT_PRESETS.map((p, idx) => (
                 <div
@@ -373,26 +326,27 @@ export function NewsPortalClient({ initialArticles }: Props) {
                     borderRadius: 'var(--radius-sm)',
                     border:
                       selectedPreset === idx
-                        ? '1px solid #38bdf8'
+                        ? '1px solid var(--ink-mute)'
                         : '1px solid var(--line)',
                     background:
                       selectedPreset === idx
-                        ? 'rgba(56, 189, 248, 0.1)'
-                        : 'var(--bg-subtle)',
+                        ? 'var(--bg-subtle)'
+                        : 'transparent',
                     cursor: 'pointer',
                     fontSize: 'var(--t-small)',
                     color: 'var(--ink)',
                   }}
                 >
-                  <div style={{ fontWeight: 600 }}>{p.topic}</div>
+                  <div style={{ fontWeight: 500 }}>{p.topic}</div>
                   <div
                     style={{
                       fontSize: 'var(--t-micro)',
                       color: 'var(--ink-mute)',
                       marginTop: 4,
+                      fontFamily: 'var(--mono)',
                     }}
                   >
-                    Simbol Terkait: {p.symbols.join(', ')}
+                    Simbol: {p.symbols.join(', ')}
                   </div>
                 </div>
               ))}
@@ -402,16 +356,17 @@ export function NewsPortalClient({ initialArticles }: Props) {
               <label
                 style={{
                   fontSize: 'var(--t-micro)',
-                  fontWeight: 700,
+                  fontWeight: 600,
                   color: 'var(--ink-mute)',
                   textTransform: 'uppercase',
+                  fontFamily: 'var(--mono)',
                 }}
               >
-                Atau Tulis Topik Kustom:
+                Atau Tulis Topik Mandiri:
               </label>
               <input
                 type="text"
-                placeholder="Misal: Dampak Kebijakan Ekspor Nikel Terhadap Saham NCKL dan Baterai EV..."
+                placeholder="Misal: Dampak Kebijakan Ekspor Nikel ke Saham NCKL..."
                 value={customTopic}
                 onChange={(e) => setCustomTopic(e.target.value)}
                 disabled={isGenerating}
@@ -430,8 +385,7 @@ export function NewsPortalClient({ initialArticles }: Props) {
               <div
                 style={{
                   padding: '8px 12px',
-                  background: 'rgba(239, 68, 68, 0.1)',
-                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  border: '1px solid var(--line)',
                   color: '#f87171',
                   borderRadius: 4,
                   fontSize: 'var(--t-small)',
@@ -451,56 +405,32 @@ export function NewsPortalClient({ initialArticles }: Props) {
             >
               <button
                 type="button"
+                className="seg"
                 onClick={() => setShowGenerateModal(false)}
                 disabled={isGenerating}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: 'var(--radius-sm)',
-                  border: '1px solid var(--line)',
-                  background: 'var(--bg-subtle)',
-                  color: 'var(--ink-mute)',
-                  cursor: 'pointer',
-                }}
               >
                 Batal
               </button>
               <button
                 type="button"
+                className="seg"
                 onClick={handleTriggerGenerate}
                 disabled={isGenerating}
                 style={{
-                  padding: '8px 20px',
-                  borderRadius: 'var(--radius-sm)',
-                  border: 'none',
-                  background: isGenerating
-                    ? 'var(--ink-mute)'
-                    : 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-                  color: '#fff',
-                  fontWeight: 700,
-                  cursor: isGenerating ? 'not-allowed' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
+                  background: 'var(--ink)',
+                  color: 'var(--bg-card)',
+                  borderColor: 'var(--ink)',
+                  fontWeight: 600,
                 }}
               >
-                {isGenerating ? (
-                  <>
-                    <span className="live-dot" />
-                    <span>AI Sedang Menganalisis &amp; Menulis...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>🚀</span>
-                    <span>Riset &amp; Terbitkan Sekarang</span>
-                  </>
-                )}
+                {isGenerating ? 'Menyusun Telaah...' : 'Terbitkan Analisis'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* --- Breaking News Spotlight (Hero Card) --- */}
+      {/* --- Fokus Intelijen (Hero Card) --- */}
       {heroArticle && (
         <article className="news-hero">
           <div className="news-hero-img-wrap">
@@ -516,45 +446,9 @@ export function NewsPortalClient({ initialArticles }: Props) {
                   width: '100%',
                   height: '100%',
                   background: 'var(--bg-subtle)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'var(--ink-mute)',
                 }}
-              >
-                Warta Intelijen Pasar
-              </div>
+              />
             )}
-            <div
-              style={{
-                position: 'absolute',
-                top: 12,
-                left: 12,
-                display: 'flex',
-                gap: 6,
-              }}
-            >
-              <span
-                className="badge-tag"
-                style={{
-                  background: 'rgba(239, 68, 68, 0.85)',
-                  color: '#fff',
-                  backdropFilter: 'blur(4px)',
-                }}
-              >
-                🔥 SOROTAN UTAMA
-              </span>
-              <span
-                className="badge-tag"
-                style={{
-                  background: 'rgba(15, 23, 42, 0.85)',
-                  color: '#38bdf8',
-                  backdropFilter: 'blur(4px)',
-                }}
-              >
-                ⚡ Dampak {heroArticle.impactScore}/10
-              </span>
-            </div>
           </div>
 
           <div className="news-hero-content">
@@ -565,27 +459,21 @@ export function NewsPortalClient({ initialArticles }: Props) {
                   alignItems: 'center',
                   gap: 8,
                   marginBottom: 10,
+                  fontSize: 'var(--t-micro)',
+                  fontFamily: 'var(--mono)',
+                  color: 'var(--ink-mute)',
                 }}
               >
-                <span className="badge-tag badge-category">
-                  {heroArticle.category.toUpperCase()}
-                </span>
-                <span
-                  className={`badge-tag badge-sentiment-${heroArticle.sentiment}`}
-                >
-                  {heroArticle.sentiment.toUpperCase()}
-                </span>
+                <span>FOKUS UTAMA</span>
+                <span>·</span>
+                <span>{heroArticle.category.toUpperCase()}</span>
+                <span>·</span>
+                <span>DAMPAK {heroArticle.impactScore}/10</span>
                 {heroArticle.youtubeVideo && (
-                  <span
-                    className="badge-tag"
-                    style={{
-                      background: 'rgba(255, 0, 0, 0.15)',
-                      color: '#f87171',
-                      border: '1px solid rgba(255, 0, 0, 0.3)',
-                    }}
-                  >
-                    ▶ VIDEO YOUTUBE
-                  </span>
+                  <>
+                    <span>·</span>
+                    <span>VIDEO TERSEDIA</span>
+                  </>
                 )}
               </div>
 
@@ -595,10 +483,10 @@ export function NewsPortalClient({ initialArticles }: Props) {
               >
                 <h2
                   style={{
-                    fontSize: clampText(20, 26),
-                    fontWeight: 800,
+                    fontSize: clampText(18, 24),
+                    fontWeight: 700,
                     lineHeight: 1.3,
-                    margin: '0 0 12px 0',
+                    margin: '0 0 10px 0',
                     color: 'var(--ink)',
                   }}
                 >
@@ -608,7 +496,7 @@ export function NewsPortalClient({ initialArticles }: Props) {
 
               <p
                 style={{
-                  fontSize: 'var(--t-body)',
+                  fontSize: 'var(--t-small)',
                   lineHeight: 1.6,
                   color: 'var(--ink-mute)',
                   margin: '0 0 16px 0',
@@ -625,18 +513,9 @@ export function NewsPortalClient({ initialArticles }: Props) {
                   flexWrap: 'wrap',
                   alignItems: 'center',
                   gap: 6,
-                  marginBottom: 16,
+                  marginBottom: 14,
                 }}
               >
-                <span
-                  style={{
-                    fontSize: 'var(--t-micro)',
-                    color: 'var(--ink-mute)',
-                    marginRight: 4,
-                  }}
-                >
-                  Aset Terkait:
-                </span>
                 {heroArticle.mentionedSymbols.map((sym) => (
                   <span key={sym} className="badge-ticker">
                     ${sym}
@@ -649,10 +528,11 @@ export function NewsPortalClient({ initialArticles }: Props) {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  fontSize: 'var(--t-small)',
+                  fontSize: 'var(--t-micro)',
+                  fontFamily: 'var(--mono)',
                   color: 'var(--ink-mute)',
                   borderTop: '1px solid var(--line)',
-                  paddingTop: 12,
+                  paddingTop: 10,
                 }}
               >
                 <span>
@@ -661,16 +541,12 @@ export function NewsPortalClient({ initialArticles }: Props) {
                 <Link
                   href={`/berita/${heroArticle.slug}`}
                   style={{
-                    fontWeight: 700,
-                    color: '#38bdf8',
+                    color: 'var(--ink)',
                     textDecoration: 'none',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 4,
+                    fontWeight: 500,
                   }}
                 >
-                  <span>Baca Analisis Lengkap</span>
-                  <span>→</span>
+                  Baca telaah lengkap →
                 </Link>
               </div>
             </div>
@@ -703,48 +579,31 @@ export function NewsPortalClient({ initialArticles }: Props) {
                     }}
                   />
                 )}
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: 10,
-                    left: 10,
-                    display: 'flex',
-                    gap: 6,
-                  }}
-                >
-                  <span className="badge-tag badge-category">
-                    {article.category}
-                  </span>
-                  <span
-                    className={`badge-tag badge-sentiment-${article.sentiment}`}
-                  >
-                    {article.sentiment}
-                  </span>
-                </div>
-                {article.youtubeVideo && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      bottom: 8,
-                      right: 8,
-                      background: 'rgba(0,0,0,0.75)',
-                      color: '#fff',
-                      padding: '2px 6px',
-                      borderRadius: 4,
-                      fontSize: 10,
-                      fontWeight: 700,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 4,
-                    }}
-                  >
-                    <span>▶</span>
-                    <span>Video</span>
-                  </div>
-                )}
               </div>
 
               <div className="news-card-body">
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    marginBottom: 8,
+                    fontSize: 'var(--t-micro)',
+                    fontFamily: 'var(--mono)',
+                    color: 'var(--ink-mute)',
+                  }}
+                >
+                  <span>{article.category.toUpperCase()}</span>
+                  <span>·</span>
+                  <span>{article.readingTimeMinutes} mnt baca</span>
+                  {article.youtubeVideo && (
+                    <>
+                      <span>·</span>
+                      <span>VIDEO</span>
+                    </>
+                  )}
+                </div>
+
                 <h3 className="news-card-title">{article.title}</h3>
                 <p className="news-card-summary">{article.summary}</p>
 
@@ -754,7 +613,7 @@ export function NewsPortalClient({ initialArticles }: Props) {
                     flexWrap: 'wrap',
                     gap: 4,
                     marginTop: 'auto',
-                    marginBottom: 12,
+                    marginBottom: 10,
                   }}
                 >
                   {article.mentionedSymbols.slice(0, 4).map((sym) => (
@@ -770,6 +629,7 @@ export function NewsPortalClient({ initialArticles }: Props) {
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     fontSize: 'var(--t-micro)',
+                    fontFamily: 'var(--mono)',
                     color: 'var(--ink-mute)',
                     borderTop: '1px solid var(--line)',
                     paddingTop: 8,
@@ -779,9 +639,12 @@ export function NewsPortalClient({ initialArticles }: Props) {
                     {new Date(article.publishedAt).toLocaleDateString('id-ID', {
                       day: 'numeric',
                       month: 'short',
+                      year: 'numeric',
                     })}
                   </span>
-                  <span>{article.readingTimeMinutes} mnt baca</span>
+                  <span style={{ textTransform: 'capitalize' }}>
+                    {article.sentiment}
+                  </span>
                 </div>
               </div>
             </Link>
@@ -797,20 +660,21 @@ export function NewsPortalClient({ initialArticles }: Props) {
               border: '1px solid var(--line)',
               borderRadius: 'var(--radius-md)',
               color: 'var(--ink-mute)',
+              fontSize: 'var(--t-small)',
             }}
           >
-            <p>Tidak ada artikel yang cocok dengan filter saat ini.</p>
+            Tidak ada telaah pasar yang cocok dengan filter saat ini.
           </div>
         )
       )}
 
-      {/* --- Kotak Akses Terbuka untuk Bot & AI Lain --- */}
+      {/* --- Akses Terbuka untuk AI Lain --- */}
       <section
         style={{
           marginTop: 'var(--space-4)',
           padding: 'var(--space-4) var(--space-5)',
-          background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.8) 0%, rgba(30, 41, 59, 0.7) 100%)',
-          border: '1px solid rgba(56, 189, 248, 0.25)',
+          background: 'var(--bg-subtle)',
+          border: '1px solid var(--line)',
           borderRadius: 'var(--radius-md)',
           display: 'flex',
           flexWrap: 'wrap',
@@ -823,16 +687,12 @@ export function NewsPortalClient({ initialArticles }: Props) {
           <div
             style={{
               fontSize: 'var(--t-small)',
-              fontWeight: 700,
-              color: '#38bdf8',
+              fontWeight: 600,
+              color: 'var(--ink)',
               marginBottom: 4,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
             }}
           >
-            <span>🤖</span>
-            <span>API Terbuka &amp; Machine-Readable Feed untuk Agen AI / Bot Lain</span>
+            Akses Mesin &amp; Umpan Terbuka (API / LLM Feed)
           </div>
           <p
             style={{
@@ -842,8 +702,11 @@ export function NewsPortalClient({ initialArticles }: Props) {
               lineHeight: 1.5,
             }}
           >
-            Sistem eksternal, bot trading, dan agen AI lain dapat langsung mengonsumsi intelijen ini
-            tanpa scraping melalui endpoint: <code style={{ color: '#34d399' }}>/api/v1/news?format=llm</code>
+            Data intelijen pasar ini dapat dikonsumsi langsung oleh agen AI atau bot
+            trading via endpoint:{' '}
+            <code style={{ color: 'var(--ink)', fontFamily: 'var(--mono)' }}>
+              /api/v1/news?format=llm
+            </code>
           </p>
         </div>
 
@@ -852,35 +715,17 @@ export function NewsPortalClient({ initialArticles }: Props) {
             href="/api/v1/news?format=llm"
             target="_blank"
             rel="noreferrer"
-            style={{
-              padding: '6px 14px',
-              borderRadius: 'var(--radius-sm)',
-              border: '1px solid rgba(56, 189, 248, 0.3)',
-              background: 'rgba(56, 189, 248, 0.1)',
-              color: '#38bdf8',
-              fontSize: 'var(--t-small)',
-              fontWeight: 600,
-              textDecoration: 'none',
-            }}
+            className="seg"
           >
-            Buka API LLM Feed
+            Format LLM
           </a>
           <a
             href="/api/v1/news"
             target="_blank"
             rel="noreferrer"
-            style={{
-              padding: '6px 14px',
-              borderRadius: 'var(--radius-sm)',
-              border: '1px solid var(--line)',
-              background: 'var(--bg-subtle)',
-              color: 'var(--ink)',
-              fontSize: 'var(--t-small)',
-              fontWeight: 600,
-              textDecoration: 'none',
-            }}
+            className="seg"
           >
-            JSON Standar
+            JSON Mentah
           </a>
         </div>
       </section>
@@ -889,5 +734,5 @@ export function NewsPortalClient({ initialArticles }: Props) {
 }
 
 function clampText(min: number, max: number): string {
-  return `clamp(${min}px, 3vw, ${max}px)`
+  return `clamp(${min}px, 2.5vw, ${max}px)`
 }

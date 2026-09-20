@@ -122,27 +122,29 @@ export default async function BeritaDetailPage({ params }: Props) {
       <article className="panel" style={{ padding: 'var(--space-5)' }}>
         {/* Header Artikel */}
         <header className="article-header">
-          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-            <span className="badge-tag badge-category">{article.category.toUpperCase()}</span>
-            <span className={`badge-tag badge-sentiment-${article.sentiment}`}>
-              SENTIMEN: {article.sentiment.toUpperCase()}
-            </span>
-            <span
-              className="badge-tag"
-              style={{
-                background: 'rgba(56, 189, 248, 0.1)',
-                color: '#38bdf8',
-                border: '1px solid rgba(56, 189, 248, 0.3)',
-              }}
-            >
-              ⚡ SKOR DAMPAK {article.impactScore}/10
-            </span>
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              gap: 8,
+              marginBottom: 10,
+              fontSize: 'var(--t-micro)',
+              fontFamily: 'var(--mono)',
+              color: 'var(--ink-mute)',
+            }}
+          >
+            <span style={{ color: 'var(--ink)', fontWeight: 600 }}>{article.category.toUpperCase()}</span>
+            <span>·</span>
+            <span>DAMPAK {article.impactScore}/10</span>
+            <span>·</span>
+            <span style={{ textTransform: 'capitalize' }}>Sentimen {article.sentiment}</span>
           </div>
 
           <h1 className="article-title">{article.title}</h1>
 
           <div className="article-meta">
-            <span>Oleh: <strong>{article.author}</strong></span>
+            <span>Oleh: {article.author}</span>
             <span>·</span>
             <span>
               {new Date(article.publishedAt).toLocaleDateString('id-ID', {
@@ -162,7 +164,7 @@ export default async function BeritaDetailPage({ params }: Props) {
           <figure style={{ margin: 'var(--space-4) 0' }}>
             <div
               style={{
-                borderRadius: 'var(--radius-md)',
+                borderRadius: 'var(--radius-sm)',
                 overflow: 'hidden',
                 background: 'var(--bg-subtle)',
                 maxHeight: 450,
@@ -184,7 +186,7 @@ export default async function BeritaDetailPage({ params }: Props) {
                 }}
               >
                 {article.featuredImage.caption}
-                {article.featuredImage.credit && ` (Foto: ${article.featuredImage.credit})`}
+                {article.featuredImage.credit && ` (${article.featuredImage.credit})`}
               </figcaption>
             )}
           </figure>
@@ -194,13 +196,12 @@ export default async function BeritaDetailPage({ params }: Props) {
         {article.keyTakeaways && article.keyTakeaways.length > 0 && (
           <div className="takeaways-box">
             <div className="takeaways-title">
-              <span>🎯</span>
-              <span>Poin Kunci Intelijen AI (Executive Takeaways)</span>
+              Poin Kunci Telaah Pasar
             </div>
             <ul className="takeaways-list">
               {article.keyTakeaways.map((takeaway, idx) => (
                 <li key={idx} className="takeaways-item">
-                  <span className="takeaways-bullet">▸</span>
+                  <span className="takeaways-bullet">—</span>
                   <span>{takeaway}</span>
                 </li>
               ))}
@@ -210,20 +211,19 @@ export default async function BeritaDetailPage({ params }: Props) {
 
         {/* Sematan Video YouTube (Jika Ada) */}
         {article.youtubeVideo?.videoId && (
-          <div style={{ margin: 'var(--space-5) 0' }}>
+          <div style={{ margin: 'var(--space-4) 0' }}>
             <div
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: 8,
-                marginBottom: 8,
-                fontSize: 'var(--t-small)',
-                fontWeight: 600,
-                color: '#f87171',
+                marginBottom: 6,
+                fontSize: 'var(--t-micro)',
+                fontFamily: 'var(--mono)',
+                color: 'var(--ink-mute)',
               }}
             >
-              <span>▶</span>
-              <span>Sematan Video YouTube: {article.youtubeVideo.title} ({article.youtubeVideo.channel})</span>
+              <span>VIDEO: {article.youtubeVideo.title} · {article.youtubeVideo.channel}</span>
             </div>
             <div className="youtube-wrapper">
               <iframe
