@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getMarketNewsList } from '@/lib/db/news-queries'
-import { generateLiveNewsArticle, seedInitialNewsArticles } from '@/lib/agents/news-agent'
+import { generateLiveNewsArticle, seedInitialNewsArticles, syncExistingNewsImagesToSupabase } from '@/lib/agents/news-agent'
 
 export const dynamic = 'force-dynamic'
 
@@ -70,10 +70,21 @@ Tautan: /berita/${a.slug}`
  * POST /api/v1/news
  *
  * Memicu agen AI untuk menulis dan menerbitkan artikel berita baru secara langsung.
+ * Atau menyinkronkan gambar artikel ke Supabase Storage (action: 'sync_images').
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}))
+
+    if (body.action === 'sync_images') {
+      const syncResult = await syncExistingNewsImagesToSupabase()
+      return NextResponse.json({
+        success: true,
+        action: 'sync_images',
+        ...syncResult,
+      })
+    }
+
     const { topic, category, targetSymbols } = body
 
     const article = await generateLiveNewsArticle({

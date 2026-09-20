@@ -13,6 +13,7 @@
 interface IconProps {
   size?: number
   className?: string
+  style?: React.CSSProperties
   /**
    * Isi hanya bila ikon berdiri sendiri tanpa teks pendamping. Ikon yang
    * ditemani label justru harus disembunyikan dari pembaca layar supaya
@@ -21,7 +22,7 @@ interface IconProps {
   title?: string
 }
 
-function Svg({ size = 20, className, title, children }: IconProps & { children: React.ReactNode }) {
+function Svg({ size = 20, className, style, title, children }: IconProps & { children: React.ReactNode }) {
   return (
     <svg
       width={size}
@@ -33,6 +34,7 @@ function Svg({ size = 20, className, title, children }: IconProps & { children: 
       strokeLinecap="round"
       strokeLinejoin="round"
       className={className}
+      style={style}
       aria-hidden={title ? undefined : true}
       role={title ? 'img' : undefined}
       focusable="false"
@@ -334,3 +336,13 @@ export function IconTrendDown(props: IconProps) {
     </Svg>
   )
 }
+
+/** Segitiga jalankan / play sidang. */
+export function IconPlay(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <polygon points="6 4 19 12 6 20 6 4" fill="currentColor" stroke="none" />
+    </Svg>
+  )
+}
+

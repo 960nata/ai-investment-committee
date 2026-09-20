@@ -49,6 +49,9 @@ export function NewsPortalClient({ initialArticles }: Props) {
   const [customTopic, setCustomTopic] = useState<string>('')
   const [selectedPreset, setSelectedPreset] = useState<number>(0)
   const [isGenerating, setIsGenerating] = useState<boolean>(false)
+  const [generatingStage, setGeneratingStage] = useState<string>('')
+  const [isSyncing, setIsSyncing] = useState<boolean>(false)
+  const [syncFeedback, setSyncFeedback] = useState<string | null>(null)
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -83,9 +86,40 @@ export function NewsPortalClient({ initialArticles }: Props) {
     setTimeout(() => setCopyFeedback(null), 3000)
   }
 
+  async function handleSyncImages() {
+    setIsSyncing(true)
+    setSyncFeedback(null)
+    try {
+      const res = await fetch('/api/v1/news', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'sync_images' }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setSyncFeedback(`Sinkronisasi selesai: ${data.updated} foto tersimpan ke Supabase Storage`)
+        const refreshed = await fetch('/api/v1/news').then((r) => r.json())
+        if (refreshed.articles) setArticles(refreshed.articles)
+      } else {
+        setSyncFeedback(data.error || 'Gagal sinkronisasi foto')
+      }
+    } catch {
+      setSyncFeedback('Gagal menghubungi server')
+    } finally {
+      setIsSyncing(false)
+      setTimeout(() => setSyncFeedback(null), 5000)
+    }
+  }
+
   async function handleTriggerGenerate() {
     setIsGenerating(true)
     setError(null)
+    setGeneratingStage('1/3: Mengunduh foto editorial internet & mengunggah ke Supabase Storage...')
+
+    const timer = setTimeout(() => {
+      setGeneratingStage('2/3: AI Jurnalis menyusun analisis pasar & laporan komprehensif...')
+    }, 2600)
+
     try {
       const preset = HOT_PRESETS[selectedPreset]
       const topic = customTopic.trim() !== '' ? customTopic.trim() : preset.topic
@@ -97,6 +131,9 @@ export function NewsPortalClient({ initialArticles }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ topic, category, targetSymbols }),
       })
+
+      clearTimeout(timer)
+      setGeneratingStage('3/3: Selesai! Menyimpan artikel ke database...')
 
       const data = await res.json()
       if (!res.ok || data.error) {
@@ -112,6 +149,7 @@ export function NewsPortalClient({ initialArticles }: Props) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
       setIsGenerating(false)
+      setGeneratingStage('')
     }
   }
 
@@ -164,6 +202,20 @@ export function NewsPortalClient({ initialArticles }: Props) {
             >
               RSS
             </a>
+
+            <button
+              type="button"
+              className="seg"
+              onClick={handleSyncImages}
+              disabled={isSyncing}
+              title="Unggah foto artikel yang belum ter-hosting ke Supabase Storage"
+              style={{
+                background: 'var(--bg-subtle)',
+                color: isSyncing ? 'var(--ink-mute)' : 'var(--ink)',
+              }}
+            >
+              {isSyncing ? 'Menyinkronkan...' : (syncFeedback ?? 'Sync Foto ke Supabase')}
+            </button>
 
             <button
               type="button"
@@ -396,6 +448,36 @@ export function NewsPortalClient({ initialArticles }: Props) {
               </div>
             )}
 
+            {isGenerating && (
+              <div
+                style={{
+                  padding: '10px 14px',
+                  borderRadius: 'var(--radius-sm)',
+                  background: 'rgba(16, 185, 129, 0.08)',
+                  border: '1px solid rgba(16, 185, 129, 0.25)',
+                  color: 'var(--ink)',
+                  fontSize: 'var(--t-small)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                }}
+              >
+                <span
+                  style={{
+                    display: 'inline-block',
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    background: '#10b981',
+                    boxShadow: '0 0 8px #10b981',
+                  }}
+                />
+                <span style={{ fontFamily: 'var(--mono)', fontSize: 12 }}>
+                  {generatingStage || 'Memproses analisis...'}
+                </span>
+              </div>
+            )}
+
             <div
               style={{
                 display: 'flex',
@@ -492,6 +574,22 @@ export function NewsPortalClient({ initialArticles }: Props) {
                 >
                   DAMPAK {heroArticle.impactScore}/10
                 </span>
+                {heroArticle.featuredImage?.url?.includes('supabase.co') && (
+                  <span
+                    style={{
+                      background: 'rgba(16, 185, 129, 0.4)',
+                      border: '1px solid rgba(52, 211, 153, 0.5)',
+                      color: '#a7f3d0',
+                      padding: '3px 8px',
+                      borderRadius: 'var(--radius-sm)',
+                      backdropFilter: 'blur(4px)',
+                      fontWeight: 600,
+                    }}
+                    title="Aset foto tersimpan di Supabase Storage"
+                  >
+                    Supabase Storage
+                  </span>
+                )}
                 {heroArticle.youtubeVideo && (
                   <span
                     style={{
@@ -611,6 +709,12 @@ export function NewsPortalClient({ initialArticles }: Props) {
                       </span>
                       <span>·</span>
                       <span>{subArticle.readingTimeMinutes} mnt baca</span>
+                      {subArticle.featuredImage?.url?.includes('supabase.co') && (
+                        <>
+                          <span>·</span>
+                          <span style={{ color: 'var(--positive, #10b981)', fontWeight: 600 }}>Supabase</span>
+                        </>
+                      )}
                     </div>
 
                     <h3 className="news-sub-title">
@@ -726,7 +830,13 @@ export function NewsPortalClient({ initialArticles }: Props) {
                   >
                     <span>{article.category.toUpperCase()}</span>
                     <span>·</span>
-                    <span>{article.readingTimeMinutes} mnt baca</span>
+                    <span>{article.readingTimeMinutes} mnt</span>
+                    {article.featuredImage?.url?.includes('supabase.co') && (
+                      <>
+                        <span>·</span>
+                        <span style={{ color: 'var(--positive, #10b981)', fontWeight: 600 }}>Supabase</span>
+                      </>
+                    )}
                     {article.youtubeVideo && (
                       <>
                         <span>·</span>

@@ -191,6 +191,20 @@ export default async function BeritaDetailPage({ params }: Props) {
               >
                 {article.featuredImage.caption}
                 {article.featuredImage.credit && ` (${article.featuredImage.credit})`}
+                {article.featuredImage.url.includes('supabase.co') && (
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      marginLeft: 8,
+                      color: 'var(--positive, #10b981)',
+                      fontWeight: 500,
+                    }}
+                  >
+                    · Supabase Storage
+                  </span>
+                )}
               </figcaption>
             )}
           </figure>

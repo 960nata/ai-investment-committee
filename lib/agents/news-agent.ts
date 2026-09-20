@@ -13,6 +13,7 @@
 
 import { complete } from '@/lib/ai/registry'
 import { saveMarketNews, getMarketNewsList } from '@/lib/db/news-queries'
+import { mirrorInternetImageToSupabase } from '@/lib/storage/supabase-storage'
 import type { NewMarketNews } from '@/lib/db/schema'
 
 export interface GenerateArticleInput {
@@ -66,6 +67,36 @@ const THEMATIC_IMAGES = {
     caption: 'Dinamika aset kripto dan adopsi institusi terhadap aset digital terdesentralisasi.',
     credit: 'Unsplash / Dmitry Demidko',
     alt: 'Bitcoin Cryptocurrency Digital Asset'
+  },
+  copper_mining: {
+    url: 'https://images.unsplash.com/photo-1578328819058-b69f3a3b0f6b?auto=format&fit=crop&w=1200&q=80',
+    caption: 'Kabel tembaga dan logam industri esensial sebagai penghantar listrik utama bagi infrastruktur komputasi AI.',
+    credit: 'Unsplash / Dan Meyers',
+    alt: 'Copper Mining & Electrical Infrastructure'
+  },
+  banking_finance: {
+    url: 'https://images.unsplash.com/photo-1501167786227-4cba60f6d58f?auto=format&fit=crop&w=1200&q=80',
+    caption: 'Gedung pencakar langit finansial dan aktivitas perbankan korporasi penopang likuiditas ekonomi riil.',
+    credit: 'Unsplash / Sean Pollock',
+    alt: 'Banking & Financial District Capital'
+  },
+  geothermal_green: {
+    url: 'https://images.unsplash.com/photo-1466611653911-95081537e5b7?auto=format&fit=crop&w=1200&q=80',
+    caption: 'Pembangkit energi baru terbarukan dan pasokan listrik ramah lingkungan tanpa emisi karbon.',
+    credit: 'Unsplash / Karsten Würth',
+    alt: 'Renewable Clean Energy Infrastructure'
+  },
+  oil_energy: {
+    url: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1200&q=80',
+    caption: 'Fasilitas eksplorasi dan transmisi minyak dan gas bumi penggerak ketahanan energi global.',
+    credit: 'Unsplash / Matthew Henry',
+    alt: 'Oil & Gas Energy Sector'
+  },
+  ai_software: {
+    url: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=1200&q=80',
+    caption: 'Arsitektur algoritma dan perangkat lunak komputasi kecerdasan buatan enterprise.',
+    credit: 'Unsplash / Fabian Grohs',
+    alt: 'AI Software & Algorithm Code'
   }
 }
 
@@ -312,7 +343,18 @@ export async function seedInitialNewsArticles(): Promise<void> {
   if (existing.length === 0) {
     console.log('[NewsAgent] Memasukkan artikel bibit intelijen pasar awal...')
     for (const article of SEED_ARTICLES) {
-      await saveMarketNews(article)
+      const art = { ...article }
+      if (art.featuredImage?.url) {
+        try {
+          const mirror = await mirrorInternetImageToSupabase(art.featuredImage.url, art.slug)
+          if (mirror.isMirrored) {
+            art.featuredImage = { ...art.featuredImage, url: mirror.url }
+          }
+        } catch {
+          // graceful fallback jika offline
+        }
+      }
+      await saveMarketNews(art)
     }
     console.log(`[NewsAgent] Berhasil memasukkan ${SEED_ARTICLES.length} artikel awal.`)
   }
@@ -340,6 +382,23 @@ export function resolveInternetPhoto(
     return THEMATIC_IMAGES.semiconductor
   }
   if (
+    syms.some((x) => x.includes('ammn') || x.includes('tembaga') || x.includes('copper')) ||
+    t.includes('tembaga') ||
+    t.includes('copper') ||
+    t.includes('kabel')
+  ) {
+    return THEMATIC_IMAGES.copper_mining
+  }
+  if (
+    syms.some((x) => x.includes('bbca') || x.includes('bbri') || x.includes('bmri') || x.includes('bbni')) ||
+    t.includes('bank') ||
+    t.includes('perbankan') ||
+    t.includes('kredit') ||
+    t.includes('casa')
+  ) {
+    return THEMATIC_IMAGES.banking_finance
+  }
+  if (
     syms.some((x) => x.includes('gold') || x.includes('antm')) ||
     t.includes('emas') ||
     t.includes('bullion')
@@ -347,10 +406,32 @@ export function resolveInternetPhoto(
     return THEMATIC_IMAGES.gold_commodity
   }
   if (
-    syms.some((x) => x.includes('bren') || x.includes('ammn') || x.includes('pgas')) ||
+    syms.some((x) => x.includes('bren') || x.includes('pgeo')) ||
+    t.includes('panas bumi') ||
+    t.includes('geotermal') ||
+    t.includes('terbarukan')
+  ) {
+    return THEMATIC_IMAGES.geothermal_green
+  }
+  if (
+    syms.some((x) => x.includes('pgas') || x.includes('medc')) ||
+    t.includes('minyak') ||
+    t.includes('gas') ||
+    t.includes('crude oil')
+  ) {
+    return THEMATIC_IMAGES.oil_energy
+  }
+  if (
+    syms.some((x) => x.includes('pltr')) ||
+    t.includes('software') ||
+    t.includes('algoritma') ||
+    t.includes('model ai')
+  ) {
+    return THEMATIC_IMAGES.ai_software
+  }
+  if (
     t.includes('energi') ||
     t.includes('listrik') ||
-    t.includes('panas bumi') ||
     t.includes('nuklir')
   ) {
     return THEMATIC_IMAGES.nuclear_energy
@@ -465,8 +546,26 @@ Artikel HARUS memenuhi kriteria:
     }
   }
 
-  // Pilih foto internet terverifikasi (bukan AI generative, murni data foto internet)
-  const featuredImg = resolveInternetPhoto(category, parsed.title || defaultTopic, targetSymbols)
+  // Jamin slug bersih, aman URL, dan ramah SEO
+  const rawCandidate = parsed.slug || parsed.title || defaultTopic
+  const cleanSlug = slugify(rawCandidate) || `analisis-${Date.now().toString(36)}`
+
+  // 1. Pilih foto internet terverifikasi (resolusi tinggi editorial sesuai topik)
+  const featuredImg = { ...resolveInternetPhoto(category, parsed.title || defaultTopic, targetSymbols) }
+
+  // 2. Unduh foto internet & unggah langsung ke Supabase Storage (bucket: 'ai investasi')
+  if (featuredImg.url) {
+    try {
+      console.log(`[NewsAgent] Mengunggah foto internet ke Supabase Storage untuk artikel: ${cleanSlug}...`)
+      const mirrorResult = await mirrorInternetImageToSupabase(featuredImg.url, cleanSlug)
+      if (mirrorResult.isMirrored) {
+        featuredImg.url = mirrorResult.url
+        console.log(`[NewsAgent] Foto tersimpan di Supabase Storage: ${featuredImg.url}`)
+      }
+    } catch (imgErr) {
+      console.warn('[NewsAgent] Peringatan unggah foto ke Supabase Storage, menggunakan foto internet asli:', imgErr)
+    }
+  }
 
   let videoEmbed = CURATED_YOUTUBE_VIDEOS.ai_power_crisis
   if (category === 'ekonomi-makro' || category === 'crypto-fintech') {
@@ -475,10 +574,7 @@ Artikel HARUS memenuhi kriteria:
     videoEmbed = CURATED_YOUTUBE_VIDEOS.idx_indonesia_economy
   }
 
-  // Jamin slug bersih, aman URL, dan ramah SEO
-  const rawCandidate = parsed.slug || parsed.title || defaultTopic
-  const cleanSlug = slugify(rawCandidate) || `analisis-${Date.now().toString(36)}`
-
+  // 3. Selesai upload foto, baru buat data artikel dan simpan ke database
   const newArticle: NewMarketNews = {
     slug: cleanSlug,
     title: parsed.title || defaultTopic,
@@ -500,6 +596,51 @@ Artikel HARUS memenuhi kriteria:
   // Simpan ke database
   const saved = await saveMarketNews(newArticle)
   return saved
+}
+
+/**
+ * Sinkronkan gambar artikel yang sudah ada di database agar juga ter-hosting
+ * di Supabase Storage.
+ */
+export async function syncExistingNewsImagesToSupabase(): Promise<{ updated: number; skipped: number }> {
+  const articles = await getMarketNewsList({ limit: 100 })
+  let updated = 0
+  let skipped = 0
+
+  for (const article of articles) {
+    if (article.featuredImage?.url && !article.featuredImage.url.includes('supabase.co')) {
+      const res = await mirrorInternetImageToSupabase(article.featuredImage.url, article.slug)
+      if (res.isMirrored) {
+        await saveMarketNews({
+          slug: article.slug,
+          title: article.title,
+          summary: article.summary,
+          category: article.category,
+          tags: article.tags,
+          mentionedSymbols: article.mentionedSymbols,
+          sentiment: article.sentiment,
+          impactScore: article.impactScore,
+          featuredImage: {
+            ...article.featuredImage,
+            url: res.url,
+          },
+          youtubeVideo: article.youtubeVideo,
+          keyTakeaways: article.keyTakeaways,
+          contentMarkdown: article.contentMarkdown,
+          author: article.author,
+          readingTimeMinutes: article.readingTimeMinutes,
+          publishedAt: article.publishedAt,
+        })
+        updated++
+      } else {
+        skipped++
+      }
+    } else {
+      skipped++
+    }
+  }
+
+  return { updated, skipped }
 }
 
 /**
