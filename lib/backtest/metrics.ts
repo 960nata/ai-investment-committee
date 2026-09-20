@@ -7,9 +7,15 @@
  * dengan cara yang membuat hasilnya terlihat lebih bagus, bukan lebih buruk.
  */
 
-/** Peringkat dengan rata-rata untuk nilai yang sama. Dipakai korelasi Spearman. */
-export function rank(values: readonly number[]): number[] {
-  const order = values.map((v, i) => ({ v, i })).sort((a, b) => a.v - b.v)
+/**
+ * Peringkat dengan rata-rata untuk nilai yang sama. Dipakai korelasi Spearman.
+ *
+ * Menerima larik biasa maupun `Float64Array`. Runner menyimpan jutaan nilai
+ * dalam larik bertipe supaya muat di memori, dan memaksanya jadi larik biasa
+ * hanya untuk dipanggil di sini akan membatalkan penghematan itu.
+ */
+export function rank(values: ArrayLike<number>): number[] {
+  const order = Array.from(values, (v, i) => ({ v, i })).sort((a, b) => a.v - b.v)
   const out = new Array<number>(values.length)
 
   let i = 0
@@ -34,7 +40,7 @@ export function rank(values: readonly number[]): number[] {
  * ketepatan nilainya. Imbal hasil saham berekor gemuk, dan satu hari ekstrem
  * bisa menggerakkan korelasi Pearson sendirian.
  */
-export function spearman(a: readonly number[], b: readonly number[]): number | null {
+export function spearman(a: ArrayLike<number>, b: ArrayLike<number>): number | null {
   if (a.length !== b.length || a.length < 3) return null
 
   const ra = rank(a)

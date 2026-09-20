@@ -13,7 +13,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { IconFlow, IconGauge, IconPulse, IconRows } from './icons'
+import { IconFlow, IconGauge, IconPulse, IconRows, IconNews } from './icons'
 
 export const SECTIONS = [
   {
@@ -21,6 +21,7 @@ export const SECTIONS = [
     links: [
       { href: '/', label: 'Ringkasan', icon: IconGauge },
       { href: '/instruments', label: 'Instrumen', icon: IconRows },
+      { href: '/berita', label: 'Warta & Intelijen AI', icon: IconNews },
     ],
   },
   {

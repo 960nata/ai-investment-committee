@@ -168,6 +168,212 @@ const MARKS: Record<string, { fill: string; glyph: React.ReactNode }> = {
       </>
     ),
   },
+  SHIB: {
+    fill: '#f04124',
+    glyph: (
+      <>
+        <path d="M6 7l3 4.5h6L18 7l-2 5.5 3 2.5-3 2-4 1-4-1-3-2 3-2.5z" />
+        <circle cx="9.5" cy="11.5" r="0.8" fill="#f04124" />
+        <circle cx="14.5" cy="11.5" r="0.8" fill="#f04124" />
+      </>
+    ),
+  },
+  PEPE: {
+    fill: '#2e7d32',
+    glyph: (
+      <>
+        <circle cx="8" cy="8.5" r="2.8" />
+        <circle cx="16" cy="8.5" r="2.8" />
+        <circle cx="8" cy="8.5" r="1.2" fill="#2e7d32" />
+        <circle cx="16" cy="8.5" r="1.2" fill="#2e7d32" />
+        <path d="M5.5 13.5c2.5 3 10.5 3 13 0" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" fill="none" />
+      </>
+    ),
+  },
+  WIF: {
+    fill: '#e91e63',
+    glyph: (
+      <>
+        {/* Topi rajut beanie */}
+        <path d="M7 11c0-4 2.5-6 5-6s5 2 5 6H7z" />
+        <circle cx="12" cy="4.2" r="1.2" />
+        <rect x="6" y="11" width="12" height="2.5" rx="0.5" />
+        <circle cx="9.5" cy="16.5" r="1" />
+        <circle cx="14.5" cy="16.5" r="1" />
+        <path d="M11 18.5h2" stroke="#fff" strokeWidth="1.2" strokeLinecap="round" />
+      </>
+    ),
+  },
+  BONK: {
+    fill: '#f57c00',
+    glyph: (
+      <>
+        <path d="M6.5 7l2 3h7l2-3-1 6-3 4-3 1-3-1-3-4z" />
+        <circle cx="10" cy="11.5" r="1" fill="#f57c00" />
+        <circle cx="14" cy="11.5" r="1" fill="#f57c00" />
+      </>
+    ),
+  },
+  FLOKI: {
+    fill: '#ff9800',
+    glyph: (
+      <>
+        {/* Helm viking bertanduk */}
+        <path d="M5 8c1 3 2 4 4 4l3-6 3 6c2 0 3-1 4-4-1 6-3 9-7 9s-6-3-7-9z" />
+        <path d="M4 6c1 2 2 3 3 3M20 6c-1 2-2 3-3 3" stroke="#fff" strokeWidth="1.2" strokeLinecap="round" fill="none" />
+      </>
+    ),
+  },
+  PNUT: {
+    fill: '#795548',
+    glyph: (
+      <>
+        {/* Bentuk kacang / peanut */}
+        <path d="M9.5 5.5a3.2 3.2 0 0 1 5 0c1 1.5.2 3-.8 4.2 1 1.2 1.8 2.7.8 4.2a3.2 3.2 0 0 1-5 0c-1-1.5-.2-3 .8-4.2-1-1.2-1.8-2.7-.8-4.2z" />
+      </>
+    ),
+  },
+  GOAT: {
+    fill: '#d4af37',
+    glyph: (
+      <>
+        {/* Tanduk kambing melengkung */}
+        <path d="M7 6c-2 2-2 5 0 7l2-1c-1-2-1-4 0-5l-2-1zm10 0c2 2 2 5 0 7l-2-1c1-2 1-4 0-5l2-1z" />
+        <path d="M9 11l3 7 3-7z" />
+      </>
+    ),
+  },
+  MOODENG: {
+    fill: '#ec407a',
+    glyph: (
+      <>
+        {/* Wajah kudanil mini membulat */}
+        <circle cx="12" cy="12" r="6.5" />
+        <circle cx="7" cy="7.5" r="1.8" />
+        <circle cx="17" cy="7.5" r="1.8" />
+        <circle cx="9.5" cy="11" r="1" fill="#ec407a" />
+        <circle cx="14.5" cy="11" r="1" fill="#ec407a" />
+        <ellipse cx="12" cy="14.5" rx="2.5" ry="1.2" fill="#ec407a" />
+      </>
+    ),
+  },
+  POPCAT: {
+    fill: '#ff5722',
+    glyph: (
+      <>
+        <path d="M6 8l3 3h6l3-3-1 6-2 3H9L7 14z" />
+        <circle cx="12" cy="13.5" r="2.8" fill="#ff5722" />
+      </>
+    ),
+  },
+  BRETT: {
+    fill: '#1976d2',
+    glyph: (
+      <>
+        <circle cx="12" cy="12" r="6.5" />
+        <rect x="7" y="10" width="10" height="2.5" rx="0.5" fill="#1976d2" />
+        <path d="M9 15c1.5 1.2 4.5 1.2 6 0" stroke="#1976d2" strokeWidth="1.2" strokeLinecap="round" />
+      </>
+    ),
+  },
+  PENGU: {
+    fill: '#0288d1',
+    glyph: (
+      <>
+        <ellipse cx="12" cy="12.5" rx="5" ry="6" />
+        <ellipse cx="12" cy="13.5" rx="3.2" ry="4" fill="#0288d1" />
+        <polygon points="12,10 10.5,12 13.5,12" fill="#ffb300" />
+      </>
+    ),
+  },
+  TRUMP: {
+    fill: '#c62828',
+    glyph: (
+      <>
+        {/* Siluet rambut dan wajah khas */}
+        <path d="M6 7c3-3 9-3 12-1-1 3-2 4-5 4H8z" fill="#ffc107" />
+        <path d="M8 10h8l-1.5 6-2.5 2-2.5-2z" />
+      </>
+    ),
+  },
+  CAT: {
+    fill: '#8e24aa',
+    glyph: (
+      <>
+        <polygon points="6,9 9,5 11,8" />
+        <polygon points="18,9 15,5 13,8" />
+        <circle cx="12" cy="13" r="5" />
+      </>
+    ),
+  },
+  '1000CAT': {
+    fill: '#8e24aa',
+    glyph: (
+      <>
+        <polygon points="6,9 9,5 11,8" />
+        <polygon points="18,9 15,5 13,8" />
+        <circle cx="12" cy="13" r="5" />
+      </>
+    ),
+  },
+  BABYDOGE: {
+    fill: '#f57c00',
+    glyph: (
+      <>
+        <circle cx="12" cy="12" r="6" />
+        <circle cx="7" cy="8" r="2" />
+        <circle cx="17" cy="8" r="2" />
+      </>
+    ),
+  },
+  '1MBABYDOGE': {
+    fill: '#f57c00',
+    glyph: (
+      <>
+        <circle cx="12" cy="12" r="6" />
+        <circle cx="7" cy="8" r="2" />
+        <circle cx="17" cy="8" r="2" />
+      </>
+    ),
+  },
+  DOGS: {
+    fill: '#212121',
+    glyph: (
+      <>
+        <circle cx="12" cy="12" r="6" />
+        <ellipse cx="8.5" cy="10" rx="1" ry="1.5" fill="#212121" />
+        <ellipse cx="15.5" cy="10" rx="1" ry="1.5" fill="#212121" />
+      </>
+    ),
+  },
+  NOT: {
+    fill: '#263238',
+    glyph: (
+      <path d="M7 6h10l-5 12z" />
+    ),
+  },
+  HMSTR: {
+    fill: '#ff9800',
+    glyph: (
+      <>
+        <circle cx="12" cy="13" r="5.5" />
+        <circle cx="7.5" cy="8.5" r="2" />
+        <circle cx="16.5" cy="8.5" r="2" />
+      </>
+    ),
+  },
+  VIRTUAL: {
+    fill: '#00e5ff',
+    glyph: (
+      <path d="M6 6l6 12 6-12h-3l-3 7-3-7z" />
+    ),
+  },
+  LUNC: {
+    fill: '#ffd600',
+    glyph: (
+      <path d="M12 4a8 8 0 1 0 8 8 6 6 0 1 1-8-8z" />
+    ),
+  },
   TRX: {
     fill: '#eb0029',
     glyph: <path d="M4.6 5.8 19.4 9l-8.2 10.2zm2.8 2.1 3.6 8.9 4.6-5.7z" />,

@@ -58,3 +58,6 @@ next-env.d.ts
 
 # file instruksi agen lokal, tidak ikut repo
 CLAUDE.md
+.claude
+*claude*
+

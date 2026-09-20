@@ -71,7 +71,7 @@ export class LlmError extends Error {
 export function classifyStatus(status: number): LlmFailureKind {
   if (status === 429) return 'rate_limited'
   if (status === 401 || status === 403) return 'auth'
-  if (status >= 500) return 'server'
+  if (status === 404 || status >= 500) return 'server'
   return 'bad_request'
 }
 

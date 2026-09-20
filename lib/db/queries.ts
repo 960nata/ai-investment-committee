@@ -729,6 +729,24 @@ export async function listLatestVerdicts(limit = 20) {
     .limit(limit)
 }
 
+export async function getLatestAgentSessionForSymbol(market: MarketCode, symbol: string) {
+  const sessions = await db
+    .select()
+    .from(agentSession)
+    .where(and(eq(agentSession.market, toDbMarket(market)), eq(agentSession.symbol, symbol)))
+    .orderBy(desc(agentSession.startedAt))
+    .limit(1)
+
+  const session = sessions[0] ?? null
+  if (!session) return null
+
+  const transcript = await getAgentTranscript(session.id)
+  return {
+    session,
+    turns: transcript,
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Fitur harian
 // ---------------------------------------------------------------------------

@@ -62,6 +62,7 @@ export function collectKeys(envPrefix: string): PooledKey[] {
   }
 
   add(envPrefix, process.env[envPrefix])
+  add(`${envPrefix}_1`, process.env[`${envPrefix}_1`])
 
   // Batas 100 bukan asumsi soal jumlah kunci, hanya penjaga agar pemindaian
   // selalu berhenti. Nomor yang tidak ada dilewati, bukan mengakhiri perulangan.

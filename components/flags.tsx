@@ -250,6 +250,44 @@ export function FlagBrazil(p: { size?: number }) {
   )
 }
 
+export function FlagNetherlands(p: { size?: number }) {
+  return <Flag label="Belanda" {...p}><Bands colours={['#ae1c28', W, '#21468b']} /></Flag>
+}
+
+export function FlagSwitzerland(p: { size?: number }) {
+  return (
+    <Flag label="Swiss" {...p}>
+      <rect width="21" height="14" fill="#d52b1e" />
+      <rect x="9" y="3.5" width="3" height="7" fill={W} />
+      <rect x="7" y="5.5" width="7" height="3" fill={W} />
+    </Flag>
+  )
+}
+
+export function FlagItaly(p: { size?: number }) {
+  return <Flag label="Italia" {...p}><Bands vertical colours={['#009246', W, '#ce2b37']} /></Flag>
+}
+
+export function FlagCanada(p: { size?: number }) {
+  return (
+    <Flag label="Kanada" {...p}>
+      <rect width="21" height="14" fill="#d80621" />
+      <rect x="5.25" width="10.5" height="14" fill={W} />
+      <path d="M10.5 3.2 11.4 5.4l2-.6-.8 1.8 1.6.8-1.7 1.4.3 1.6-2-.8-.3 1.8-.3-1.8-2 .8.3-1.6-1.7-1.4 1.6-.8-.8-1.8 2 .6z" fill="#d80621" />
+    </Flag>
+  )
+}
+
+export function FlagSaudiArabia(p: { size?: number }) {
+  return (
+    <Flag label="Arab Saudi" {...p}>
+      <rect width="21" height="14" fill="#006c35" />
+      <rect x="5" y="5" width="11" height="2" fill={W} rx="0.5" />
+      <path d="M5 9h11M5 9l2-1.5M5 9l2 1.5" stroke={W} strokeWidth="0.8" fill="none" />
+    </Flag>
+  )
+}
+
 /** Untuk aset yang tidak terikat satu negara: emas, komoditi, indeks dolar. */
 export function FlagGlobal(p: { size?: number }) {
   return (
@@ -278,6 +316,11 @@ const BY_REGION: Record<string, (p: { size?: number }) => React.ReactElement> = 
   Inggris: FlagUnitedKingdom,
   Jerman: FlagGermany,
   Prancis: FlagFrance,
+  Belanda: FlagNetherlands,
+  Swiss: FlagSwitzerland,
+  Italia: FlagItaly,
+  Kanada: FlagCanada,
+  'Arab Saudi': FlagSaudiArabia,
   'Zona Euro': FlagEuropeanUnion,
   Brasil: FlagBrazil,
   Global: FlagGlobal,

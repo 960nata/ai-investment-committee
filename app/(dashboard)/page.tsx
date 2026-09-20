@@ -32,7 +32,7 @@ import {
   STALE_AFTER_MINUTES,
   type DashboardStats,
 } from '@/lib/db/queries'
-import { ASSET_CLASSES } from '@/lib/db/schema'
+import { TAB_LAYOUT } from '@/lib/db/schema'
 import { MODEL_VERSION } from '@/lib/scoring/weights'
 import type { HorizonView } from '@/components/score-panel'
 import { isQStashConfigured } from '@/lib/queue/qstash'
@@ -66,87 +66,13 @@ export default async function OverviewPage() {
       {error && <DatabaseNotice detail={error} />}
 
       {data && (
-        <>
-          <div className="statusbar">
-            <span className="status-item">
-              <Lamp state={data.adapterState} />
-              {data.adapterSummary}
-            </span>
-
-            <span className="status-item">
-              <IconClock size={14} />
-              {data.stats.latestCandleDate ?? 'belum ada data'}
-              <span style={{ color: 'var(--ink-faint)' }}>·</span>
-              {describeAge(data.stats.ageMinutes)}
-            </span>
-
-            <span className="status-item">
-              <Lamp state={freshnessState(data.stats.freshness)} />
-              {freshnessLabel(data.stats.freshness)}
-            </span>
-
-            <span className="status-item">
-              <IconQueue size={14} />
-              antrian {data.queueConfigured ? 'aktif' : 'belum diset'}
-            </span>
-
-            <span className="status-item status-spacer">
-              <Lamp state={data.cacheAvailable ? 'ok' : 'unknown'} />
-              cache {data.cacheAvailable ? 'aktif' : 'belum diset'}
-            </span>
-          </div>
-
-          <div className="readouts">
-            <Readout
-              icon={<IconRows size={14} />}
-              label="Instrumen"
-              value={data.stats.instrumentCount.toLocaleString('id-ID')}
-              note={
-                data.stats.perMarket.length > 0
-                  ? data.stats.perMarket.map((m) => `${m.market} ${m.instruments}`).join(' · ')
-                  : 'belum ada yang terdaftar'
-              }
-            />
-
-            <Readout
-              icon={<IconCandles size={14} />}
-              label="Candle harian"
-              value={data.stats.candleCount.toLocaleString('id-ID')}
-              note="riwayat yang ditabung sendiri"
-            />
-
-            <Readout
-              icon={<IconPlug size={14} />}
-              label="Adapter sehat"
-              value={`${data.healthy}/${data.adapterCount}`}
-              note="dibaca dari data_source_health"
-              track={{
-                value: data.adapterCount === 0 ? null : data.healthy / data.adapterCount,
-                state: data.adapterState,
-              }}
-            />
-
-            <Readout
-              icon={<IconFlask size={14} />}
-              label="Karantina"
-              value={data.stats.quarantinedCount.toLocaleString('id-ID')}
-              quiet={data.stats.quarantinedCount === 0}
-              note={
-                data.stats.quarantinedCount === 0
-                  ? 'tidak ada baris yang ditolak'
-                  : 'ditahan untuk diperiksa, bukan dibuang'
-              }
-            />
-          </div>
-
-          <InstrumentExplorer
-            instruments={data.instruments}
-            scores={data.scores}
-            tabs={data.tabs}
-            initialInstrumentId={data.initialInstrumentId}
-            initialCandles={data.initialCandles}
-          />
-        </>
+        <InstrumentExplorer
+          instruments={data.instruments}
+          scores={data.scores}
+          tabs={data.tabs}
+          initialInstrumentId={data.initialInstrumentId}
+          initialCandles={data.initialCandles}
+        />
       )}
 
       {!data && !error && (
@@ -248,7 +174,15 @@ async function load() {
   const healthy = health.filter((h) => h.status === 'healthy').length
 
   // Tab hanya menampilkan kelas aset yang benar-benar punya instrumen.
+  // Grup yang seluruh anaknya kosong disingkirkan; anak yang kosong di dalam
+  // grup yang masih punya anak lain ikut disingkirkan juga.
   const present = new Set(instruments.map((i) => i.assetClass))
+  const tabs = TAB_LAYOUT
+    .map((group) => ({
+      ...group,
+      children: group.children.filter((c) => present.has(c.id)),
+    }))
+    .filter((group) => group.children.length > 0)
 
   return {
     stats,
@@ -258,7 +192,7 @@ async function load() {
     adapterSummary: adapterSummary(health.map((h) => h.status)),
     instruments,
     scores: scoresByInstrument,
-    tabs: ASSET_CLASSES.filter((c) => present.has(c.id)),
+    tabs,
     initialInstrumentId,
     initialCandles,
     queueConfigured: isQStashConfigured(),

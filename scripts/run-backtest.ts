@@ -10,7 +10,11 @@ import './load-env'
 import { runBacktest } from '../lib/backtest/runner'
 import { describeIc } from '../lib/backtest/metrics'
 import { saveBacktestRun } from '../lib/db/queries'
+import { FEATURES } from '../lib/features/registry'
 import type { MarketCode } from '../lib/db/schema'
+
+/** Label manusiawi tiap fitur, dipakai menamai hasil kalibrasi. */
+const FEATURE_LABEL = new Map(FEATURES.map((f) => [f.name, f.label]))
 
 function flag(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`)
@@ -43,6 +47,17 @@ async function main(): Promise<void> {
     )
   }
 
+  console.log('\nArah diasumsikan registry, atas baris uji yang sama')
+  for (const [horizon, m] of Object.entries(result.assumed)) {
+    console.log(
+      `  ${horizon.padEnd(11)} ${String(m.n).padStart(6)} ${String(m.effectiveN).padStart(14)}` +
+        `  ${pct(m.hitRate).padStart(8)}  ${pct(m.baseRate).padStart(6)}` +
+        `  ${(m.ic === null ? '—' : m.ic.toFixed(3)).padStart(6)}` +
+        `  ${(m.icir === null ? '—' : m.icir.toFixed(2)).padStart(5)}` +
+        `  ${pct(m.topMinusBottom, 2).padStart(10)}`,
+    )
+  }
+
   console.log('\nKesimpulan')
   for (const [horizon, m] of Object.entries(result.horizons)) {
     console.log(`  ${horizon.padEnd(11)} ${m.verdict.kind.toUpperCase().padEnd(16)} ${m.verdict.reason}`)
@@ -65,6 +80,28 @@ async function main(): Promise<void> {
     )
   }
 
+  console.log('\nKalibrasi maju, horizon menengah')
+  for (const f of result.folds.menengah) {
+    console.log(
+      `  uji ${f.from} sampai ${f.to} · latih ${f.trainDates} tanggal` +
+        ` · ${f.featuresUsed} fitur dipakai, ${f.featuresDropped} dibuang`,
+    )
+  }
+
+  const lolos = result.calibration.menengah.filter((c) => c.direction !== null)
+  if (lolos.length === 0) {
+    console.log('  Tidak ada fitur yang lolos di lipatan terakhir.')
+  } else {
+    console.log(`\n  Yang lolos di lipatan terakhir (${lolos.length} fitur)`)
+    for (const c of lolos.slice(0, 8)) {
+      const arah = c.direction === 1 ? 'searah' : 'terbalik'
+      console.log(
+        `    ${(FEATURE_LABEL.get(c.feature) ?? c.feature).padEnd(34)} ${arah.padEnd(9)}` +
+          ` IC ${(c.ic ?? 0).toFixed(4).padStart(8)}  t ${(c.tStat ?? 0).toFixed(2).padStart(6)}`,
+      )
+    }
+  }
+
   console.log('\nPer kondisi pasar, horizon menengah')
   for (const [regime, m] of Object.entries(result.byRegime.menengah)) {
     console.log(`  ${regime.padEnd(12)} n=${String(m.n).padStart(6)}  hit ${pct(m.hitRate).padStart(7)}  IC ${(m.ic === null ? '—' : m.ic.toFixed(3)).padStart(6)}`)
@@ -75,7 +112,14 @@ async function main(): Promise<void> {
     featureSetVersion: result.featureSetVersion,
     market: result.market,
     config: { instruments: result.instruments, from: result.from, to: result.to, limit: limit ?? null },
-    metrics: { horizons: result.horizons, featureIc: result.featureIc, byRegime: result.byRegime },
+    metrics: {
+      horizons: result.horizons,
+      assumed: result.assumed,
+      featureIc: result.featureIc,
+      calibration: result.calibration,
+      folds: result.folds,
+      byRegime: result.byRegime,
+    },
   })
 
   console.log(`\nTersimpan sebagai backtest #${id}, selesai dalam ${((Date.now() - started) / 1000).toFixed(0)} detik\n`)

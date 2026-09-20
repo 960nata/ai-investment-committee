@@ -222,6 +222,35 @@ export const ASSET_CLASSES: { id: AssetClass; label: string }[] = [
   { id: 'indeks', label: 'Indeks' },
 ]
 
+/**
+ * Tata letak tab di antarmuka, dengan pengelompokan.
+ *
+ * Crypto dan meme coin satu tab karena keduanya diperdagangkan di bursa yang
+ * sama. Tapi profil risikonya berbeda, jadi di dalam tab itu ada sub-filter
+ * supaya pengguna bisa melihat masing-masing secara terpisah.
+ */
+export interface TabGroup {
+  id: string
+  label: string
+  /** Kelas aset yang termasuk di tab ini. Kalau lebih dari satu, sub-tab muncul. */
+  children: { id: AssetClass; label: string }[]
+}
+
+export const TAB_LAYOUT: TabGroup[] = [
+  {
+    id: 'crypto',
+    label: 'Crypto',
+    children: [
+      { id: 'crypto', label: 'Crypto' },
+      { id: 'memecoin', label: 'Meme Coin' },
+    ],
+  },
+  { id: 'saham', label: 'Saham', children: [{ id: 'saham', label: 'Saham' }] },
+  { id: 'emas', label: 'Emas', children: [{ id: 'emas', label: 'Emas' }] },
+  { id: 'komoditi', label: 'Komoditi', children: [{ id: 'komoditi', label: 'Komoditi' }] },
+  { id: 'indeks', label: 'Indeks', children: [{ id: 'indeks', label: 'Indeks' }] },
+]
+
 export type Instrument = typeof instrument.$inferSelect
 export type NewInstrument = typeof instrument.$inferInsert
 export type CandleRow = typeof candleDaily.$inferSelect
@@ -513,3 +542,49 @@ export const backtestRun = pgTable(
 )
 
 export type BacktestRunRow = typeof backtestRun.$inferSelect
+
+// ---------------------------------------------------------------------------
+// Berita & Intelijen Pasar AI
+// ---------------------------------------------------------------------------
+
+export const marketNews = pgTable(
+  'market_news',
+  {
+    id: serial('id').primaryKey(),
+    slug: varchar('slug', { length: 180 }).notNull(),
+    title: varchar('title', { length: 255 }).notNull(),
+    summary: text('summary').notNull(),
+    category: varchar('category', { length: 48 }).notNull().default('ekonomi-makro'),
+    tags: jsonb('tags').$type<string[]>().notNull().default([]),
+    mentionedSymbols: jsonb('mentioned_symbols').$type<string[]>().notNull().default([]),
+    sentiment: varchar('sentiment', { length: 16 }).notNull().default('neutral'),
+    impactScore: integer('impact_score').notNull().default(5),
+    featuredImage: jsonb('featured_image').$type<{
+      url: string
+      caption?: string
+      credit?: string
+      alt: string
+    } | null>(),
+    youtubeVideo: jsonb('youtube_video').$type<{
+      videoId: string
+      title: string
+      channel: string
+      relevance?: string
+    } | null>(),
+    keyTakeaways: jsonb('key_takeaways').$type<string[]>().notNull().default([]),
+    contentMarkdown: text('content_markdown').notNull(),
+    author: varchar('author', { length: 64 }).notNull().default('AI Intelligence Desk'),
+    readingTimeMinutes: integer('reading_time_minutes').notNull().default(3),
+    publishedAt: timestamp('published_at', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('market_news_slug_uq').on(t.slug),
+    index('market_news_category_idx').on(t.category),
+    index('market_news_published_at_idx').on(t.publishedAt),
+  ],
+)
+
+export type MarketNewsRow = typeof marketNews.$inferSelect
+export type NewMarketNews = typeof marketNews.$inferInsert
+

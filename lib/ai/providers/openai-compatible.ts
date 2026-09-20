@@ -119,7 +119,7 @@ export const groqAdapter = createOpenAiCompatibleAdapter({
   id: 'groq',
   name: 'Groq',
   baseUrl: 'https://api.groq.com/openai/v1',
-  model: process.env.GROQ_MODEL ?? 'llama-3.3-70b-versatile',
+  model: process.env.GROQ_MODEL ?? 'qwen/qwen3.8-27b',
   envPrefix: 'GROQ_API_KEY',
 })
 
@@ -127,7 +127,7 @@ export const openRouterAdapter = createOpenAiCompatibleAdapter({
   id: 'openrouter',
   name: 'OpenRouter',
   baseUrl: 'https://openrouter.ai/api/v1',
-  model: process.env.OPENROUTER_MODEL ?? 'meta-llama/llama-3.3-70b-instruct:free',
+  model: process.env.OPENROUTER_MODEL ?? 'deepseek/deepseek-v4-flash-0731:free',
   envPrefix: 'OPENROUTER_API_KEY',
   extraHeaders: {
     'http-referer': process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000',
@@ -147,7 +147,7 @@ export const mistralAdapter = createOpenAiCompatibleAdapter({
   id: 'mistral',
   name: 'Mistral',
   baseUrl: 'https://api.mistral.ai/v1',
-  model: process.env.MISTRAL_MODEL ?? 'mistral-large-latest',
+  model: process.env.MISTRAL_MODEL ?? 'open-mistral-7b',
   envPrefix: 'MISTRAL_API_KEY',
 })
 

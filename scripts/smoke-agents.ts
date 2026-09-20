@@ -147,6 +147,21 @@ console.log('\nparseVerdict')
     assert.equal(parseVerdict('Saya kira sebaiknya ditahan dulu.'), null)
   })
 
+  check('toleransi huruf kapital pada verdict', () => {
+    assert.equal(parseVerdict('{"verdict":"BELI","confidence":80,"rationale":"x"}')?.verdict, 'beli')
+  })
+
+  check('toleransi trailing comma dalam JSON', () => {
+    const trailing = '{"verdict":"jual","confidence":70,"rationale":"risiko tinggi",}'
+    assert.equal(parseVerdict(trailing)?.verdict, 'jual')
+  })
+
+  check('toleransi confidence float dan probabilitas 0-1', () => {
+    assert.equal(parseVerdict('{"verdict":"beli","confidence":0.85,"rationale":"x"}')?.confidence, 85)
+    assert.equal(parseVerdict('{"verdict":"beli","confidence":75.4,"rationale":"x"}')?.confidence, 75)
+    assert.equal(parseVerdict('{"verdict":"beli","confidence":"90%","rationale":"x"}')?.confidence, 90)
+  })
+
   check('balasan kosong ditolak', () => {
     assert.equal(parseVerdict(null), null)
     assert.equal(parseVerdict(''), null)

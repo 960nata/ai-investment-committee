@@ -237,3 +237,15 @@ export function IconLayers(props: IconProps) {
     </Svg>
   )
 }
+
+/** Surat kabar / warta intelijen pasar. */
+export function IconNews(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M4 20h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v13a2 2 0 0 1-2 2H3" />
+      <path d="M8 7h8M8 11h8M8 15h5" />
+      <path d="M4 20a2 2 0 0 1-2-2V7" />
+    </Svg>
+  )
+}
+

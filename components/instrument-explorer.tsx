@@ -10,15 +10,28 @@
  * Tab memilah menurut jenis aset, bukan menurut bursa. Orang mencari "emas",
  * bukan "kontrak berjangka di bursa global", dan emas kebetulan bisa dibeli di
  * dua tempat dengan kalender berbeda.
+ *
+ * Tab yang punya lebih dari satu kelas aset (seperti Crypto, yang mencakup
+ * crypto dan meme coin) memperlihatkan sub-filter supaya pengguna bisa melihat
+ * masing-masing secara terpisah.
  */
 
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import { CandlestickChart, type Candle } from './candlestick-chart'
 import { RegionFlag } from './flags'
 import { IconAlert, IconCandles, IconRows } from './icons'
 import { AssetIcon } from './asset-icons'
 import { Blank } from './ui'
 import { ScorePanel, type HorizonView } from './score-panel'
+import { CommitteeBoardroom } from './committee-boardroom'
+import type { TabGroup } from '@/lib/db/schema'
+
+interface LiveQuoteData {
+  price: number
+  changePct: number
+  time: number
+  source: 'binance' | 'yahoo'
+}
 
 export interface ExplorerInstrument {
   id: number
@@ -37,24 +50,41 @@ export interface ExplorerInstrument {
 interface Props {
   instruments: ExplorerInstrument[]
   scores: Record<number, { asOf: string; horizons: HorizonView[] }>
-  tabs: { id: string; label: string }[]
+  tabs: TabGroup[]
   initialInstrumentId: number | null
   initialCandles: Candle[]
 }
 
 export function InstrumentExplorer({ instruments, scores, tabs, initialInstrumentId, initialCandles }: Props) {
   const initial = instruments.find((i) => i.id === initialInstrumentId)
-  const [tab, setTab] = useState(initial?.assetClass ?? tabs[0]?.id ?? 'crypto')
+
+  // Cari tab group mana yang memuat instrumen pembuka.
+  const initialTab =
+    tabs.find((t) => t.children.some((c) => c.id === initial?.assetClass))?.id ??
+    tabs[0]?.id ??
+    'crypto'
+
+  const [tab, setTab] = useState(initialTab)
+  const [subtab, setSubtab] = useState<string>('semua')
   const [query, setQuery] = useState('')
   const [region, setRegion] = useState<RegionFilter>('semua')
   const [selectedId, setSelectedId] = useState(initialInstrumentId)
   const [candles, setCandles] = useState(initialCandles)
+  const [showBoardroom, setShowBoardroom] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
+  const [liveQuotes, setLiveQuotes] = useState<Record<string, LiveQuoteData>>({})
+
+  const activeGroup = tabs.find((t) => t.id === tab)
+  const childIds = useMemo(
+    () => activeGroup?.children.map((c) => c.id) ?? [],
+    [activeGroup],
+  )
+  const showSubtabs = (activeGroup?.children.length ?? 0) > 1
 
   const inTab = useMemo(
-    () => instruments.filter((i) => i.assetClass === tab),
-    [instruments, tab],
+    () => instruments.filter((i) => (childIds as string[]).includes(i.assetClass)),
+    [instruments, childIds],
   )
 
   /**
@@ -71,9 +101,48 @@ export function InstrumentExplorer({ instruments, scores, tabs, initialInstrumen
   const showRegions = regionSplit.lokal > 0 && regionSplit.asing > 0
 
   const visible = useMemo(
-    () => inTab.filter((i) => matchesRegion(i, showRegions ? region : 'semua') && matchesQuery(i, query)),
-    [inTab, region, showRegions, query],
+    () =>
+      inTab.filter((i) => {
+        if (showSubtabs && subtab !== 'semua' && i.assetClass !== subtab) return false
+        if (showRegions && !matchesRegion(i, region)) return false
+        return matchesQuery(i, query)
+      }),
+    [inTab, showSubtabs, subtab, showRegions, region, query],
   )
+
+  const selected = instruments.find((i) => i.id === selectedId) ?? null
+
+  // Polling kutipan harga realtime untuk instrumen terpilih dan baris yang sedang terlihat
+  useEffect(() => {
+    const symbols = new Set<string>()
+    if (selected) symbols.add(selected.symbol)
+    for (const item of visible.slice(0, 24)) {
+      symbols.add(item.symbol)
+    }
+    if (symbols.size === 0) return
+
+    let cancelled = false
+    async function fetchLive() {
+      try {
+        const queryStr = Array.from(symbols).join(',')
+        const res = await fetch(`/api/quotes/live?symbols=${encodeURIComponent(queryStr)}`)
+        if (!res.ok) return
+        const body = (await res.json()) as { quotes?: Record<string, LiveQuoteData> }
+        if (!cancelled && body.quotes) {
+          setLiveQuotes((prev) => ({ ...prev, ...body.quotes }))
+        }
+      } catch {
+        // Abaikan galat jaringan, tetap tampilkan harga candle historis
+      }
+    }
+
+    fetchLive()
+    const timer = setInterval(fetchLive, 8_000)
+    return () => {
+      cancelled = true
+      clearInterval(timer)
+    }
+  }, [visible, selected])
 
   /**
    * Berapa yang cocok di kelas aset lain.
@@ -89,12 +158,12 @@ export function InstrumentExplorer({ instruments, scores, tabs, initialInstrumen
       .filter((t) => t.id !== tab)
       .map((t) => ({
         ...t,
-        count: instruments.filter((i) => i.assetClass === t.id && matchesQuery(i, query)).length,
+        count: instruments.filter(
+          (i) => t.children.some((c) => c.id === i.assetClass) && matchesQuery(i, query),
+        ).length,
       }))
       .filter((t) => t.count > 0)
   }, [instruments, tabs, tab, query])
-
-  const selected = instruments.find((i) => i.id === selectedId) ?? null
 
   function load(instrument: ExplorerInstrument) {
     setSelectedId(instrument.id)
@@ -124,11 +193,26 @@ export function InstrumentExplorer({ instruments, scores, tabs, initialInstrumen
 
   function switchTab(next: string) {
     setTab(next)
+    setSubtab('semua')
+    setRegion('semua')
+
     // Pindah tab langsung memuat instrumen pertamanya. Grafik yang menampilkan
     // aset dari tab sebelumnya adalah cara termudah salah membaca harga.
-    const first = instruments.find(
-      (i) => i.assetClass === next && matchesQuery(i, query),
+    //
+    // Yang dipilih adalah instrumen pertama yang PUNYA riwayat, bukan yang
+    // pertama menurut abjad. Kelas aset yang baru ditambahkan berisi instrumen
+    // yang sudah terdaftar tetapi belum pernah ditarik datanya, dan membuka tab
+    // pada salah satunya menampilkan bidang kosong — yang terbaca sebagai
+    // "grafiknya rusak", padahal datanya memang ada di instrumen sebelah.
+    // Aturan ini sama dengan yang dipakai halaman saat memilih instrumen
+    // pembuka; sebelumnya aturan itu hanya berlaku pada muatan pertama.
+    const group = tabs.find((t) => t.id === next)
+    const nextChildIds = group?.children.map((c) => c.id) ?? []
+    const candidates = instruments.filter(
+      (i) => (nextChildIds as string[]).includes(i.assetClass) && matchesQuery(i, query),
     )
+    const first = candidates.find((i) => i.candleCount > 0) ?? candidates[0]
+
     if (first && first.id !== selectedId) load(first)
   }
 
@@ -136,7 +220,9 @@ export function InstrumentExplorer({ instruments, scores, tabs, initialInstrumen
     <>
       <div className="tabs" role="tablist" aria-label="Jenis aset">
         {tabs.map((t) => {
-          const count = instruments.filter((i) => i.assetClass === t.id).length
+          const count = instruments.filter((i) =>
+            t.children.some((c) => c.id === i.assetClass),
+          ).length
           return (
             <button
               key={t.id}
@@ -162,19 +248,61 @@ export function InstrumentExplorer({ instruments, scores, tabs, initialInstrumen
           </span>
           {selected && (
             <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--t-small)', color: 'var(--ink-mute)' }}>
-              <RegionFlag region={selected.region} size={12} />
+              {selected.assetClass === 'crypto' || selected.assetClass === 'memecoin' ? (
+                <AssetIcon symbol={selected.symbol} size={14} />
+              ) : (
+                <RegionFlag region={selected.region} size={12} />
+              )}
               {selected.name}
             </span>
           )}
-          {selected?.lastClose != null && (
-            <span className="quote">
-              <span className="quote-price">
-                {formatPrice(selected.lastClose, selected.currency)}
+          {(() => {
+            const live = selected ? liveQuotes[selected.symbol] : null
+            const price = live?.price ?? selected?.lastClose
+            const change = live?.changePct ?? selected?.changePct ?? null
+            if (price == null) return null
+            return (
+              <span className="quote">
+                <span className="quote-price">
+                  {formatPrice(price, selected?.currency ?? '')}
+                </span>
+                <Change value={change} />
+                {live && (
+                  <span className="live-pill" title="Harga diperbarui langsung dari bursa">
+                    <span className="live-dot" />
+                    Live
+                  </span>
+                )}
               </span>
-              <Change value={selected.changePct} />
-            </span>
-          )}
+            )
+          })()}
           <span className="panel-meta">{pending ? 'memuat' : `${candles.length} candle`}</span>
+          {selected && (
+            <button
+              type="button"
+              className={`seg ${showBoardroom ? 'active' : ''}`}
+              onClick={() => setShowBoardroom((prev) => !prev)}
+              style={{
+                marginLeft: 'auto',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '4px 10px',
+                fontSize: 'var(--t-micro)',
+                fontWeight: 600,
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--line)',
+                background: showBoardroom ? 'var(--tint-brand)' : 'var(--bg-card)',
+                color: showBoardroom ? 'var(--brand)' : 'var(--ink-mute)',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+              title="Tampilkan / sembunyikan transkrip debat rapat komite AI"
+            >
+              <span>🏛️</span>
+              <span>{showBoardroom ? 'Tutup Rapat Komite' : 'Rapat Komite AI'}</span>
+            </button>
+          )}
         </div>
 
         <div className="chart chart-wide">
@@ -187,42 +315,62 @@ export function InstrumentExplorer({ instruments, scores, tabs, initialInstrumen
             <CandlestickChart data={candles} />
           ) : (
             <Blank icon={<IconCandles size={22} />} title="Belum ada candle">
-              Instrumen ini belum punya riwayat tersimpan. Tunggu dispatcher berjalan pada jam
-              berikutnya, atau isi riwayatnya lebih dulu.
+              {selected
+                ? `Belum ada data harga tersimpan untuk ${selected.symbol}. Jalankan ingest untuk memuatnya.`
+                : 'Pilih instrumen di bawah untuk melihat grafiknya.'}
             </Blank>
           )}
         </div>
       </section>
 
-      <ScorePanel
-        horizons={selected ? (scores[selected.id]?.horizons ?? []) : []}
-        asOf={selected ? (scores[selected.id]?.asOf ?? null) : null}
-      />
+      {/* --- panel skor terkalibrasi -------------------------------------- */}
+      {selected && scores[selected.id] && (
+        <ScorePanel
+          asOf={scores[selected.id].asOf}
+          horizons={scores[selected.id].horizons}
+        />
+      )}
 
-      <section className="panel">
+      {/* --- panel rapat komite AI (Live Boardroom) ------------------------ */}
+      {selected && showBoardroom && (
+        <CommitteeBoardroom
+          market={selected.market}
+          symbol={selected.symbol}
+          name={selected.name}
+          currency={selected.currency}
+        />
+      )}
+
+      {/* --- daftar instrumen --------------------------------------------- */}
+      <section className="panel" style={{ marginTop: 'var(--space-3)' }}>
         <div className="panel-head">
           <span className="panel-title">
             <IconRows size={14} />
-            {tabs.find((t) => t.id === tab)?.label ?? 'Instrumen'}
+            {activeGroup?.label ?? 'Instrumen'}
           </span>
-          <span className="panel-meta">
-            {visible.length === inTab.length
-              ? `${inTab.length} instrumen`
-              : `${visible.length} dari ${inTab.length}`}
-          </span>
-        </div>
-
-        <div className="filter-bar">
-          <input
-            type="search"
-            className="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Cari simbol, nama, atau negara"
-            aria-label="Cari instrumen"
-            autoComplete="off"
-            spellCheck={false}
-          />
+          {showSubtabs && (
+            <div className="segmented" role="group" aria-label="Kategori">
+              {[
+                { id: 'semua', label: 'Semua', count: inTab.length },
+                ...activeGroup!.children.map((child) => ({
+                  id: child.id,
+                  label: child.label,
+                  count: inTab.filter((i) => (i.assetClass as string) === child.id).length,
+                })),
+              ].map(({ id, label, count }) => (
+                <button
+                  key={id}
+                  type="button"
+                  className="seg"
+                  aria-pressed={subtab === id}
+                  onClick={() => setSubtab(id)}
+                >
+                  {label}
+                  <span className="seg-count">{count}</span>
+                </button>
+              ))}
+            </div>
+          )}
 
           {showRegions && (
             <div className="segmented" role="group" aria-label="Wilayah">
@@ -276,37 +424,51 @@ export function InstrumentExplorer({ instruments, scores, tabs, initialInstrumen
           </Blank>
         ) : (
           <div className="cards">
-            {visible.map((instrument) => (
-              <button
-                key={instrument.id}
-                type="button"
-                className="card-pick"
-                aria-pressed={instrument.id === selectedId}
-                onClick={() => load(instrument)}
-              >
-                <span className="card-pick-head">
-                  <AssetIcon symbol={instrument.symbol} size={16} />
-                  <RegionFlag region={instrument.region} size={13} />
-                  <span className="card-pick-symbol">{display(instrument.symbol)}</span>
-                  <Change value={instrument.changePct} />
-                </span>
-                <span className="card-pick-name">{instrument.name}</span>
-                <span className="card-pick-foot">
-                  {instrument.lastClose == null ? (
-                    <span style={{ color: 'var(--ink-faint)' }}>belum ada harga</span>
-                  ) : (
-                    <>
-                      <span className="card-pick-price">
-                        {formatPrice(instrument.lastClose, instrument.currency)}
-                      </span>
-                      <span style={{ color: 'var(--ink-faint)' }}>
-                        {instrument.candleCount} candle
-                      </span>
-                    </>
-                  )}
-                </span>
-              </button>
-            ))}
+            {visible.map((instrument) => {
+              const live = liveQuotes[instrument.symbol]
+              const price = live?.price ?? instrument.lastClose
+              const change = live?.changePct ?? instrument.changePct
+              return (
+                <button
+                  key={instrument.id}
+                  type="button"
+                  className="card-pick"
+                  aria-pressed={instrument.id === selectedId}
+                  onClick={() => load(instrument)}
+                >
+                  <span className="card-pick-head">
+                    <AssetIcon symbol={instrument.symbol} size={16} />
+                    {instrument.assetClass !== 'crypto' && instrument.assetClass !== 'memecoin' && (
+                      <RegionFlag region={instrument.region} size={13} />
+                    )}
+                    <span className="card-pick-symbol">{display(instrument.symbol)}</span>
+                    <Change value={change} />
+                  </span>
+                  <span className="card-pick-name">{instrument.name}</span>
+                  <span className="card-pick-foot">
+                    {price == null ? (
+                      <span style={{ color: 'var(--ink-faint)' }}>belum ada harga</span>
+                    ) : (
+                      <>
+                        <span className="card-pick-price">
+                          {formatPrice(price, instrument.currency)}
+                          {live && (
+                            <span
+                              className="live-dot"
+                              style={{ display: 'inline-block', marginLeft: 5, verticalAlign: 'middle' }}
+                              title="Harga realtime"
+                            />
+                          )}
+                        </span>
+                        <span style={{ color: 'var(--ink-faint)' }}>
+                          {instrument.candleCount} candle
+                        </span>
+                      </>
+                    )}
+                  </span>
+                </button>
+              )
+            })}
           </div>
         )}
       </section>

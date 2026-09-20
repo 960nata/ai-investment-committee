@@ -96,6 +96,19 @@ export interface ScoreInput {
   turnover?: number | null
   /** Ambang likuiditas yang dianggap memadai untuk pasar itu. */
   turnoverThreshold?: number
+  /**
+   * Arah hasil kalibrasi, menggantikan arah yang diasumsikan registry.
+   *
+   * Bila diisi untuk sebuah horizon, registry tidak dipakai sama sekali pada
+   * horizon itu: fitur yang tidak ada di petanya tidak ikut skor. Itu disengaja
+   * — peta ini hasil pengujian, dan fitur yang tidak lolos pengujian tidak
+   * pantas diam-diam masuk lewat pintu belakang dengan tanda tebakan.
+   *
+   * Dipisah per horizon karena arahnya memang bisa berbeda. Pembalikan jangka
+   * pendek dan penerusan jangka menengah adalah dua gejala yang sama-sama nyata,
+   * dan memaksa satu tanda untuk keduanya berarti salah di salah satunya.
+   */
+  directions?: Partial<Record<Horizon, ReadonlyMap<string, 1 | -1>>>
 }
 
 export interface ScoreResult {
@@ -112,6 +125,21 @@ export function scoreInstrument(input: ScoreInput): ScoreResult {
   }
 }
 
+/**
+ * Seragamkan arah satu fitur, dari kalibrasi bila ada dan dari registry bila
+ * tidak.
+ */
+function orient(
+  name: string,
+  raw: number | null,
+  directions: ReadonlyMap<string, 1 | -1> | undefined,
+): number | null {
+  if (!directions) return applyDirection(name, raw)
+  if (raw === null) return null
+  const direction = directions.get(name)
+  return direction === undefined ? null : raw * direction
+}
+
 function scoreHorizon(horizon: Horizon, input: ScoreInput): HorizonScore {
   const weights = GROUP_WEIGHTS[horizon]
   const { values } = input
@@ -123,7 +151,7 @@ function scoreHorizon(horizon: Horizon, input: ScoreInput): HorizonScore {
     // Fitur yang arahnya belum ditetapkan sengaja tidak ikut. Menebak tandanya
     // sama saja mengarang, dan tanda yang salah menarik skor ke arah keliru
     // dengan keyakinan penuh.
-    const z = applyDirection(spec.name, values[`${spec.name}_z`] ?? null)
+    const z = orient(spec.name, values[`${spec.name}_z`] ?? null, input.directions?.[horizon])
     if (z === null) continue
 
     const group = GROUP_OF[spec.group]

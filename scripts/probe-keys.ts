@@ -161,7 +161,9 @@ async function probeGitHub(key: string): Promise<{ status: ProbeResult['status']
 }
 
 async function main() {
-  const env = parseEnv(resolve(process.cwd(), '.env.local'))
+  const envLocal = parseEnv(resolve(process.cwd(), '.env.local'))
+  const envDefault = parseEnv(resolve(process.cwd(), '.env'))
+  const env = { ...envDefault, ...envLocal, ...process.env }
   const entries: KeyEntry[] = []
 
   for (const [keyName, val] of Object.entries(env)) {
@@ -183,7 +185,7 @@ async function main() {
     }
   }
 
-  console.log(`\n🔍 Memeriksa ${entries.length} kunci API dari .env.local...\n`)
+  console.log(`\n🔍 Memeriksa ${entries.length} kunci API dari .env / .env.local...\n`)
 
   const results: ProbeResult[] = []
 

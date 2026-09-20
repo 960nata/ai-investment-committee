@@ -24,7 +24,7 @@ import {
 const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta'
 const TIMEOUT_MS = 30_000
 
-const MODEL = process.env.GEMINI_MODEL ?? 'gemini-2.0-flash'
+const MODEL = process.env.GEMINI_MODEL ?? 'gemini-2.5-flash'
 
 /**
  * Apakah 429 ini soal batas harian, bukan batas per menit.
@@ -54,6 +54,7 @@ export const geminiAdapter: LlmAdapter = {
       generationConfig: {
         temperature: request.temperature ?? 0.4,
         maxOutputTokens: request.maxOutputTokens ?? 1024,
+        thinkingConfig: { thinkingBudget: 0 },
         ...(request.json ? { responseMimeType: 'application/json' } : {}),
       },
     }
