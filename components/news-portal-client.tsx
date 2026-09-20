@@ -4,6 +4,7 @@ import React, { useState } from 'react'
 import Link from 'next/link'
 import type { MarketNewsRow } from '@/lib/db/schema'
 import { IconNews } from './icons'
+import { NewsSidebar } from './news-sidebar'
 
 interface Props {
   initialArticles: MarketNewsRow[]
@@ -430,145 +431,18 @@ export function NewsPortalClient({ initialArticles }: Props) {
         </div>
       )}
 
-      {/* --- Fokus Intelijen (Hero Card) --- */}
-      {heroArticle && (
-        <article className="news-hero">
-          <div className="news-hero-img-wrap">
-            {heroArticle.featuredImage?.url ? (
-              <img
-                src={heroArticle.featuredImage.url}
-                alt={heroArticle.featuredImage.alt ?? heroArticle.title}
-                className="news-hero-img"
-              />
-            ) : (
-              <div
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  background: 'var(--bg-subtle)',
-                }}
-              />
-            )}
-          </div>
-
-          <div className="news-hero-content">
-            <div>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  marginBottom: 10,
-                  fontSize: 'var(--t-micro)',
-                  fontFamily: 'var(--mono)',
-                  color: 'var(--ink-mute)',
-                }}
-              >
-                <span>FOKUS UTAMA</span>
-                <span>·</span>
-                <span>{heroArticle.category.toUpperCase()}</span>
-                <span>·</span>
-                <span>DAMPAK {heroArticle.impactScore}/10</span>
-                {heroArticle.youtubeVideo && (
-                  <>
-                    <span>·</span>
-                    <span>VIDEO TERSEDIA</span>
-                  </>
-                )}
-              </div>
-
-              <Link
-                href={`/berita/${heroArticle.slug}`}
-                style={{ textDecoration: 'none', color: 'inherit' }}
-              >
-                <h2
-                  style={{
-                    fontSize: clampText(18, 24),
-                    fontWeight: 700,
-                    lineHeight: 1.3,
-                    margin: '0 0 10px 0',
-                    color: 'var(--ink)',
-                  }}
-                >
-                  {heroArticle.title}
-                </h2>
-              </Link>
-
-              <p
-                style={{
-                  fontSize: 'var(--t-small)',
-                  lineHeight: 1.6,
-                  color: 'var(--ink-mute)',
-                  margin: '0 0 16px 0',
-                }}
-              >
-                {heroArticle.summary}
-              </p>
-            </div>
-
-            <div>
-              <div
-                style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  alignItems: 'center',
-                  gap: 6,
-                  marginBottom: 14,
-                }}
-              >
-                {heroArticle.mentionedSymbols.map((sym) => (
-                  <span key={sym} className="badge-ticker">
-                    ${sym}
-                  </span>
-                ))}
-              </div>
-
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  fontSize: 'var(--t-micro)',
-                  fontFamily: 'var(--mono)',
-                  color: 'var(--ink-mute)',
-                  borderTop: '1px solid var(--line)',
-                  paddingTop: 10,
-                }}
-              >
-                <span>
-                  {heroArticle.author} · {heroArticle.readingTimeMinutes} mnt baca
-                </span>
-                <Link
-                  href={`/berita/${heroArticle.slug}`}
-                  style={{
-                    color: 'var(--ink)',
-                    textDecoration: 'none',
-                    fontWeight: 500,
-                  }}
-                >
-                  Baca telaah lengkap →
-                </Link>
-              </div>
-            </div>
-          </div>
-        </article>
-      )}
-
-      {/* --- Grid Artikel Berita Lainnya --- */}
-      {gridArticles.length > 0 ? (
-        <div className="news-grid">
-          {gridArticles.map((article) => (
-            <Link
-              key={article.id}
-              href={`/berita/${article.slug}`}
-              className="news-card"
-            >
-              <div className="news-card-img-wrap">
-                {article.featuredImage?.url ? (
+      {/* --- Layout Utama: Feed Berita + Sidebar Kanan (Berita Terkini, Tag, Iklan) --- */}
+      <div className="news-layout-with-sidebar">
+        <div className="news-main-column">
+          {/* --- Fokus Intelijen (Hero Card) --- */}
+          {heroArticle && (
+            <article className="news-hero">
+              <div className="news-hero-img-wrap">
+                {heroArticle.featuredImage?.url ? (
                   <img
-                    src={article.featuredImage.url}
-                    alt={article.featuredImage.alt ?? article.title}
-                    className="news-card-img"
+                    src={heroArticle.featuredImage.url}
+                    alt={heroArticle.featuredImage.alt ?? heroArticle.title}
+                    className="news-hero-img"
                   />
                 ) : (
                   <div
@@ -581,92 +455,232 @@ export function NewsPortalClient({ initialArticles }: Props) {
                 )}
               </div>
 
-              <div className="news-card-body">
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    marginBottom: 8,
-                    fontSize: 'var(--t-micro)',
-                    fontFamily: 'var(--mono)',
-                    color: 'var(--ink-mute)',
-                  }}
-                >
-                  <span>{article.category.toUpperCase()}</span>
-                  <span>·</span>
-                  <span>{article.readingTimeMinutes} mnt baca</span>
-                  {article.youtubeVideo && (
-                    <>
-                      <span>·</span>
-                      <span>VIDEO</span>
-                    </>
-                  )}
+              <div className="news-hero-content">
+                <div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      marginBottom: 10,
+                      fontSize: 'var(--t-micro)',
+                      fontFamily: 'var(--mono)',
+                      color: 'var(--ink-mute)',
+                    }}
+                  >
+                    <span>FOKUS UTAMA</span>
+                    <span>·</span>
+                    <span>{heroArticle.category.toUpperCase()}</span>
+                    <span>·</span>
+                    <span>DAMPAK {heroArticle.impactScore}/10</span>
+                    {heroArticle.youtubeVideo && (
+                      <>
+                        <span>·</span>
+                        <span>VIDEO TERSEDIA</span>
+                      </>
+                    )}
+                  </div>
+
+                  <Link
+                    href={`/berita/${heroArticle.slug}`}
+                    style={{ textDecoration: 'none', color: 'inherit' }}
+                  >
+                    <h2
+                      style={{
+                        fontSize: clampText(18, 24),
+                        fontWeight: 700,
+                        lineHeight: 1.3,
+                        margin: '0 0 10px 0',
+                        color: 'var(--ink)',
+                      }}
+                    >
+                      {heroArticle.title}
+                    </h2>
+                  </Link>
+
+                  <p
+                    style={{
+                      fontSize: 'var(--t-small)',
+                      lineHeight: 1.6,
+                      color: 'var(--ink-mute)',
+                      margin: '0 0 16px 0',
+                    }}
+                  >
+                    {heroArticle.summary}
+                  </p>
                 </div>
 
-                <h3 className="news-card-title">{article.title}</h3>
-                <p className="news-card-summary">{article.summary}</p>
+                <div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      alignItems: 'center',
+                      gap: 6,
+                      marginBottom: 14,
+                    }}
+                  >
+                    {heroArticle.mentionedSymbols.map((sym) => (
+                      <span key={sym} className="badge-ticker">
+                        ${sym}
+                      </span>
+                    ))}
+                  </div>
 
-                <div
-                  style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: 4,
-                    marginTop: 'auto',
-                    marginBottom: 10,
-                  }}
-                >
-                  {article.mentionedSymbols.slice(0, 4).map((sym) => (
-                    <span key={sym} className="badge-ticker">
-                      ${sym}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      fontSize: 'var(--t-micro)',
+                      fontFamily: 'var(--mono)',
+                      color: 'var(--ink-mute)',
+                      borderTop: '1px solid var(--line)',
+                      paddingTop: 10,
+                    }}
+                  >
+                    <span>
+                      {heroArticle.author} · {heroArticle.readingTimeMinutes} mnt baca
                     </span>
-                  ))}
-                </div>
-
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    fontSize: 'var(--t-micro)',
-                    fontFamily: 'var(--mono)',
-                    color: 'var(--ink-mute)',
-                    borderTop: '1px solid var(--line)',
-                    paddingTop: 8,
-                  }}
-                >
-                  <span>
-                    {new Date(article.publishedAt).toLocaleDateString('id-ID', {
-                      day: 'numeric',
-                      month: 'short',
-                      year: 'numeric',
-                    })}
-                  </span>
-                  <span style={{ textTransform: 'capitalize' }}>
-                    {article.sentiment}
-                  </span>
+                    <Link
+                      href={`/berita/${heroArticle.slug}`}
+                      style={{
+                        color: 'var(--ink)',
+                        textDecoration: 'none',
+                        fontWeight: 500,
+                      }}
+                    >
+                      Baca telaah lengkap →
+                    </Link>
+                  </div>
                 </div>
               </div>
-            </Link>
-          ))}
+            </article>
+          )}
+
+          {/* --- Grid Artikel Berita Lainnya --- */}
+          {gridArticles.length > 0 ? (
+            <div className="news-grid">
+              {gridArticles.map((article) => (
+                <Link
+                  key={article.id}
+                  href={`/berita/${article.slug}`}
+                  className="news-card"
+                >
+                  <div className="news-card-img-wrap">
+                    {article.featuredImage?.url ? (
+                      <img
+                        src={article.featuredImage.url}
+                        alt={article.featuredImage.alt ?? article.title}
+                        className="news-card-img"
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          background: 'var(--bg-subtle)',
+                        }}
+                      />
+                    )}
+                  </div>
+
+                  <div className="news-card-body">
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        marginBottom: 8,
+                        fontSize: 'var(--t-micro)',
+                        fontFamily: 'var(--mono)',
+                        color: 'var(--ink-mute)',
+                      }}
+                    >
+                      <span>{article.category.toUpperCase()}</span>
+                      <span>·</span>
+                      <span>{article.readingTimeMinutes} mnt baca</span>
+                      {article.youtubeVideo && (
+                        <>
+                          <span>·</span>
+                          <span>VIDEO</span>
+                        </>
+                      )}
+                    </div>
+
+                    <h3 className="news-card-title">{article.title}</h3>
+                    <p className="news-card-summary">{article.summary}</p>
+
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: 4,
+                        marginTop: 'auto',
+                        marginBottom: 10,
+                      }}
+                    >
+                      {article.mentionedSymbols.slice(0, 4).map((sym) => (
+                        <span key={sym} className="badge-ticker">
+                          ${sym}
+                        </span>
+                      ))}
+                    </div>
+
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        fontSize: 'var(--t-micro)',
+                        fontFamily: 'var(--mono)',
+                        color: 'var(--ink-mute)',
+                        borderTop: '1px solid var(--line)',
+                        paddingTop: 8,
+                      }}
+                    >
+                      <span>
+                        {new Date(article.publishedAt).toLocaleDateString('id-ID', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                        })}
+                      </span>
+                      <span style={{ textTransform: 'capitalize' }}>
+                        {article.sentiment}
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            !heroArticle && (
+              <div
+                style={{
+                  padding: 'var(--space-6)',
+                  textAlign: 'center',
+                  background: 'var(--bg-card)',
+                  border: '1px solid var(--line)',
+                  borderRadius: 'var(--radius-md)',
+                  color: 'var(--ink-mute)',
+                  fontSize: 'var(--t-small)',
+                }}
+              >
+                Tidak ada telaah pasar yang cocok dengan filter saat ini.
+              </div>
+            )
+          )}
         </div>
-      ) : (
-        !heroArticle && (
-          <div
-            style={{
-              padding: 'var(--space-6)',
-              textAlign: 'center',
-              background: 'var(--bg-card)',
-              border: '1px solid var(--line)',
-              borderRadius: 'var(--radius-md)',
-              color: 'var(--ink-mute)',
-              fontSize: 'var(--t-small)',
-            }}
-          >
-            Tidak ada telaah pasar yang cocok dengan filter saat ini.
-          </div>
-        )
-      )}
+
+        {/* --- Kolom Samping Kanan: Berita Terkini + Tag Populer + Slot Iklan --- */}
+        <NewsSidebar
+          recentArticles={articles}
+          activeTag={searchQuery}
+          onSelectTag={(tag) => setSearchQuery(tag)}
+        />
+      </div>
+
 
       {/* --- Akses Terbuka untuk AI Lain --- */}
       <section

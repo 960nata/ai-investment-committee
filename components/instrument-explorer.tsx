@@ -394,6 +394,50 @@ export function InstrumentExplorer({ instruments, scores, tabs, initialInstrumen
               ))}
             </div>
           )}
+
+          {/* Kolom Pencarian Simbol / Emiten */}
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ position: 'relative', minWidth: 210 }}>
+              <input
+                type="text"
+                placeholder="Cari simbol atau emiten..."
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '4px 26px 4px 10px',
+                  fontSize: 'var(--t-small)',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--line)',
+                  background: 'var(--bg-card)',
+                  color: 'var(--ink)',
+                  fontFamily: 'inherit',
+                }}
+              />
+              {query && (
+                <button
+                  type="button"
+                  onClick={() => setQuery('')}
+                  style={{
+                    position: 'absolute',
+                    right: 6,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--ink-mute)',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    padding: '2px 4px',
+                    lineHeight: 1,
+                  }}
+                  title="Kosongkan pencarian"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
         {visible.length === 0 ? (
@@ -437,8 +481,9 @@ export function InstrumentExplorer({ instruments, scores, tabs, initialInstrumen
                   onClick={() => load(instrument)}
                 >
                   <span className="card-pick-head">
-                    <AssetIcon symbol={instrument.symbol} size={16} />
-                    {instrument.assetClass !== 'crypto' && instrument.assetClass !== 'memecoin' && (
+                    {instrument.assetClass === 'crypto' || instrument.assetClass === 'memecoin' ? (
+                      <AssetIcon symbol={instrument.symbol} size={16} />
+                    ) : (
                       <RegionFlag region={instrument.region} size={13} />
                     )}
                     <span className="card-pick-symbol">{display(instrument.symbol)}</span>
@@ -537,9 +582,25 @@ function display(symbol: string): string {
 }
 
 function formatPrice(value: number, currency: string): string {
-  // Rupiah tidak pernah ditulis berkoma; dolar dan sejenisnya perlu dua angka.
-  const digits = currency === 'IDR' || currency === 'JPY' || currency === 'KRW' ? 0 : value < 10 ? 4 : 2
-  return `${value.toLocaleString('id-ID', { minimumFractionDigits: digits, maximumFractionDigits: digits })} ${currency}`
+  if (value === 0) return `0 ${currency}`
+  // Rupiah tidak pernah ditulis berkoma
+  if (currency === 'IDR' || currency === 'JPY' || currency === 'KRW') {
+    return `${Math.round(value).toLocaleString('id-ID')} ${currency}`
+  }
+  // Koin mikro atau meme coin dengan harga di bawah 0.01 tidak boleh dibulatkan jadi 0,0000
+  let minDigits = 2
+  let maxDigits = 2
+  if (value < 0.0001) {
+    minDigits = 6
+    maxDigits = 8
+  } else if (value < 0.01) {
+    minDigits = 4
+    maxDigits = 6
+  } else if (value < 10) {
+    minDigits = 2
+    maxDigits = 4
+  }
+  return `${value.toLocaleString('id-ID', { minimumFractionDigits: minDigits, maximumFractionDigits: maxDigits })} ${currency}`
 }
 
 function yearsAgo(n: number): string {

@@ -2335,5 +2335,304 @@ button {
   border-bottom: 1px solid var(--line);
 }
 
+.article-body-content u {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--ink-mute);
+}
 
+.article-body-content mark {
+  background: rgba(234, 179, 8, 0.18);
+  color: var(--ink);
+  padding: 1px 4px;
+  border-radius: var(--radius-xs);
+  border-bottom: 1px solid rgba(234, 179, 8, 0.4);
+}
 
+.article-body-content blockquote {
+  border-left: 3px solid var(--brand);
+  padding: var(--space-2) var(--space-4);
+  margin: var(--space-4) 0;
+  background: var(--bg-card);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  color: var(--ink-mute);
+  font-style: italic;
+}
+
+.article-body-content blockquote p {
+  margin: 0;
+}
+
+.article-body-content ul,
+.article-body-content ol {
+  margin: var(--space-3) 0 var(--space-4) var(--space-5);
+  padding: 0;
+}
+
+.article-body-content li {
+  margin-bottom: var(--space-1);
+  line-height: 1.6;
+}
+
+.article-body-content code {
+  font-family: var(--mono);
+  font-size: var(--t-micro);
+  background: var(--bg-card);
+  padding: 2px 6px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--line);
+  color: var(--brand);
+}
+
+.article-body-content hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: var(--space-5) 0;
+}
+
+/* ---------------------------------------------------------------------------
+   Kolom Widget Samping Berita & Slot Iklan (Palet Gelap Institusional)
+   --------------------------------------------------------------------------- */
+
+.news-layout-with-sidebar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: var(--space-5);
+  align-items: start;
+}
+
+@media (max-width: 1040px) {
+  .news-layout-with-sidebar {
+    grid-template-columns: 1fr;
+  }
+}
+
+.news-main-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.news-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.sidebar-widget {
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+}
+
+.sidebar-widget-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: var(--space-3);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.sidebar-widget-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--t-small);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.sidebar-widget-badge,
+.sidebar-widget-sub {
+  font-family: var(--mono);
+  font-size: var(--t-micro);
+  color: var(--ink-mute);
+  letter-spacing: 0.05em;
+}
+
+.sidebar-recent-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.sidebar-recent-item {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--line);
+  transition: opacity 0.15s ease;
+}
+
+.sidebar-recent-item:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.sidebar-recent-item:hover .sidebar-recent-title {
+  color: var(--brand);
+}
+
+.sidebar-recent-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--t-micro);
+  font-family: var(--mono);
+  color: var(--ink-mute);
+  margin-bottom: 4px;
+}
+
+.sidebar-recent-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.sidebar-recent-title {
+  font-size: var(--t-small);
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--ink);
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.sidebar-empty {
+  font-size: var(--t-small);
+  color: var(--ink-mute);
+  margin: var(--space-2) 0;
+}
+
+.sidebar-tags-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sidebar-tag-pill {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: var(--t-micro);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+  border: 1px solid var(--line);
+  color: var(--ink-mute);
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sidebar-tag-pill:hover,
+.sidebar-tag-pill.active {
+  background: var(--bg-card);
+  border-color: var(--line-focus, #383838);
+  color: var(--ink);
+}
+
+/* Slot Iklan & Kemitraan */
+.ad-sponsor-widget {
+  background: var(--bg-card);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  position: relative;
+  overflow: hidden;
+}
+
+.ad-sponsor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px dashed var(--line);
+}
+
+.ad-sponsor-label {
+  font-family: var(--mono);
+  font-size: var(--t-micro);
+  font-weight: 600;
+  color: var(--ink-mute);
+  letter-spacing: 0.05em;
+}
+
+.ad-sponsor-tag {
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--line);
+  background: var(--bg-subtle);
+  color: var(--ink-mute);
+}
+
+.ad-sponsor-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.ad-sponsor-badge-mark {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-mute);
+  text-transform: uppercase;
+}
+
+.ad-sponsor-title {
+  font-size: var(--t-small);
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--ink);
+  margin: 0;
+}
+
+.ad-sponsor-desc {
+  font-size: var(--t-micro);
+  line-height: 1.5;
+  color: var(--ink-mute);
+  margin: 0;
+}
+
+.ad-sponsor-btn {
+  display: inline-block;
+  text-align: center;
+  font-size: var(--t-micro);
+  font-weight: 600;
+  font-family: var(--mono);
+  color: var(--ink);
+  background: var(--bg-subtle);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  margin-top: var(--space-2);
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+
+.ad-sponsor-btn:hover {
+  background: var(--bg-card);
+  border-color: var(--line-focus, #383838);
+}
+
+.ad-sponsor-foot {
+  margin-top: var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px dashed var(--line);
+  font-size: 10px;
+  font-family: var(--mono);
+  color: var(--ink-faint);
+  text-align: center;
+}

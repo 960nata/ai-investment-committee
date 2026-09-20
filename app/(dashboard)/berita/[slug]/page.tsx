@@ -6,6 +6,7 @@ import { seedInitialNewsArticles } from '@/lib/agents/news-agent'
 import { MarkdownView } from '@/components/markdown-view'
 import { ArticleActions } from '@/components/article-actions'
 import { IconNews } from '@/components/icons'
+import { NewsSidebar } from '@/components/news-sidebar'
 
 export const dynamic = 'force-dynamic'
 
@@ -59,7 +60,8 @@ export default async function BeritaDetailPage({ params }: Props) {
     notFound()
   }
 
-  const related = (await getMarketNewsList({ limit: 4 })).filter((a) => a.slug !== slug).slice(0, 3)
+  const allNews = await getMarketNewsList({ limit: 8 })
+  const related = allNews.filter((a) => a.slug !== slug).slice(0, 3)
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 
   // JSON-LD Structured Data untuk Google Search & Google News
@@ -94,7 +96,7 @@ export default async function BeritaDetailPage({ params }: Props) {
   }
 
   return (
-    <div style={{ maxWidth: 880, margin: '0 auto', paddingBottom: 'var(--space-6)' }}>
+    <div style={{ maxWidth: 1200, margin: '0 auto', paddingBottom: 'var(--space-6)' }}>
       {/* Script JSON-LD Schema.org */}
       <script
         type="application/ld+json"
@@ -119,7 +121,9 @@ export default async function BeritaDetailPage({ params }: Props) {
         </Link>
       </div>
 
-      <article className="panel" style={{ padding: 'var(--space-5)' }}>
+      <div className="news-layout-with-sidebar">
+        <div className="news-main-column">
+          <article className="panel" style={{ padding: 'var(--space-5)' }}>
         {/* Header Artikel */}
         <header className="article-header">
           <div
@@ -322,7 +326,7 @@ export default async function BeritaDetailPage({ params }: Props) {
                   )}
                 </div>
                 <div className="news-card-body">
-                  <div style={{ fontSize: 'var(--t-micro)', color: '#38bdf8', fontWeight: 600, marginBottom: 4 }}>
+                  <div style={{ fontSize: 'var(--t-micro)', color: 'var(--ink-mute)', fontWeight: 600, marginBottom: 4, fontFamily: 'var(--mono)' }}>
                     {rel.category.toUpperCase()}
                   </div>
                   <h4 style={{ fontSize: 'var(--t-small)', fontWeight: 700, margin: '0 0 6px 0', lineHeight: 1.4 }}>
@@ -337,6 +341,12 @@ export default async function BeritaDetailPage({ params }: Props) {
           </div>
         </section>
       )}
+        </div>
+
+        {/* Kolom Kanan: Berita Terkini + Tag Populer + Slot Iklan */}
+        <NewsSidebar recentArticles={allNews} />
+      </div>
     </div>
   )
 }
+

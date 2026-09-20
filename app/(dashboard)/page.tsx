@@ -55,11 +55,10 @@ export default async function OverviewPage() {
   return (
     <>
       <header className="masthead">
-        <p className="eyebrow">Fase 1 · engine fitur</p>
-        <h1 className="headline">Ringkasan</h1>
+        <p className="eyebrow">Terminal Kuantitatif &amp; Rapat Komite AI</p>
+        <h1 className="headline">Ringkasan Pasar &amp; Keputusan Investasi</h1>
         <p className="standfirst">
-          Keadaan pipa data dan riwayat yang sudah tersimpan. Sumber gratis punya jeda, jadi
-          alat ini tidak cocok untuk perdagangan harian.
+          Pemantauan harga realtime, grafik candlestick 448 instrumen, dan transkrip deliberasi 4 agen AI komite investasi.
         </p>
       </header>
 

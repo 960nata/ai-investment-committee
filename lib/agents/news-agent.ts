@@ -129,34 +129,70 @@ export const SEED_ARTICLES: NewMarketNews[] = [
     ],
     contentMarkdown: `## Konvergensi Terbesar Abad Ini: Silikon Bertemu Gigawatt
 
-Dunia komputasi sedang menghadapi batas fisik nyata: **listrik**. Dalam dua tahun terakhir, narasi pasar modal didominasi oleh siapa pembuat chip AI tercepat. Namun pada paruh kedua tahun ini, pertanyaan para manajer dana global bergeser dari *"Berapa banyak GPU yang bisa Anda beli?"* menjadi *"Dari mana Anda mendapatkan gigawatt listrik untuk menyalakannya?"*.
+Dunia komputasi sedang menghadapi batas fisik nyata: <strong>listrik</strong>. Dalam dua tahun terakhir, narasi pasar modal didominasi oleh siapa pembuat chip AI tercepat. Namun pada paruh kedua tahun ini, pertanyaan para manajer dana global bergeser dari <em>"Berapa banyak GPU yang bisa Anda beli?"</em> menjadi <u>"Dari mana Anda mendapatkan gigawatt listrik untuk menyalakannya?"</u>.
 
-Pusat data konvensional umumnya memerlukan daya sekitar 7 hingga 10 kilowatt (kW) per rak server. Server berbasis arsitektur **NVIDIA Blackwell NVL72** mengonsumsi lebih dari **120 kW per rak**, menghasilkan panas luar biasa yang mewajibkan pendinginan cair (*liquid cooling*) terpadu serta pasokan daya tanpa jeda (*24/7 baseload power*).
+Pusat data konvensional umumnya memerlukan daya sekitar 7 hingga 10 kilowatt (kW) per rak server. Server berbasis arsitektur <strong>NVIDIA Blackwell NVL72</strong> mengonsumsi lebih dari <mark>120 kW per rak</mark>, menghasilkan panas luar biasa yang mewajibkan pendinginan cair (<em>liquid cooling</em>) terpadu serta pasokan daya tanpa jeda (<u>24/7 baseload power</u>).
 
----
+<hr />
+
+### Matriks Komparasi Rantai Pasok Energi & Komputasi AI
+
+<table>
+  <thead>
+    <tr>
+      <th>Segmen Rantai Nilai</th>
+      <th>Simbol Aset</th>
+      <th>Peran Kunci dalam Ekosistem AI</th>
+      <th>Valuasi &amp; Sentimen</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Komputasi &amp; Fabrikasi</td>
+      <td><strong>NVDA</strong>, <strong>TSM</strong></td>
+      <td>Arsitektur GPU generasi baru dan litografi 3nm CoWoS</td>
+      <td>Premium (Bullish)</td>
+    </tr>
+    <tr>
+      <td>Energi Hijau Baseload</td>
+      <td><strong>BREN.JK</strong></td>
+      <td>Penyedia listrik panas bumi tanpa karbon untuk data center domestik</td>
+      <td>Strategis (Akumulasi)</td>
+    </tr>
+    <tr>
+      <td>Transmisi &amp; Komoditas</td>
+      <td><strong>AMMN.JK</strong></td>
+      <td>Pasokan tembaga berkadar tinggi untuk kabel daya &amp; busbar server</td>
+      <td>Tumbuh Pesat (Bullish)</td>
+    </tr>
+  </tbody>
+</table>
 
 ### Siapa Saja yang Menguasai Rantai Pasok Ini?
 
-1. **Raja Chip AI & Fabrikasi (NVDA & TSM)**:
-   NVIDIA terus mempertahankan margin laba kotor di atas 70% berkat permintaan tak terbatas dari *hyperscalers*. TSMC menjadi satu-satunya pembuat silikon tercanggih yang mampu mengemas chip AI skala besar melalui teknologi CoWoS.
-2. **Pembangkit Listrik Bersih & Nuklir SMR**:
+1. <strong>Raja Chip AI &amp; Fabrikasi (NVDA &amp; TSM)</strong>:
+   NVIDIA terus mempertahankan margin laba kotor di atas 70% berkat permintaan tak terbatas dari <em>hyperscalers</em>. TSMC menjadi satu-satunya pembuat silikon tercanggih yang mampu mengemas chip AI skala besar melalui teknologi CoWoS.
+2. <strong>Pembangkit Listrik Bersih &amp; Nuklir SMR</strong>:
    Di bursa Amerika Serikat, saham seperti Constellation Energy (CEG) dan Vistra melonjak setelah Microsoft menyepakati pembelian seluruh daya dari pembangkit nuklir Three Mile Island.
-3. **Koneksi Pasar Domestik Indonesia (BREN.JK & AMMN.JK)**:
+3. <strong>Koneksi Pasar Domestik Indonesia (BREN.JK &amp; AMMN.JK)</strong>:
    Indonesia memegang peran strategis ganda:
-   - **BREN.JK (Barito Renewables)**: Memegang kapasitas panas bumi (*geothermal*) terbesar di kawasan, sumber energi hijau baseload yang paling dicari untuk penyediaan data center regional hijau (seperti di Batam dan Jawa Barat).
-   - **AMMN.JK (Amman Mineral)**: Permintaan kabel transmisi tembaga untuk konektivitas busbar data center global melonjak hingga dua kali lipat per megawatt kapasitas terpasang.
+   - <strong>BREN.JK (Barito Renewables)</strong>: Memegang kapasitas panas bumi (<em>geothermal</em>) terbesar di kawasan, sumber energi hijau baseload yang paling dicari untuk penyediaan data center regional hijau.
+   - <strong>AMMN.JK (Amman Mineral)</strong>: Permintaan kabel transmisi tembaga untuk konektivitas busbar data center global melonjak hingga dua kali lipat per megawatt kapasitas terpasang.
 
----
+<hr />
 
-### Implikasi Portofolio & Skenario Risiko
+### Implikasi Portofolio &amp; Skenario Risiko
 
-Investor yang hanya mengoleksi saham perangkat lunak berisiko kehilangan rotasi modal terbesar dekade ini. Alokasi strategis kini mengalir ke perusahaan infrastruktur fisik: **tembaga, pendingin cair, trafo listrik tegangan tinggi, dan energi terbarukan**.
+Investor yang hanya mengoleksi saham perangkat lunak berisiko kehilangan rotasi modal terbesar dekade ini. Alokasi strategis kini mengalir ke perusahaan infrastruktur fisik: <u>tembaga, pendingin cair, trafo listrik tegangan tinggi, dan energi terbarukan</u>.
 
-> **Peringatan Risiko Pengawas**: Hambatan regulasi izin sambungan grid PLN dan utilitas AS bisa menunda penyelesaian fasilitas data center hingga 2–4 tahun, yang dapat memicu kompresi valuasi jika pendapatan AI tidak segera menghasilkan laba operasional riil bagi penyewa cloud.`,
+<blockquote>
+  <p><strong>Peringatan Risiko Pengawas</strong>: Hambatan regulasi izin sambungan grid PLN dan utilitas AS bisa menunda penyelesaian fasilitas data center hingga 2–4 tahun, yang dapat memicu kompresi valuasi jika belanja capex AI tidak segera menghasilkan laba operasional riil bagi penyewa cloud.</p>
+</blockquote>`,
     author: 'AI Intelligence Desk (Makro & Energi)',
     readingTimeMinutes: 4,
     publishedAt: new Date(Date.now() - 3600 * 1000 * 4), // 4 jam lalu
   },
+
   {
     slug: 'arah-kebijakan-the-fed-rotasi-saham-ihsg-dan-kripto',
     title: 'Sinyal Poros Suku Bunga The Fed: Dampak Arus Modal Asing ke IHSG, Saham Bank, & Likuiditas Bitcoin',
@@ -318,7 +354,7 @@ Artikel HARUS memenuhi kriteria:
     "Poin kunci eksekutif 3",
     "Poin kunci eksekutif 4"
   ],
-  "contentMarkdown": "Isi lengkap artikel minimal 400 kata menggunakan Markdown dengan H2 (##), H3 (###), poin-poin tebal, kutipan analisis, dan tabel bila relevan.",
+  "contentMarkdown": "Isi lengkap artikel minimal 400 kata. Anda sangat dianjurkan memadukan Markdown dan tag HTML seperti di Microsoft Word (seperti <u>garis bawah</u>, <mark>highlight poin penting</mark>, <strong>tebal</strong>, <em>miring</em>, <table> tabel komparasi finansial, <blockquote> kutipan analisis, <hr> garis pemisah, dsb) untuk penyajian riset yang sangat rapi dan profesional.",
   "author": "AI Intelligence Desk",
   "readingTimeMinutes": 3
 }`

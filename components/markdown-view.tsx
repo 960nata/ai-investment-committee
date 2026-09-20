@@ -1,232 +1,148 @@
 'use client'
 
-import React from 'react'
+import React, { useMemo } from 'react'
 
 interface Props {
   content: string
 }
 
 /**
- * Renderer Markdown ringan tanpa pustaka eksternal.
- * Menangani heading, paragraf, list, blockquote, tabel, dan penekanan tebal.
+ * Renderer hibrida Markdown & HTML (Word-like rich text).
+ *
+ * Mendukung sintaks Markdown standar (##, **, lists, tables) sekaligus tag HTML
+ * seperti di Microsoft Word atau Google Docs (<b>, <strong>, <i>, <em>, <u>,
+ * <mark>, <p>, <table>, <span>, <ul>, <ol>, <blockquote>, dll).
  */
 export function MarkdownView({ content }: Props) {
-  const lines = content.split('\n')
-  const elements: React.ReactNode[] = []
-  let i = 0
+  const renderedHtml = useMemo(() => {
+    return processMarkdownAndHtml(content)
+  }, [content])
 
-  while (i < lines.length) {
-    const line = lines[i]
-    const trimmed = line.trim()
-
-    // Baris kosong
-    if (!trimmed) {
-      i++
-      continue
-    }
-
-    // Horizontal Rule
-    if (trimmed === '---' || trimmed === '***') {
-      elements.push(<hr key={i} className="my-6 border-t border-[var(--line)]" />)
-      i++
-      continue
-    }
-
-    // Heading 2
-    if (trimmed.startsWith('## ')) {
-      elements.push(
-        <h2 key={i} className="text-xl font-bold text-[var(--ink)] mt-8 mb-3 flex items-center gap-2">
-          {formatInline(trimmed.slice(3))}
-        </h2>,
-      )
-      i++
-      continue
-    }
-
-    // Heading 3
-    if (trimmed.startsWith('### ')) {
-      elements.push(
-        <h3 key={i} className="text-lg font-semibold text-[var(--ink)] mt-6 mb-2">
-          {formatInline(trimmed.slice(4))}
-        </h3>,
-      )
-      i++
-      continue
-    }
-
-    // Heading 4
-    if (trimmed.startsWith('#### ')) {
-      elements.push(
-        <h4 key={i} className="text-base font-semibold text-[var(--ink-mute)] mt-4 mb-2">
-          {formatInline(trimmed.slice(5))}
-        </h4>,
-      )
-      i++
-      continue
-    }
-
-    // Blockquote
-    if (trimmed.startsWith('> ')) {
-      const quoteLines: string[] = []
-      while (i < lines.length && lines[i].trim().startsWith('> ')) {
-        quoteLines.push(lines[i].trim().slice(2))
-        i++
-      }
-      elements.push(
-        <blockquote
-          key={`quote-${i}`}
-          className="my-4 pl-4 py-2 border-l-2 border-[var(--brand)] bg-[var(--tint-brand)] text-[var(--ink)] rounded-r italic"
-        >
-          {quoteLines.map((ql, qidx) => (
-            <p key={qidx} className="mb-1 last:mb-0">
-              {formatInline(ql)}
-            </p>
-          ))}
-        </blockquote>,
-      )
-      continue
-    }
-
-    // Table
-    if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
-      const tableLines: string[] = []
-      while (i < lines.length && lines[i].trim().startsWith('|') && lines[i].trim().endsWith('|')) {
-        tableLines.push(lines[i].trim())
-        i++
-      }
-
-      if (tableLines.length >= 2) {
-        const headerCols = tableLines[0]
-          .split('|')
-          .slice(1, -1)
-          .map((c) => c.trim())
-        // Baris kedua adalah pemisah (---)
-        const rowLines = tableLines.slice(2)
-
-        elements.push(
-          <div key={`table-${i}`} className="overflow-x-auto my-5">
-            <table className="w-full text-sm border-collapse text-left border border-[var(--line)]">
-              <thead>
-                <tr className="bg-[var(--bg-card)] border-b border-[var(--line)]">
-                  {headerCols.map((h, hidx) => (
-                    <th key={hidx} className="px-3 py-2 font-semibold text-[var(--ink-mute)]">
-                      {formatInline(h)}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {rowLines.map((r, ridx) => {
-                  const cols = r
-                    .split('|')
-                    .slice(1, -1)
-                    .map((c) => c.trim())
-                  return (
-                    <tr
-                      key={ridx}
-                      className="border-b border-[var(--line)] hover:bg-[var(--bg-subtle)]"
-                    >
-                      {cols.map((col, cidx) => (
-                        <td key={cidx} className="px-3 py-2 text-[var(--ink)]">
-                          {formatInline(col)}
-                        </td>
-                      ))}
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>,
-        )
-        continue
-      }
-    }
-
-    // Unordered List
-    if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-      const listItems: string[] = []
-      while (
-        i < lines.length &&
-        (lines[i].trim().startsWith('- ') || lines[i].trim().startsWith('* '))
-      ) {
-        listItems.push(lines[i].trim().slice(2))
-        i++
-      }
-      elements.push(
-        <ul key={`ul-${i}`} className="list-disc list-inside my-3 space-y-1 text-[var(--ink)]">
-          {listItems.map((item, lidx) => (
-            <li key={lidx} className="leading-relaxed">
-              {formatInline(item)}
-            </li>
-          ))}
-        </ul>,
-      )
-      continue
-    }
-
-    // Ordered List (1. , 2. )
-    if (/^\d+\.\s/.test(trimmed)) {
-      const listItems: string[] = []
-      while (i < lines.length && /^\d+\.\s/.test(lines[i].trim())) {
-        listItems.push(lines[i].trim().replace(/^\d+\.\s/, ''))
-        i++
-      }
-      elements.push(
-        <ol key={`ol-${i}`} className="list-decimal list-inside my-3 space-y-1.5 text-[var(--ink)]">
-          {listItems.map((item, lidx) => (
-            <li key={lidx} className="leading-relaxed">
-              {formatInline(item)}
-            </li>
-          ))}
-        </ol>,
-      )
-      continue
-    }
-
-    // Paragraph biasa
-    elements.push(
-      <p key={i} className="my-3 leading-relaxed text-[var(--ink)]">
-        {formatInline(trimmed)}
-      </p>,
-    )
-    i++
-  }
-
-  return <div className="article-body-content">{elements}</div>
+  return (
+    <div
+      className="article-body-content"
+      dangerouslySetInnerHTML={{ __html: renderedHtml }}
+    />
+  )
 }
 
 /**
- * Format penekanan inline: **bold**, *italic*, dan `code`
+ * Memproses teks menjadi HTML aman dengan dukungan Markdown dan HTML.
  */
-function formatInline(text: string): React.ReactNode {
-  // Regex untuk memisahkan token bold, italic, dan code
-  const tokens = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g)
+function processMarkdownAndHtml(raw: string): string {
+  if (!raw) return ''
 
-  return tokens.map((token, idx) => {
-    if (token.startsWith('**') && token.endsWith('**')) {
-      return (
-        <strong key={idx} className="font-bold text-[var(--ink)]">
-          {token.slice(2, -2)}
-        </strong>
-      )
+  // 1. Sanitasi awal untuk mencegah script berbahaya
+  let text = raw
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/on\w+\s*=\s*["'][^"']*["']/gi, '')
+    .replace(/javascript\s*:/gi, '')
+
+  // 2. Normalisasi Markdown Tables menjadi HTML <table>
+  text = processMarkdownTables(text)
+
+  // 3. Normalisasi Blockquotes
+  text = text.replace(/^>\s+(.+)$/gm, '<blockquote><p>$1</p></blockquote>')
+
+  // 4. Normalisasi Headings (h2, h3, h4)
+  text = text.replace(/^####\s+(.+)$/gm, '<h4>$1</h4>')
+  text = text.replace(/^###\s+(.+)$/gm, '<h3>$1</h3>')
+  text = text.replace(/^##\s+(.+)$/gm, '<h2>$1</h2>')
+  text = text.replace(/^#\s+(.+)$/gm, '<h1>$1</h1>')
+
+  // 5. Normalisasi Horizontal Rule
+  text = text.replace(/^(\-\-\-|\*\*\*)$/gm, '<hr />')
+
+  // 6. Normalisasi Lists
+  text = text.replace(/^\s*[-*]\s+(.+)$/gm, '<li>$1</li>')
+  text = text.replace(/(<li>.*<\/li>\s*)+/g, '<ul>$&</ul>')
+
+  // 7. Normalisasi Inline Markdown: Bold, Italic, Code
+  text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+  text = text.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>')
+  text = text.replace(/`([^`]+)`/g, '<code>$1</code>')
+
+  // 8. Normalisasi Paragraf jika belum terbungkus blok HTML
+  const blocks = text.split(/\n\s*\n/)
+  const wrapped = blocks
+    .map((block) => {
+      const trimmed = block.trim()
+      if (!trimmed) return ''
+      // Jika sudah diawali tag block HTML, biarkan
+      if (
+        /^(<(h[1-6]|table|thead|tbody|tr|th|td|ul|ol|li|blockquote|div|p|hr|figure|pre)\b)/i.test(
+          trimmed,
+        )
+      ) {
+        return trimmed
+      }
+      return `<p>${trimmed.replace(/\n/g, '<br />')}</p>`
+    })
+    .filter(Boolean)
+    .join('\n')
+
+  return wrapped
+}
+
+/**
+ * Mengubah tabel Markdown | a | b | menjadi tag <table> HTML bersih.
+ */
+function processMarkdownTables(text: string): string {
+  const lines = text.split('\n')
+  const out: string[] = []
+  let inTable = false
+  let tableRows: string[] = []
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim()
+
+    if (line.startsWith('|') && line.endsWith('|')) {
+      inTable = true
+      tableRows.push(line)
+    } else {
+      if (inTable) {
+        out.push(renderHtmlTable(tableRows))
+        tableRows = []
+        inTable = false
+      }
+      out.push(lines[i])
     }
-    if (token.startsWith('*') && token.endsWith('*')) {
-      return (
-        <em key={idx} className="italic">
-          {token.slice(1, -1)}
-        </em>
-      )
+  }
+
+  if (inTable && tableRows.length > 0) {
+    out.push(renderHtmlTable(tableRows))
+  }
+
+  return out.join('\n')
+}
+
+function renderHtmlTable(rows: string[]): string {
+  if (rows.length < 2) return rows.join('\n')
+
+  const headerCols = rows[0]
+    .split('|')
+    .slice(1, -1)
+    .map((c) => c.trim())
+  const bodyRows = rows.slice(2) // Baris ke-1 biasanya pemisah |---|---|
+
+  let html = '<table><thead><tr>'
+  for (const h of headerCols) {
+    html += `<th>${h}</th>`
+  }
+  html += '</tr></thead><tbody>'
+
+  for (const row of bodyRows) {
+    const cols = row
+      .split('|')
+      .slice(1, -1)
+      .map((c) => c.trim())
+    html += '<tr>'
+    for (const c of cols) {
+      html += `<td>${c}</td>`
     }
-    if (token.startsWith('`') && token.endsWith('`')) {
-      return (
-        <code
-          key={idx}
-          className="px-1.5 py-0.5 rounded text-xs font-mono bg-[var(--bg-subtle)] text-[var(--brand)] border border-[var(--line)]"
-        >
-          {token.slice(1, -1)}
-        </code>
-      )
-    }
-    return token
-  })
+    html += '</tr>'
+  }
+
+  html += '</tbody></table>'
+  return html
 }
