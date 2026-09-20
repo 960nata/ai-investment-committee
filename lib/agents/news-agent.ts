@@ -319,6 +319,69 @@ export async function seedInitialNewsArticles(): Promise<void> {
 }
 
 /**
+ * Pilih gambar editorial internet terverifikasi (Unsplash CDN direct image URLs)
+ * berdasarkan topik, simbol, dan kategori.
+ * PENTING: AI dilarang men-generate gambar artifisial, sistem murni mengambil data
+ * foto internet asli dan menyimpannya ke database (Supabase / Postgres).
+ */
+export function resolveInternetPhoto(
+  category: string,
+  topic: string,
+  symbols: string[],
+): typeof THEMATIC_IMAGES.ai_datacenter {
+  const t = topic.toLowerCase()
+  const syms = symbols.map((s) => s.toLowerCase())
+
+  if (
+    syms.some((x) => x.includes('nvda') || x.includes('tsm') || x.includes('arm')) ||
+    t.includes('chip') ||
+    t.includes('semikonduktor')
+  ) {
+    return THEMATIC_IMAGES.semiconductor
+  }
+  if (
+    syms.some((x) => x.includes('gold') || x.includes('antm')) ||
+    t.includes('emas') ||
+    t.includes('bullion')
+  ) {
+    return THEMATIC_IMAGES.gold_commodity
+  }
+  if (
+    syms.some((x) => x.includes('bren') || x.includes('ammn') || x.includes('pgas')) ||
+    t.includes('energi') ||
+    t.includes('listrik') ||
+    t.includes('panas bumi') ||
+    t.includes('nuklir')
+  ) {
+    return THEMATIC_IMAGES.nuclear_energy
+  }
+  if (
+    syms.some((x) => x.includes('btc') || x.includes('eth') || x.includes('sol')) ||
+    t.includes('kripto') ||
+    t.includes('bitcoin')
+  ) {
+    return THEMATIC_IMAGES.crypto_bitcoin
+  }
+  if (
+    category === 'saham-idx' ||
+    syms.some((x) => x.includes('.jk')) ||
+    t.includes('ihsg') ||
+    t.includes('bursa')
+  ) {
+    return THEMATIC_IMAGES.idx_exchange
+  }
+  if (
+    category === 'ekonomi-makro' ||
+    t.includes('fed') ||
+    t.includes('suku bunga') ||
+    t.includes('inflasi')
+  ) {
+    return THEMATIC_IMAGES.wall_street
+  }
+  return THEMATIC_IMAGES.ai_datacenter
+}
+
+/**
  * Jalankan agen AI untuk memproduksi artikel berita & analisis pasar baru secara on-demand.
  * Menggunakan model LLM dari keyring aktif (Gemini/Groq/OpenRouter).
  */
@@ -402,22 +465,14 @@ Artikel HARUS memenuhi kriteria:
     }
   }
 
-  // Pilih gambar dan video tematik yang paling cocok dengan kategori
-  let featuredImg = THEMATIC_IMAGES.ai_datacenter
-  let videoEmbed = CURATED_YOUTUBE_VIDEOS.ai_power_crisis
+  // Pilih foto internet terverifikasi (bukan AI generative, murni data foto internet)
+  const featuredImg = resolveInternetPhoto(category, parsed.title || defaultTopic, targetSymbols)
 
-  if (category === 'ekonomi-makro') {
-    featuredImg = THEMATIC_IMAGES.wall_street
+  let videoEmbed = CURATED_YOUTUBE_VIDEOS.ai_power_crisis
+  if (category === 'ekonomi-makro' || category === 'crypto-fintech') {
     videoEmbed = CURATED_YOUTUBE_VIDEOS.fed_rate_macro
-  } else if (category === 'energi-komoditas') {
-    featuredImg = THEMATIC_IMAGES.nuclear_energy
-    videoEmbed = CURATED_YOUTUBE_VIDEOS.ai_power_crisis
   } else if (category === 'saham-idx') {
-    featuredImg = THEMATIC_IMAGES.idx_exchange
     videoEmbed = CURATED_YOUTUBE_VIDEOS.idx_indonesia_economy
-  } else if (category === 'crypto-fintech') {
-    featuredImg = THEMATIC_IMAGES.crypto_bitcoin
-    videoEmbed = CURATED_YOUTUBE_VIDEOS.fed_rate_macro
   }
 
   // Jamin slug bersih, aman URL, dan ramah SEO
