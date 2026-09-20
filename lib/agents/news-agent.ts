@@ -420,8 +420,12 @@ Artikel HARUS memenuhi kriteria:
     videoEmbed = CURATED_YOUTUBE_VIDEOS.fed_rate_macro
   }
 
+  // Jamin slug bersih, aman URL, dan ramah SEO
+  const rawCandidate = parsed.slug || parsed.title || defaultTopic
+  const cleanSlug = slugify(rawCandidate) || `analisis-${Date.now().toString(36)}`
+
   const newArticle: NewMarketNews = {
-    slug: parsed.slug || `analisis-${Date.now()}`,
+    slug: cleanSlug,
     title: parsed.title || defaultTopic,
     summary: parsed.summary || 'Analisis intelijen pasar keuangan dan teknologi AI.',
     category: parsed.category || category,
@@ -442,3 +446,20 @@ Artikel HARUS memenuhi kriteria:
   const saved = await saveMarketNews(newArticle)
   return saved
 }
+
+/**
+ * Normalisasi teks menjadi slug URL yang bersih, aman, dan ramah SEO.
+ */
+export function slugify(text: string): string {
+  return text
+    .toString()
+    .toLowerCase()
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/[\s_-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 90)
+}
+

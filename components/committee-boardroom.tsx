@@ -1,7 +1,22 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import type { AgentVerdict, MarketCode } from '@/lib/db/schema'
+import {
+  IconAlert,
+  IconCheck,
+  IconClock,
+  IconClose,
+  IconCopy,
+  IconCourt,
+  IconRows,
+  IconScales,
+  IconShield,
+  IconTarget,
+  IconChat,
+  IconTrendDown,
+  IconTrendUp,
+} from './icons'
 
 interface Turn {
   agent: string
@@ -33,47 +48,47 @@ interface Props {
 
 const ROLES_INFO: Record<
   string,
-  { title: string; badge: string; icon: string; color: string; bg: string; border: string }
+  { title: string; badge: string; icon: React.ReactNode; color: string; bg: string; border: string }
 > = {
   analis: {
     title: 'Analis Data Kuantitatif',
     badge: 'AUDIT DATA',
-    icon: '📊',
-    color: '#38bdf8',
-    bg: 'rgba(56, 189, 248, 0.08)',
-    border: 'rgba(56, 189, 248, 0.25)',
+    icon: <IconRows size={16} />,
+    color: 'var(--ink)',
+    bg: 'var(--bg-subtle)',
+    border: 'var(--line)',
   },
   strateg: {
     title: 'Strateg Portofolio',
     badge: 'TESIS INVESTASI (BULL)',
-    icon: '🎯',
-    color: '#34d399',
-    bg: 'rgba(52, 211, 153, 0.08)',
-    border: 'rgba(52, 211, 153, 0.25)',
+    icon: <IconTarget size={16} />,
+    color: 'var(--ink)',
+    bg: 'var(--bg-subtle)',
+    border: 'var(--line)',
   },
   risiko: {
     title: 'Pengawas Risiko',
     badge: "DEVIL'S ADVOCATE (BEAR)",
-    icon: '🛡️',
-    color: '#f87171',
-    bg: 'rgba(248, 113, 113, 0.08)',
-    border: 'rgba(248, 113, 113, 0.25)',
+    icon: <IconShield size={16} />,
+    color: 'var(--ink)',
+    bg: 'var(--bg-subtle)',
+    border: 'var(--line)',
   },
   ketua: {
     title: 'Ketua Komite (CIO)',
     badge: 'PUTUSAN SIDANG',
-    icon: '⚖️',
-    color: '#a78bfa',
-    bg: 'rgba(167, 139, 250, 0.08)',
-    border: 'rgba(167, 139, 250, 0.25)',
+    icon: <IconScales size={16} />,
+    color: 'var(--ink)',
+    bg: 'var(--bg-subtle)',
+    border: 'var(--line)',
   },
 }
 
 const STEPS = [
-  { agent: 'Analis Data', text: 'Mengaudit angka, volatilitas & kualitas data...', icon: '📊' },
-  { agent: 'Strateg Portofolio', text: 'Menyusun tesis investasi & target harga...', icon: '🎯' },
-  { agent: 'Pengawas Risiko', text: 'Menguji skenario terburuk & mencari celah kerugian...', icon: '🛡️' },
-  { agent: 'Ketua Komite', text: 'Menimbang debat & memukul palu putusan...', icon: '⚖️' },
+  { agent: 'Analis Data', text: 'Mengaudit angka, volatilitas & kualitas data...', icon: <IconRows size={16} /> },
+  { agent: 'Strateg Portofolio', text: 'Menyusun tesis investasi & target harga...', icon: <IconTarget size={16} /> },
+  { agent: 'Pengawas Risiko', text: 'Menguji skenario terburuk & mencari celah kerugian...', icon: <IconShield size={16} /> },
+  { agent: 'Ketua Komite', text: 'Menimbang debat & memukul palu putusan...', icon: <IconScales size={16} /> },
 ]
 
 export function CommitteeBoardroom({ symbol, market, name, onClose }: Props) {
@@ -183,15 +198,15 @@ export function CommitteeBoardroom({ symbol, market, name, onClose }: Props) {
     const invalidationText = (parsed.invalidation as string) ?? ''
 
     const text = [
-      `🏛️ HASIL RAPAT KOMITE INVESTASI AI`,
+      `[HASIL RAPAT KOMITE INVESTASI AI]`,
       `Instrumen: ${symbol} (${name})`,
       `Putusan  : [ ${verdictText} ]`,
       `Keyakinan: ${confidenceText} (Kekuatan Bukti Kuantitatif)`,
       ``,
-      `📌 Tesis Utama:`,
+      `Tesis Utama:`,
       rationaleText,
-      keyRiskText ? `\n⚠️ Risiko Terbesar (Pengawas Risiko):\n${keyRiskText}` : '',
-      invalidationText ? `\n🛑 Syarat Pembatalan (Cut Loss):\n${invalidationText}` : '',
+      keyRiskText ? `\nRisiko Terbesar (Pengawas Risiko):\n${keyRiskText}` : '',
+      invalidationText ? `\nSyarat Pembatalan (Cut Loss):\n${invalidationText}` : '',
       ``,
       `— Ditelaah oleh 4 Agen AI Kuantitatif (Analis, Strateg, Pengawas Risiko, Ketua Komite)`,
     ]
@@ -213,7 +228,9 @@ export function CommitteeBoardroom({ symbol, market, name, onClose }: Props) {
         <div className="boardroom-title-block">
           <span className="boardroom-tag">RUANG SIDANG AI</span>
           <h2 className="boardroom-title">
-            <span className="boardroom-icon">🏛️</span>
+            <span className="boardroom-icon">
+              <IconCourt size={16} />
+            </span>
             Komite Investasi · {symbol}
           </h2>
           <span className="boardroom-sub">
@@ -229,7 +246,15 @@ export function CommitteeBoardroom({ symbol, market, name, onClose }: Props) {
               onClick={handleShare}
               title="Salin ringkasan tesis untuk dibagikan ke Telegram/Twitter"
             >
-              {copied ? '✓ Tersalin!' : '📋 Bagikan Tesis'}
+              {copied ? (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <IconCheck size={13} /> Tersalin!
+                </span>
+              ) : (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <IconCopy size={13} /> Bagikan Tesis
+                </span>
+              )}
             </button>
           )}
 
@@ -252,8 +277,8 @@ export function CommitteeBoardroom({ symbol, market, name, onClose }: Props) {
           </button>
 
           {onClose && (
-            <button type="button" className="boardroom-btn btn-close" onClick={onClose}>
-              ✕
+            <button type="button" className="boardroom-btn btn-close" onClick={onClose} title="Tutup">
+              <IconClose size={14} />
             </button>
           )}
         </div>
@@ -277,7 +302,9 @@ export function CommitteeBoardroom({ symbol, market, name, onClose }: Props) {
 
       {error && (
         <div className="boardroom-error">
-          <span>⚠️ {error}</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <IconAlert size={14} /> {error}
+          </span>
           <button type="button" className="link-inline" onClick={() => triggerDeliberation(true)}>
             Coba lagi
           </button>
@@ -293,7 +320,9 @@ export function CommitteeBoardroom({ symbol, market, name, onClose }: Props) {
 
       {!loading && !deliberating && !session && (
         <div className="boardroom-empty">
-          <div className="empty-circle">🏛️</div>
+          <div className="empty-circle">
+            <IconCourt size={28} />
+          </div>
           <h3>Belum Ada Sidang untuk {symbol}</h3>
           <p>
             Komite investasi belum menggelar rapat evaluasi untuk instrumen ini.
@@ -317,10 +346,26 @@ export function CommitteeBoardroom({ symbol, market, name, onClose }: Props) {
             <div className="verdict-pill-wrap">
               <span className="verdict-label">PUTUSAN KOMITE</span>
               <div className="verdict-badge">
-                {verdict === 'beli' && '🚀 BELI'}
-                {verdict === 'tahan' && '⏸️ TAHAN'}
-                {verdict === 'jual' && '🔻 JUAL'}
-                {verdict === 'abstain' && '🛡️ ABSTAIN'}
+                {verdict === 'beli' && (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <IconTrendUp size={14} /> BELI
+                  </span>
+                )}
+                {verdict === 'tahan' && (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <IconClock size={14} /> TAHAN
+                  </span>
+                )}
+                {verdict === 'jual' && (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <IconTrendDown size={14} /> JUAL
+                  </span>
+                )}
+                {verdict === 'abstain' && (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <IconShield size={14} /> ABSTAIN
+                  </span>
+                )}
               </div>
             </div>
 
@@ -341,7 +386,9 @@ export function CommitteeBoardroom({ symbol, market, name, onClose }: Props) {
               <div className="metric-box tension-box">
                 <span className="metric-label">Tensi Rapat (Bull vs Bear)</span>
                 <div className="tension-bar">
-                  <span className="tension-bull">🐂 Strateg</span>
+                  <span className="tension-bull" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <IconTrendUp size={12} /> Strateg
+                  </span>
                   <div className="tension-track">
                     <div
                       className="tension-pointer"
@@ -350,7 +397,9 @@ export function CommitteeBoardroom({ symbol, market, name, onClose }: Props) {
                       }}
                     />
                   </div>
-                  <span className="tension-bear">Risiko 🐻</span>
+                  <span className="tension-bear" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    Risiko <IconTrendDown size={12} />
+                  </span>
                 </div>
               </div>
             </div>
@@ -374,11 +423,12 @@ export function CommitteeBoardroom({ symbol, market, name, onClose }: Props) {
                 const role = ROLES_INFO[turn.agent] ?? {
                   title: turn.agent,
                   badge: 'ANGGOTA',
-                  icon: '💬',
+                  icon: <IconChat size={16} />,
                   color: 'var(--ink)',
                   bg: 'var(--surface-2)',
                   border: 'var(--line)',
                 }
+
 
                 return (
                   <div

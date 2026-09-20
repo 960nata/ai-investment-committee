@@ -19,7 +19,7 @@
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { CandlestickChart, type Candle } from './candlestick-chart'
 import { RegionFlag } from './flags'
-import { IconAlert, IconCandles, IconRows } from './icons'
+import { IconAlert, IconCandles, IconClose, IconCourt, IconRows } from './icons'
 import { AssetIcon } from './asset-icons'
 import { Blank } from './ui'
 import { ScorePanel, type HorizonView } from './score-panel'
@@ -299,7 +299,7 @@ export function InstrumentExplorer({ instruments, scores, tabs, initialInstrumen
               }}
               title="Tampilkan / sembunyikan transkrip debat rapat komite AI"
             >
-              <span>🏛️</span>
+              <IconCourt size={14} />
               <span>{showBoardroom ? 'Tutup Rapat Komite' : 'Rapat Komite AI'}</span>
             </button>
           )}
@@ -433,7 +433,7 @@ export function InstrumentExplorer({ instruments, scores, tabs, initialInstrumen
                   }}
                   title="Kosongkan pencarian"
                 >
-                  ✕
+                  <IconClose size={12} />
                 </button>
               )}
             </div>

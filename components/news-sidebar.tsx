@@ -3,7 +3,7 @@
 import React from 'react'
 import Link from 'next/link'
 import type { MarketNewsRow } from '@/lib/db/schema'
-import { IconClock, IconNews } from './icons'
+import { IconArrowRight, IconClock, IconNews } from './icons'
 
 export const POPULAR_TAGS = [
   '#Semikonduktor',
@@ -25,12 +25,14 @@ interface NewsSidebarProps {
     MarketNewsRow,
     'id' | 'slug' | 'title' | 'category' | 'publishedAt' | 'readingTimeMinutes'
   >[]
+  currentSlug?: string
   activeTag?: string | null
   onSelectTag?: (tag: string) => void
 }
 
 export function NewsSidebar({
   recentArticles = [],
+  currentSlug,
   activeTag,
   onSelectTag,
 }: NewsSidebarProps) {
@@ -50,28 +52,40 @@ export function NewsSidebar({
           {recentArticles.length === 0 ? (
             <p className="sidebar-empty">Belum ada pembaruan telaah.</p>
           ) : (
-            recentArticles.slice(0, 5).map((art) => (
-              <Link
-                key={art.id}
-                href={`/berita/${art.slug}`}
-                className="sidebar-recent-item"
-              >
-                <div className="sidebar-recent-meta">
-                  <span className="sidebar-recent-cat">
-                    {art.category.replace('-', ' ').toUpperCase()}
-                  </span>
-                  <span>·</span>
-                  <span className="sidebar-recent-time">
-                    <IconClock size={11} />
-                    {new Date(art.publishedAt).toLocaleDateString('id-ID', {
-                      day: 'numeric',
-                      month: 'short',
-                    })}
-                  </span>
-                </div>
-                <h4 className="sidebar-recent-title">{art.title}</h4>
-              </Link>
-            ))
+            recentArticles.slice(0, 6).map((art) => {
+              const isCurrent = currentSlug === art.slug
+              return (
+                <Link
+                  key={art.id}
+                  href={`/berita/${art.slug}`}
+                  className={`sidebar-recent-item ${isCurrent ? 'active' : ''}`}
+                  style={isCurrent ? { opacity: 0.65 } : undefined}
+                >
+                  <div className="sidebar-recent-meta">
+                    <span className="sidebar-recent-cat">
+                      {art.category.replace('-', ' ').toUpperCase()}
+                    </span>
+                    <span>·</span>
+                    <span className="sidebar-recent-time">
+                      <IconClock size={11} />
+                      {new Date(art.publishedAt).toLocaleDateString('id-ID', {
+                        day: 'numeric',
+                        month: 'short',
+                      })}
+                    </span>
+                    {isCurrent && (
+                      <>
+                        <span>·</span>
+                        <span style={{ color: 'var(--brand)', fontFamily: 'var(--mono)', fontSize: 10 }}>
+                          SEDANG DIBACA
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  <h4 className="sidebar-recent-title">{art.title}</h4>
+                </Link>
+              )
+            })
           )}
         </div>
       </div>
@@ -132,7 +146,9 @@ export function NewsSidebar({
             href="mailto:partnership@ai-investment-committee.internal?subject=Kerjasama%20Penempatan%20Iklan%20%26%20Sponsor"
             className="ad-sponsor-btn"
           >
-            Pasang Iklan / Kemitraan →
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              Pasang Iklan / Kemitraan <IconArrowRight size={12} />
+            </span>
           </a>
         </div>
 
@@ -143,3 +159,4 @@ export function NewsSidebar({
     </aside>
   )
 }
+

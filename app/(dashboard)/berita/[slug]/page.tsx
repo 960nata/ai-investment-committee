@@ -5,7 +5,7 @@ import { getMarketNewsBySlug, getMarketNewsList } from '@/lib/db/news-queries'
 import { seedInitialNewsArticles } from '@/lib/agents/news-agent'
 import { MarkdownView } from '@/components/markdown-view'
 import { ArticleActions } from '@/components/article-actions'
-import { IconNews } from '@/components/icons'
+import { IconCandles, IconNews } from '@/components/icons'
 import { NewsSidebar } from '@/components/news-sidebar'
 
 export const dynamic = 'force-dynamic'
@@ -277,10 +277,11 @@ export default async function BeritaDetailPage({ params }: Props) {
                 key={symbol}
                 href={`/instruments`}
                 className="badge-ticker"
-                style={{ padding: '4px 10px', fontSize: 'var(--t-small)' }}
+                style={{ padding: '4px 10px', fontSize: 'var(--t-small)', display: 'inline-flex', alignItems: 'center', gap: 5 }}
                 title={`Buka grafik dan analisis teknikal untuk ${symbol}`}
               >
-                📊 ${symbol}
+                <IconCandles size={13} />
+                <span>${symbol}</span>
               </Link>
             ))}
           </div>
@@ -344,9 +345,10 @@ export default async function BeritaDetailPage({ params }: Props) {
         </div>
 
         {/* Kolom Kanan: Berita Terkini + Tag Populer + Slot Iklan */}
-        <NewsSidebar recentArticles={allNews} />
+        <NewsSidebar recentArticles={allNews} currentSlug={slug} />
       </div>
     </div>
   )
 }
+
 

@@ -249,3 +249,88 @@ export function IconNews(props: IconProps) {
   )
 }
 
+/** Gedung sidang / komite institusional. */
+export function IconCourt(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M3 21h18" />
+      <path d="M5 21V10" />
+      <path d="M9 21V10" />
+      <path d="M15 21V10" />
+      <path d="M19 21V10" />
+      <path d="M12 3 3 8h18z" />
+    </Svg>
+  )
+}
+
+/** Bidikan sasaran / strategis portofolio. */
+export function IconTarget(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <circle cx="12" cy="12" r="8.5" />
+      <circle cx="12" cy="12" r="5" />
+      <circle cx="12" cy="12" r="1.5" />
+    </Svg>
+  )
+}
+
+/** Neraca timbangan keadilan / ketua komite. */
+export function IconScales(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M12 3v18" />
+      <path d="M5 6h14" />
+      <path d="M5 6l-3 7h6z" />
+      <path d="M19 6l-3 7h6z" />
+      <path d="M9 21h6" />
+    </Svg>
+  )
+}
+
+/** Gelembung pesan / debat agen. */
+export function IconChat(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </Svg>
+  )
+}
+
+/** Salin berkas / teks. */
+export function IconCopy(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect x="8.5" y="8.5" width="11" height="11" rx="1.5" />
+      <path d="M5.5 15.5H4a1.5 1.5 0 0 1-1.5-1.5V4a1.5 1.5 0 0 1 1.5-1.5h10A1.5 1.5 0 0 1 15.5 4v1.5" />
+    </Svg>
+  )
+}
+
+/** Tanda silang tutup / batal. */
+export function IconClose(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M18 6 6 18M6 6l12 12" />
+    </Svg>
+  )
+}
+
+/** Tren naik / sentimen beli. */
+export function IconTrendUp(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
+      <polyline points="16 7 22 7 22 13" />
+    </Svg>
+  )
+}
+
+/** Tren turun / sentimen jual. */
+export function IconTrendDown(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <polyline points="22 17 13.5 8.5 8.5 13.5 2 7" />
+      <polyline points="16 17 22 17 22 11" />
+    </Svg>
+  )
+}

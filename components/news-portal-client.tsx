@@ -3,7 +3,7 @@
 import React, { useState } from 'react'
 import Link from 'next/link'
 import type { MarketNewsRow } from '@/lib/db/schema'
-import { IconNews } from './icons'
+import { IconClose, IconNews } from './icons'
 import { NewsSidebar } from './news-sidebar'
 
 interface Props {
@@ -290,7 +290,7 @@ export function NewsPortalClient({ initialArticles }: Props) {
                   cursor: 'pointer',
                 }}
               >
-                ✕
+                <IconClose size={16} />
               </button>
             </div>
 
