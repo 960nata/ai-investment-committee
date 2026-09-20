@@ -9,31 +9,30 @@ export default async function AdminNewsListPage() {
   const news = await getMarketNewsList({ limit: 100 })
 
   return (
-    <div>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: 'var(--space-4)',
-          flexWrap: 'wrap',
-          gap: '12px',
-        }}
-      >
-        <div>
-          <p className="eyebrow">Content Management System</p>
-          <h1 className="headline" style={{ margin: '4px 0 0' }}>
-            Manajemen Warta &amp; Intelijen AI
-          </h1>
+    <div className="admin-page-content" suppressHydrationWarning>
+      <div className="admin-page-hero" suppressHydrationWarning>
+        <div className="admin-page-hero-main">
+          <div className="admin-eyebrow mono">
+            <IconNews size={13} style={{ color: 'var(--signal)' }} />
+            <span>CONTENT MANAGEMENT SYSTEM</span>
+          </div>
+          <h1 className="admin-page-headline">Manajemen Warta &amp; Intelijen AI</h1>
+          <p className="admin-page-standfirst">
+            Daftar publikasi artikel analisis pasar dengan kontrol penuh: edit isi teks, unggah gambar sampul Supabase, dan kontrol sematan video YouTube.
+          </p>
         </div>
 
-        <Link href="/admin/berita/baru" className="btn btn-primary" style={{ fontSize: '13px', fontFamily: 'var(--mono)' }}>
+        <Link
+          href="/admin/berita/baru"
+          className="btn btn-primary mono"
+          style={{ padding: '8px 16px', fontSize: '13px' }}
+        >
           <IconPlus size={14} />
           <span>Tulis Warta Baru</span>
         </Link>
       </div>
 
-      <div className="admin-card">
+      <div className="admin-table-card" style={{ padding: '20px' }} suppressHydrationWarning>
         <NewsTableClient initialNews={news} />
       </div>
     </div>

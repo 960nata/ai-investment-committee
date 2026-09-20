@@ -1,5 +1,6 @@
 import { getMarketNewsById } from '@/lib/db/news-queries'
 import { notFound } from 'next/navigation'
+import { IconNews } from '@/components/icons'
 import { NewsForm } from '../../news-form'
 
 export const dynamic = 'force-dynamic'
@@ -21,18 +22,23 @@ export default async function AdminEditArticlePage({
   }
 
   return (
-    <div>
-      <div style={{ marginBottom: 'var(--space-4)' }}>
-        <p className="eyebrow">CMS Redaksi Komite</p>
-        <h1 className="headline" style={{ margin: '4px 0 0' }}>
-          Edit Warta: #{article.id}
-        </h1>
-        <p className="standfirst">
-          Perbarui teks analisis, ganti foto sampul di Supabase Storage, atau perbarui/kosongkan URL YouTube.
-        </p>
+    <div className="admin-page-content" suppressHydrationWarning>
+      <div className="admin-page-hero" suppressHydrationWarning>
+        <div className="admin-page-hero-main">
+          <div className="admin-eyebrow mono">
+            <IconNews size={13} style={{ color: 'var(--signal)' }} />
+            <span>CMS REDAKSI KOMITE</span>
+          </div>
+          <h1 className="admin-page-headline">Edit Warta: #{article.id}</h1>
+          <p className="admin-page-standfirst">
+            Perbarui teks analisis, ganti foto sampul di Supabase Storage, atau perbarui/kosongkan URL YouTube.
+          </p>
+        </div>
       </div>
 
-      <NewsForm initialData={article} isEdit={true} />
+      <div suppressHydrationWarning>
+        <NewsForm initialData={article} isEdit={true} />
+      </div>
     </div>
   )
 }
