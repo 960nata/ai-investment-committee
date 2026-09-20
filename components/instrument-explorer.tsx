@@ -218,7 +218,7 @@ export function InstrumentExplorer({ instruments, scores, tabs, initialInstrumen
 
   return (
     <>
-      <div className="tabs" role="tablist" aria-label="Jenis aset">
+      <div className="tabs" role="tablist" aria-label="Jenis aset" suppressHydrationWarning>
         {tabs.map((t) => {
           const count = instruments.filter((i) =>
             t.children.some((c) => c.id === i.assetClass),
@@ -240,7 +240,7 @@ export function InstrumentExplorer({ instruments, scores, tabs, initialInstrumen
         })}
       </div>
 
-      <section className="panel" style={{ marginTop: 0 }}>
+      <section className="panel" style={{ marginTop: 0 }} suppressHydrationWarning>
         <div className="panel-head">
           <span className="panel-title">
             <IconCandles size={14} />

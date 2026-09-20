@@ -995,6 +995,7 @@ export interface InstrumentQuote extends InstrumentView {
   lastDate: string | null
   /** Perubahan terhadap penutupan sebelumnya, dalam persen. */
   changePct: number | null
+  change24h: number | null
   candleCount: number
 }
 
@@ -1033,7 +1034,7 @@ export async function listInstrumentQuotes(): Promise<InstrumentQuote[]> {
         max(d.close) filter (where d.rn = 1) as last_close,
         max(d.close) filter (where d.rn = 2) as prev_close,
         max(d.date)  filter (where d.rn = 1) as last_date,
-        max(d.total) as candle_count
+        count(d.close) as candle_count
       from (
         select
           close, date,
@@ -1051,6 +1052,7 @@ export async function listInstrumentQuotes(): Promise<InstrumentQuote[]> {
   return rows.map((r) => {
     const last = r.last_close === null ? null : Number(r.last_close)
     const prev = r.prev_close === null ? null : Number(r.prev_close)
+    const change = last !== null && prev !== null && prev !== 0 ? ((last - prev) / prev) * 100 : null
 
     return {
       id: r.id,
@@ -1068,7 +1070,8 @@ export async function listInstrumentQuotes(): Promise<InstrumentQuote[]> {
       lastDate: r.last_date,
       // Butuh dua penutupan. Satu penutupan tidak memberi tahu arah apa pun,
       // dan nol akan terbaca sebagai "tidak berubah".
-      changePct: last !== null && prev !== null && prev !== 0 ? ((last - prev) / prev) * 100 : null,
+      changePct: change,
+      change24h: change,
       candleCount: Number(r.candle_count),
     }
   })

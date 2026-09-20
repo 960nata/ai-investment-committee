@@ -1,12 +1,13 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { getMarketNewsBySlug, getMarketNewsList } from '@/lib/db/news-queries'
+import { getMarketNewsBySlug, getMarketNewsList, getAdSettings } from '@/lib/db/news-queries'
 import { seedInitialNewsArticles } from '@/lib/agents/news-agent'
 import { MarkdownView } from '@/components/markdown-view'
 import { ArticleActions } from '@/components/article-actions'
 import { IconCandles, IconNews } from '@/components/icons'
 import { NewsSidebar } from '@/components/news-sidebar'
+import { AdSlot } from '@/components/ad-slot'
 
 export const dynamic = 'force-dynamic'
 
@@ -60,7 +61,16 @@ export default async function BeritaDetailPage({ params }: Props) {
     notFound()
   }
 
-  const allNews = await getMarketNewsList({ limit: 8 })
+  const [allNews, adSlots] = await Promise.all([
+    getMarketNewsList({ limit: 8 }),
+    getAdSettings().catch(() => []),
+  ])
+
+  const headerAd = adSlots.find((s) => s.slotName === 'header_leaderboard')
+  const midAd = adSlots.find((s) => s.slotName === 'in_article_mid')
+  const sidebarAd = adSlots.find((s) => s.slotName === 'sidebar_widget')
+  const footerAd = adSlots.find((s) => s.slotName === 'footer_banner')
+
   const related = allNews.filter((a) => a.slug !== slug).slice(0, 3)
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 
@@ -124,6 +134,9 @@ export default async function BeritaDetailPage({ params }: Props) {
       <div className="news-layout-with-sidebar">
         <div className="news-main-column">
           <article className="panel" style={{ padding: 'var(--space-5)' }}>
+        {/* Slot Iklan 1: Header Leaderboard (Default Hidden) */}
+        <AdSlot slot={headerAd} />
+
         {/* Header Artikel */}
         <header className="article-header">
           <div
@@ -259,6 +272,9 @@ export default async function BeritaDetailPage({ params }: Props) {
           </div>
         )}
 
+        {/* Slot Iklan 2: In-Article Mid-Stream (Default Hidden) */}
+        <AdSlot slot={midAd} />
+
         {/* Konten Utama Artikel (Markdown) */}
         <div style={{ margin: 'var(--space-5) 0' }}>
           <MarkdownView content={article.contentMarkdown} />
@@ -300,6 +316,9 @@ export default async function BeritaDetailPage({ params }: Props) {
             ))}
           </div>
         </div>
+
+        {/* Slot Iklan 4: Footer Anchor Banner (Default Hidden) */}
+        <AdSlot slot={footerAd} />
 
         {/* Bilah Aksi & Bagikan */}
         <ArticleActions
@@ -358,8 +377,11 @@ export default async function BeritaDetailPage({ params }: Props) {
       )}
         </div>
 
-        {/* Kolom Kanan: Berita Terkini + Tag Populer + Slot Iklan */}
-        <NewsSidebar recentArticles={allNews} currentSlug={slug} />
+        {/* Kolom Kanan: Berita Terkini + Tag Populer + Slot Iklan 3: Sidebar */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+          <AdSlot slot={sidebarAd} />
+          <NewsSidebar recentArticles={allNews} currentSlug={slug} />
+        </div>
       </div>
     </div>
   )

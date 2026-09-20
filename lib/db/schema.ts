@@ -588,3 +588,53 @@ export const marketNews = pgTable(
 export type MarketNewsRow = typeof marketNews.$inferSelect
 export type NewMarketNews = typeof marketNews.$inferInsert
 
+// ---------------------------------------------------------------------------
+// Manajemen Pengguna & Hak Akses (User vs Admin)
+// ---------------------------------------------------------------------------
+
+export const appUser = pgTable(
+  'app_user',
+  {
+    id: serial('id').primaryKey(),
+    email: varchar('email', { length: 128 }).notNull(),
+    name: varchar('name', { length: 128 }).notNull().default('Analis Komite'),
+    role: varchar('role', { length: 32 }).notNull().default('user'), // 'admin' | 'user'
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex('app_user_email_uq').on(t.email),
+    index('app_user_role_idx').on(t.role),
+  ],
+)
+
+export type AppUserRow = typeof appUser.$inferSelect
+export type NewAppUser = typeof appUser.$inferInsert
+
+// ---------------------------------------------------------------------------
+// Pengaturan Iklan & AdSense (4 Slot Strategis, Default Hidden)
+// ---------------------------------------------------------------------------
+
+export const adSettings = pgTable(
+  'ad_settings',
+  {
+    id: serial('id').primaryKey(),
+    slotName: varchar('slot_name', { length: 64 }).notNull(), // 'header_leaderboard' | 'in_article_mid' | 'sidebar_widget' | 'footer_banner'
+    title: varchar('title', { length: 128 }).notNull(),
+    description: text('description'),
+    isEnabled: boolean('is_enabled').notNull().default(false), // WAJIB DEFAULT FALSE / HIDDEN
+    adCodeHtml: text('ad_code_html'),
+    targetUrl: text('target_url'),
+    imageUrl: text('image_url'),
+    sponsorName: varchar('sponsor_name', { length: 128 }),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('ad_settings_slot_name_uq').on(t.slotName),
+  ],
+)
+
+export type AdSettingsRow = typeof adSettings.$inferSelect
+export type NewAdSettings = typeof adSettings.$inferInsert
+

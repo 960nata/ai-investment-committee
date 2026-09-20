@@ -20,7 +20,7 @@ export const SECTIONS = [
   {
     label: 'Pasar',
     links: [
-      { href: '/', label: 'Ringkasan', icon: IconGauge },
+      { href: '/ringkasan', label: 'Ringkasan', icon: IconGauge },
       { href: '/instruments', label: 'Instrumen', icon: IconRows },
       { href: '/berita', label: 'Warta & Intelijen AI', icon: IconNews },
     ],
@@ -90,6 +90,11 @@ export function Rail() {
           <strong>Alat ukur</strong>
           Menampilkan peluang beserta data mentahnya. Tidak pernah menganjurkan satu pun
           keputusan.
+          <div style={{ marginTop: 'var(--space-2)', paddingTop: 'var(--space-2)', borderTop: '1px solid var(--line)' }}>
+            <Link href="/admin" className="mono" style={{ color: 'var(--ink-faint)', fontSize: '11px', textDecoration: 'none' }}>
+              &rarr; Portal Admin Komite
+            </Link>
+          </div>
         </div>
       </aside>
     </>

@@ -24,7 +24,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <SidebarProvider>
-      <div className="app">
+      <div className="app" suppressHydrationWarning>
         <Topbar
           status={status}
           action={
@@ -33,9 +33,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
             ) : undefined
           }
         />
-        <div className="shell">
+        <div className="shell" suppressHydrationWarning>
           <Rail />
-          <main className="main">{children}</main>
+          <main className="main" suppressHydrationWarning>{children}</main>
         </div>
       </div>
     </SidebarProvider>

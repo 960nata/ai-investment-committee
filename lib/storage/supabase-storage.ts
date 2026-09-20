@@ -106,6 +106,31 @@ export async function uploadBufferToSupabase(
 }
 
 /**
+ * Unggah berkas File (dari FormData formulir browser) langsung ke Supabase Storage.
+ */
+export async function uploadImageFile(
+  file: File,
+  filenamePrefix = 'manual',
+): Promise<UploadResult> {
+  try {
+    const bytes = await file.arrayBuffer()
+    const buffer = Buffer.from(bytes)
+    const ext = file.name.split('.').pop() || 'jpg'
+    const cleanPrefix = filenamePrefix
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, '-')
+      .slice(0, 40)
+    const storagePath = `news/${cleanPrefix}-${Date.now().toString(36)}.${ext}`
+    return uploadBufferToSupabase(buffer, storagePath, file.type || 'image/jpeg')
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    }
+  }
+}
+
+/**
  * Unduh foto asli dari internet (misal CDN Unsplash / berita), lalu langsung
  * unggah ke Supabase Storage sebelum artikel diterbitkan.
  *

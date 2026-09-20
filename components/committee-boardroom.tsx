@@ -100,14 +100,19 @@ export function CommitteeBoardroom({ symbol, market, name, onClose }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('timeline')
+  const [prevSymbol, setPrevSymbol] = useState(symbol)
+
+  if (prevSymbol !== symbol) {
+    setPrevSymbol(symbol)
+    setLoading(true)
+    setError(null)
+  }
 
   const stepTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   // Ambil transkrip rapat terakhir untuk instrumen ini
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
-    setError(null)
 
     async function fetchSession() {
       try {
@@ -986,17 +991,17 @@ function RisikoRenderer({ raw }: { raw: string }) {
 
 /** Renderer Khusus Ketua Komite (CIO) */
 function KetuaRenderer({ raw, session }: { raw: string; session: SessionData }) {
-  let parsed: any = null
+  let parsed: Record<string, unknown> | null = null
   try {
     parsed = JSON.parse(raw)
   } catch {
     // line-based
   }
 
-  const verdict = parsed?.verdict ?? session.verdict ?? 'abstain'
-  const rationale = parsed?.rationale ?? session.rationale ?? raw
-  const keyRisk = parsed?.key_risk ?? extractKey(raw, 'risiko utama')
-  const invalidation = parsed?.invalidation ?? extractKey(raw, 'syarat pembatalan')
+  const verdict = (parsed?.verdict as string | undefined) ?? session.verdict ?? 'abstain'
+  const rationale = (parsed?.rationale as string | undefined) ?? session.rationale ?? raw
+  const keyRisk = (parsed?.key_risk as string | undefined) ?? extractKey(raw, 'risiko utama')
+  const invalidation = (parsed?.invalidation as string | undefined) ?? extractKey(raw, 'syarat pembatalan')
 
   const verdictTone =
     verdict === 'beli' ? 'ok' : verdict === 'jual' ? 'down' : verdict === 'tahan' ? 'warn' : 'neutral'

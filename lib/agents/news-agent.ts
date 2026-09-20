@@ -332,6 +332,46 @@ Kekuatan ekosistem semikonduktor saat ini terpusat pada tiga pilar yang saling m
     author: 'AI Intelligence Desk (Riset Teknologi)',
     readingTimeMinutes: 4,
     publishedAt: new Date(Date.now() - 3600 * 1000 * 36), // 1.5 hari lalu
+  },
+  {
+    slug: 'eskalasi-geopolitik-selat-hormuz-minyak-mentah-brent-dan-rekor-emas',
+    title: 'Eskalasi Konflik Geopolitik & Disrupsi Jalur Minyak: Mengapa Emas Mengunci Rekor Baru dan Dolar Menguat',
+    summary: 'Ketegangan militer di jalur pasokan minyak dunia memicu premi risiko global. Analisis dampak langsung terhadap harga minyak mentah Brent, lonjakan safe-haven emas fisik, serta tekanan depresiasi nilai tukar mata uang berkembang.',
+    category: 'komoditi-emas',
+    tags: ['Geopolitik', 'Minyak Mentah', 'Emas', 'Komoditi', 'Inflasi', 'Dolar AS'],
+    mentionedSymbols: ['CL=F', 'BZ=F', 'XAUUSD', 'MEDC.JK', 'PGAS.JK', 'USDIDR'],
+    sentiment: 'bullish',
+    impactScore: 9,
+    featuredImage: THEMATIC_IMAGES.gold_commodity,
+    youtubeVideo: null, // CONTOH NYATA: Tanpa video YouTube. Player otomatis tersembunyi total di reader!
+    keyTakeaways: [
+      'Disrupsi jalur maritim energi di Selat Hormuz berpotensi memotong pasokan 20% minyak mentah dunia, mendorong premi risiko kilat di pasar berjangka Brent dan WTI.',
+      'Bank sentral global dan dana institusional memindahkan aset likuid ke emas fisik murni (XAUUSD) sebagai instrumen lindung nilai mutlak bebas risiko sanksi.',
+      'Emiten migas dan energi hulu domestik seperti MEDC.JK dan ELSA.JK mencatat kenaikan rata-rata harga jual (ASP) seketika.',
+      'Risiko imported inflation memaksa otoritas moneter mempertahankan suku bunga tinggi demi meredam gejolak nilai tukar mata uang domestik.'
+    ],
+    contentMarkdown: `## Anatomi Kejutan Geopolitik: Ketika Pasokan Fisik Terancam
+Ketika ketegangan militer memuncak di titik-titik penyempitan maritim (*chokepoints*) energi dunia, pasar finansial tidak lagi bereaksi terhadap laporan laba kuartalan, melainkan terhadap <strong>ketersediaan fisik pasokan energi dan keamanan logistik</strong>.
+
+Premi risiko geopolitik (*geopolitical risk premium*) langsung tercermin pada harga minyak mentah Brent yang menguji level kritis di atas $85 per barel. Bagi negara importir neto minyak, setiap kenaikan $10 per barel memperlebar defisit transaksi berjalan dan memberi tekanan depresiasi pada nilai tukar mata uang lokal terhadap Dolar AS (USD).
+
+---
+
+### Tiga Pilar Dampak Harga di Portofolio Global & Domestik
+
+1. **Emas (XAUUSD) Sebagai Benteng Lindung Nilai Mutlak**:
+   Berbeda dari instrumen surat utang yang masih membawa risiko gagal bayar atau pembekuan cadangan devisa, emas fisik tidak memiliki risiko pihak ketiga (*counterparty risk*). Pembelian masif oleh bank-bank sentral Asia dan Timur Tengah mengonfirmasi bahwa emas kini diperlakukan sebagai jangkar moneter alternatif.
+
+2. **Dinamika Saham Hulu Migas Domestik (MEDC.JK & PGAS.JK)**:
+   Perusahaan eksplorasi dan produksi minyak hulu (*upstream*) seperti Medco Energi (MEDC) menikmati *operating leverage* instan: biaya pengangkatan (*lifting cost*) relatif tetap, sementara pendapatan melonjak mengikuti harga patokan minyak mentah dunia.
+
+3. **Ancaman Imported Inflation & Respon Bank Sentral**:
+   Biaya logistik pelayaran internasional dan premi asuransi kapal tanker melonjak hingga 300%. Kenaikan biaya bahan bakar menular ke rantai pasok pangan dan manufaktur, menahan bank sentral untuk tidak terburu-buru melonggarkan suku bunga acuan.
+
+> **Protokol Risiko Komite**: Hindari mengejar reli spekulatif pada kontrak berjangka minyak dengan *leverage* tinggi saat volatilitas tersirat (*implied volatility*) melonjak ekstrem. Lindung nilai defensif paling terukur tetap berada pada alokasi emas murni dan saham produsen energi dengan rasio kas kuat.`,
+    author: 'AI Intelligence Desk (Makro & Geopolitik)',
+    readingTimeMinutes: 4,
+    publishedAt: new Date(Date.now() - 3600 * 1000 * 12), // 12 jam lalu
   }
 ]
 
@@ -519,7 +559,22 @@ Artikel HARUS memenuhi kriteria:
     json: true
   })
 
-  let parsed: any
+  interface ParsedNewsPayload {
+    slug?: string
+    title?: string
+    summary?: string
+    category?: string
+    tags?: string[]
+    mentionedSymbols?: string[]
+    sentiment?: string
+    impactScore?: number
+    keyTakeaways?: string[]
+    contentMarkdown?: string
+    author?: string
+    readingTimeMinutes?: number
+  }
+
+  let parsed: ParsedNewsPayload
   try {
     const raw = response.text.trim()
     const cleanJson = raw.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim()

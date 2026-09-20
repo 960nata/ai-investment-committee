@@ -480,3 +480,5 @@ export function AssetIcon({ symbol, size = 16, label }: AssetIconProps) {
     </svg>
   )
 }
+
+export const AssetLogo = AssetIcon
