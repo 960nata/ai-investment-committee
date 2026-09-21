@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { IconPlus, IconNews } from '@/components/icons'
 import { getMarketNewsList } from '@/lib/db/news-queries'
 import { NewsTableClient } from './news-table-client'
+import { AiGeneratorClient } from './ai-generator-client'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,14 +23,20 @@ export default async function AdminNewsListPage() {
           </p>
         </div>
 
-        <Link
-          href="/admin/berita/baru"
-          className="btn btn-primary mono"
-          style={{ padding: '8px 16px', fontSize: '13px' }}
-        >
-          <IconPlus size={14} />
-          <span>Tulis Warta Baru</span>
-        </Link>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <AiGeneratorClient />
+
+            <Link
+              href="/admin/berita/baru"
+              className="btn btn-primary mono"
+              style={{ padding: '8px 16px', fontSize: '13px' }}
+            >
+              <IconPlus size={14} />
+              <span>Tulis Warta Baru</span>
+            </Link>
+          </div>
+        </div>
       </div>
 
       <div className="admin-table-card" style={{ padding: '20px' }} suppressHydrationWarning>

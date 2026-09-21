@@ -11,6 +11,7 @@ import {
   IconCheck,
   IconAlert,
   IconVideo,
+  IconEye,
 } from '@/components/icons'
 import type { MarketNewsRow } from '@/lib/db/schema'
 
@@ -153,6 +154,7 @@ export function NewsTableClient({ initialNews }: { initialNews: MarketNewsRow[] 
               <th>Judul Warta</th>
               <th>Kategori</th>
               <th>Dampak</th>
+              <th>Tayangan</th>
               <th>YouTube</th>
               <th>Tanggal Rilis</th>
               <th style={{ textAlign: 'right' }}>Aksi</th>
@@ -186,6 +188,12 @@ export function NewsTableClient({ initialNews }: { initialNews: MarketNewsRow[] 
                   >
                     {item.impactScore}/10
                   </span>
+                </td>
+                <td className="mono" style={{ fontSize: '11px', color: 'var(--ink)' }}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                    <IconEye size={13} style={{ color: 'var(--signal)' }} />
+                    <span style={{ fontWeight: 600 }}>{(item.viewsCount ?? 0).toLocaleString('id-ID')}</span>
+                  </div>
                 </td>
                 <td>
                   {item.youtubeVideo?.videoId ? (

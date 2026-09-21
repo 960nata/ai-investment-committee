@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getMarketNewsList } from '@/lib/db/news-queries'
 import { generateLiveNewsArticle, seedInitialNewsArticles, syncExistingNewsImagesToSupabase } from '@/lib/agents/news-agent'
+import { isRequestAdminAuthenticated, verifyAdminSession } from '@/lib/auth/admin-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -71,8 +72,21 @@ Tautan: /berita/${a.slug}`
  *
  * Memicu agen AI untuk menulis dan menerbitkan artikel berita baru secara langsung.
  * Atau menyinkronkan gambar artikel ke Supabase Storage (action: 'sync_images').
+ *
+ * Khusus redaksi. Satu permintaan di sini membakar kuota LLM, mengunduh foto,
+ * dan menerbitkan artikel atas nama portal — kalau siapa pun bisa memanggilnya,
+ * kuota habis dalam semenit dan halaman warta terisi tulisan yang tak seorang
+ * pun di redaksi pernah minta.
  */
 export async function POST(request: NextRequest) {
+  const isAuthed = (await verifyAdminSession()) || isRequestAdminAuthenticated(request)
+  if (!isAuthed) {
+    return NextResponse.json(
+      { error: 'Akses ditolak. Penerbitan warta AI hanya untuk redaksi.' },
+      { status: 403 },
+    )
+  }
+
   try {
     const body = await request.json().catch(() => ({}))
 

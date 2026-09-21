@@ -6,12 +6,29 @@
  * penuh dengan runtime Node.js dan Next.js Server Components / API Routes.
  */
 
+import { convertToAvif, downloadImage } from '@/lib/media/avif'
+
 const DEFAULT_SUPABASE_URL = 'https://gnluripxpvpxjektjntw.supabase.co'
 const DEFAULT_BUCKET = 'ai investasi'
 
 export interface UploadResult {
   ok: boolean
   publicUrl?: string
+  error?: string
+}
+
+/** Hasil penyimpanan satu foto internet ke bucket sendiri. */
+export interface StoredImageResult {
+  ok: boolean
+  publicUrl?: string
+  /** Ukuran berkas setelah konversi. */
+  bytes?: number
+  /** Ukuran berkas asli sebelum konversi, untuk pelaporan penghematan. */
+  originalBytes?: number
+  width?: number
+  height?: number
+  /** false bila sharp tidak tersedia dan berkas disimpan dalam format aslinya. */
+  isAvif?: boolean
   error?: string
 }
 
@@ -131,80 +148,117 @@ export async function uploadImageFile(
 }
 
 /**
- * Unduh foto asli dari internet (misal CDN Unsplash / berita), lalu langsung
- * unggah ke Supabase Storage sebelum artikel diterbitkan.
+ * Unduh foto dari internet, ubah ke AVIF, lalu unggah ke Supabase Storage.
  *
- * Jika proses upload gagal (misal koneksi jaringan / kuota), fungsi ini secara
- * otomatis dan aman mengembalikan URL internet asli sebagai jaring pengaman
- * (graceful fallback) agar proses pembuatan artikel tidak terputus.
+ * Ini jalur ketat: ia tidak pernah diam-diam mengembalikan URL internet asli.
+ * Sampul yang masih menunjuk ke CDN orang lain adalah sampul yang suatu hari
+ * berubah jadi kotak kosong tanpa ada yang tahu, jadi pemanggil harus melihat
+ * kegagalannya dan memutuskan sendiri — mencoba kandidat foto berikutnya, atau
+ * membatalkan penerbitan artikel.
  *
- * @param internetUrl URL foto asli di internet
- * @param slugPrefix Prefix penamaan berkas berdasarkan slug artikel
+ * @param internetUrl URL berkas foto asli di internet
+ * @param slugPrefix Prefix penamaan berkas, biasanya slug artikel
+ */
+export async function storeRemoteImageAsAvif(
+  internetUrl: string,
+  slugPrefix: string,
+): Promise<StoredImageResult> {
+  if (!isSupabaseStorageConfigured()) {
+    return { ok: false, error: 'SUPABASE_SERVICE_ROLE_KEY belum dikonfigurasi.' }
+  }
+
+  const download = await downloadImage(internetUrl)
+  if (!download.ok || !download.buffer) {
+    return { ok: false, error: download.error ?? 'Unduhan foto gagal' }
+  }
+
+  const converted = await convertToAvif(download.buffer, download.contentType)
+  if (!converted.ok || !converted.buffer) {
+    return { ok: false, error: converted.error ?? 'Konversi AVIF gagal' }
+  }
+
+  const fileName = buildStoragePath(slugPrefix, converted.extension ?? 'avif')
+
+  const upload = await uploadBufferToSupabase(
+    converted.buffer,
+    fileName,
+    converted.contentType ?? 'image/avif',
+  )
+
+  if (!upload.ok || !upload.publicUrl) {
+    return { ok: false, error: upload.error ?? 'Unggahan ke Supabase Storage gagal' }
+  }
+
+  const ratio = converted.originalBytes
+    ? Math.round((1 - converted.buffer.length / converted.originalBytes) * 100)
+    : 0
+
+  console.log(
+    `[SupabaseStorage] ${fileName} tersimpan — ` +
+      `${formatKb(converted.originalBytes ?? 0)} → ${formatKb(converted.buffer.length)}` +
+      `${ratio > 0 ? ` (hemat ${ratio}%)` : ''}` +
+      `${converted.usedOriginal ? ' [tanpa konversi AVIF]' : ''}`,
+  )
+
+  return {
+    ok: true,
+    publicUrl: upload.publicUrl,
+    bytes: converted.buffer.length,
+    originalBytes: converted.originalBytes,
+    width: converted.width,
+    height: converted.height,
+    isAvif: converted.contentType === 'image/avif',
+  }
+}
+
+/**
+ * Nama berkas dibuat unik per unggahan, bukan per slug.
+ *
+ * Menimpa berkas lama dengan nama yang sama akan membuat pembaca yang sudah
+ * memuat halaman melihat foto lamanya dari cache CDN sampai TTL-nya habis.
+ */
+function buildStoragePath(slugPrefix: string, extension: string): string {
+  const cleanPrefix =
+    slugPrefix
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 50) || 'warta'
+
+  return `news/${cleanPrefix}-${Date.now().toString(36)}.${extension}`
+}
+
+function formatKb(bytes: number): string {
+  return `${Math.round(bytes / 1024)} KB`
+}
+
+/**
+ * Bungkus lunak `storeRemoteImageAsAvif` untuk pemakaian yang tidak boleh
+ * menggagalkan proses besar — penyemaian artikel bibit dan sinkronisasi massal.
+ *
+ * Di sini kegagalan berarti sampulnya tetap menunjuk ke internet, dan pemanggil
+ * mengetahuinya lewat `isMirrored: false`.
  */
 export async function mirrorInternetImageToSupabase(
   internetUrl: string,
   slugPrefix: string,
-): Promise<{ url: string; isMirrored: boolean }> {
-  // Jika URL sudah berasal dari Supabase Storage, tidak perlu di-mirror ulang
+): Promise<{ url: string; isMirrored: boolean; error?: string }> {
   const { supabaseUrl } = getSupabaseStorageConfig()
-  if (internetUrl.startsWith(supabaseUrl)) {
+
+  // Foto yang sudah tersimpan sebagai AVIF di bucket sendiri tidak perlu diulang.
+  if (internetUrl.startsWith(supabaseUrl) && internetUrl.endsWith('.avif')) {
     return { url: internetUrl, isMirrored: true }
   }
 
-  try {
-    console.log(`[SupabaseStorage] Mengunduh foto internet dari: ${internetUrl}`)
+  const stored = await storeRemoteImageAsAvif(internetUrl, slugPrefix)
 
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 12_000)
-
-    const response = await fetch(internetUrl, {
-      signal: controller.signal,
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 AI-News-Bot/1.0',
-        Accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-      },
-    })
-    clearTimeout(timeoutId)
-
-    if (!response.ok) {
-      console.warn(
-        `[SupabaseStorage] Gagal mengunduh foto internet (HTTP ${response.status}). Gunakan URL asli.`,
-      )
-      return { url: internetUrl, isMirrored: false }
-    }
-
-    const contentType = response.headers.get('content-type') || 'image/jpeg'
-    const arrayBuffer = await response.arrayBuffer()
-    const buffer = Buffer.from(arrayBuffer)
-
-    // Tentukan ekstensi berkas
-    let ext = 'jpg'
-    if (contentType.includes('png')) ext = 'png'
-    else if (contentType.includes('webp')) ext = 'webp'
-    else if (contentType.includes('gif')) ext = 'gif'
-
-    // Format nama file rapi dan unik
-    const cleanPrefix = slugPrefix
-      .toLowerCase()
-      .replace(/[^a-z0-9-]/g, '-')
-      .slice(0, 50)
-    const fileName = `news/${cleanPrefix}-${Date.now().toString(36)}.${ext}`
-
-    console.log(`[SupabaseStorage] Mengunggah foto ke Supabase Storage: ${fileName} (${buffer.length} bytes)...`)
-    const uploadResult = await uploadBufferToSupabase(buffer, fileName, contentType)
-
-    if (uploadResult.ok && uploadResult.publicUrl) {
-      console.log(`[SupabaseStorage] Berhasil diunggah! URL Publik: ${uploadResult.publicUrl}`)
-      return { url: uploadResult.publicUrl, isMirrored: true }
-    } else {
-      console.warn(
-        `[SupabaseStorage] Gagal mengunggah ke Supabase Storage: ${uploadResult.error}. Gunakan URL asli.`,
-      )
-      return { url: internetUrl, isMirrored: false }
-    }
-  } catch (err) {
-    console.warn('[SupabaseStorage] Error mirror foto ke Supabase Storage:', err)
-    return { url: internetUrl, isMirrored: false }
+  if (stored.ok && stored.publicUrl) {
+    return { url: stored.publicUrl, isMirrored: true }
   }
+
+  console.warn(
+    `[SupabaseStorage] Gagal menyimpan foto ${internetUrl}: ${stored.error}. Pakai URL asli.`,
+  )
+  return { url: internetUrl, isMirrored: false, error: stored.error }
 }

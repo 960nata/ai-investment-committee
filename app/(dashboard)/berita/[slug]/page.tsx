@@ -1,11 +1,11 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { getMarketNewsBySlug, getMarketNewsList, getAdSettings } from '@/lib/db/news-queries'
+import { getMarketNewsBySlug, getMarketNewsList, getAdSettings, incrementNewsViews } from '@/lib/db/news-queries'
 import { seedInitialNewsArticles } from '@/lib/agents/news-agent'
 import { MarkdownView } from '@/components/markdown-view'
 import { ArticleActions } from '@/components/article-actions'
-import { IconCandles, IconNews } from '@/components/icons'
+import { IconCandles, IconNews, IconEye } from '@/components/icons'
 import { NewsSidebar } from '@/components/news-sidebar'
 import { AdSlot } from '@/components/ad-slot'
 
@@ -60,6 +60,9 @@ export default async function BeritaDetailPage({ params }: Props) {
   if (!article) {
     notFound()
   }
+
+  // Tambah view counter secara atomik saat artikel dibaca
+  const updatedViews = await incrementNewsViews(slug)
 
   const [allNews, adSlots] = await Promise.all([
     getMarketNewsList({ limit: 8 }),
@@ -173,6 +176,11 @@ export default async function BeritaDetailPage({ params }: Props) {
             </span>
             <span>·</span>
             <span>{article.readingTimeMinutes} menit baca</span>
+            <span>·</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--ink)' }}>
+              <IconEye size={14} style={{ color: 'var(--signal)' }} />
+              <strong>{Math.max(updatedViews || 0, (article.viewsCount || 0) + 1).toLocaleString('id-ID')}</strong> pembaca
+            </span>
           </div>
         </header>
 
@@ -203,19 +211,24 @@ export default async function BeritaDetailPage({ params }: Props) {
                 }}
               >
                 {article.featuredImage.caption}
-                {article.featuredImage.credit && ` (${article.featuredImage.credit})`}
-                {article.featuredImage.url.includes('supabase.co') && (
-                  <span
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 4,
-                      marginLeft: 8,
-                      color: 'var(--positive, #10b981)',
-                      fontWeight: 500,
-                    }}
-                  >
-                    · Supabase Storage
+                {/* Kredit dan lisensi ditautkan ke halaman sumber: sebagian foto
+                    dipakai di bawah lisensi Creative Commons yang mewajibkannya. */}
+                {article.featuredImage.credit && (
+                  <span style={{ marginLeft: 6 }}>
+                    (
+                    {article.featuredImage.sourceUrl ? (
+                      <a
+                        href={article.featuredImage.sourceUrl}
+                        target="_blank"
+                        rel="noreferrer nofollow"
+                        style={{ color: 'inherit', textDecoration: 'underline' }}
+                      >
+                        {article.featuredImage.credit}
+                      </a>
+                    ) : (
+                      article.featuredImage.credit
+                    )}
+                    {article.featuredImage.license && ` · ${article.featuredImage.license}`})
                   </span>
                 )}
               </figcaption>

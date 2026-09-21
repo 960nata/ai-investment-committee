@@ -13,7 +13,11 @@
 
 import { complete } from '@/lib/ai/registry'
 import { saveMarketNews, getMarketNewsList } from '@/lib/db/news-queries'
-import { mirrorInternetImageToSupabase } from '@/lib/storage/supabase-storage'
+import {
+  mirrorInternetImageToSupabase,
+  storeRemoteImageAsAvif,
+} from '@/lib/storage/supabase-storage'
+import { buildPhotoQuery, searchInternetPhotos, type PhotoCandidate } from '@/lib/media/image-search'
 import type { NewMarketNews } from '@/lib/db/schema'
 
 export interface GenerateArticleInput {
@@ -502,6 +506,106 @@ export function resolveInternetPhoto(
   return THEMATIC_IMAGES.ai_datacenter
 }
 
+/** Sampul warta yang sudah dipastikan tersimpan di bucket sendiri sebagai AVIF. */
+export interface StoredFeaturedImage {
+  url: string
+  caption: string
+  credit: string
+  alt: string
+  sourceUrl?: string
+  license?: string
+}
+
+/**
+ * Berapa kandidat foto yang dicoba sebelum menyerah.
+ *
+ * Unduhan bisa ditolak sumbernya atau berkasnya korup, jadi satu kandidat saja
+ * membuat penerbitan artikel bergantung pada keberuntungan. Lima percobaan
+ * masih di bawah batas waktu fungsi serverless bahkan bila semuanya lambat.
+ */
+const MAX_PHOTO_ATTEMPTS = 5
+
+/**
+ * Dapatkan foto sampul: cari di internet, unduh, ubah ke AVIF, unggah ke
+ * Supabase Storage — dan baru kembalikan setelah semuanya benar-benar selesai.
+ *
+ * Tidak ada gambar yang digambar model AI di sini. Yang disumbang AI hanyalah
+ * kata kuncinya; fotonya foto nyata milik pemotret nyata, dan kreditnya ikut
+ * tersimpan supaya lisensinya bisa dipenuhi di halaman artikel.
+ *
+ * Fungsi ini sengaja melempar galat ketika tidak ada satu pun kandidat yang
+ * berhasil tersimpan. Artikel tanpa sampul yang ter-hosting sendiri berarti
+ * portal menaruh tautan CDN orang lain di basis datanya, dan tautan itu akan
+ * mati tanpa pemberitahuan — lebih baik penerbitannya batal dan bisa diulang.
+ */
+export async function acquireFeaturedPhoto(options: {
+  slug: string
+  query?: string
+  topic: string
+  category: string
+  symbols: string[]
+  alt?: string
+  caption?: string
+}): Promise<StoredFeaturedImage> {
+  const { slug, topic, category, symbols } = options
+
+  const aiQuery = options.query?.trim()
+  const fallbackQuery = buildPhotoQuery(topic, category, symbols)
+
+  // Kata kunci dari model dicoba dulu; kata kunci rakitan sendiri menyusul bila
+  // yang dari model terlalu spesifik sehingga tidak menghasilkan apa-apa.
+  let candidates = aiQuery ? await searchInternetPhotos(aiQuery) : []
+
+  if (candidates.length === 0 && fallbackQuery !== aiQuery) {
+    console.warn(
+      `[NewsAgent] Kata kunci AI "${aiQuery ?? '-'}" nihil, beralih ke "${fallbackQuery}".`,
+    )
+    candidates = await searchInternetPhotos(fallbackQuery)
+  }
+
+  // Foto kurasi manual jadi peluru terakhir, tetap diunduh dan dikonversi sama.
+  const curated = resolveInternetPhoto(category, topic, symbols)
+  const queue: PhotoCandidate[] = [
+    ...candidates,
+    {
+      url: curated.url,
+      title: curated.caption,
+      credit: curated.credit,
+      provider: 'kurasi-redaksi',
+    },
+  ]
+
+  const failures: string[] = []
+
+  for (const candidate of queue.slice(0, MAX_PHOTO_ATTEMPTS)) {
+    const stored = await storeRemoteImageAsAvif(candidate.url, slug)
+
+    if (stored.ok && stored.publicUrl) {
+      console.log(
+        `[NewsAgent] Sampul dari ${candidate.provider} tersimpan sebagai ` +
+          `${stored.isAvif ? 'AVIF' : 'berkas asli'}: ${stored.publicUrl}`,
+      )
+
+      return {
+        url: stored.publicUrl,
+        caption: options.caption?.trim() || candidate.title || curated.caption,
+        credit: candidate.credit,
+        alt: options.alt?.trim() || candidate.title || curated.alt,
+        sourceUrl: candidate.sourcePage,
+        license: candidate.license,
+      }
+    }
+
+    failures.push(`${candidate.provider}: ${stored.error}`)
+    console.warn(`[NewsAgent] Kandidat ${candidate.provider} gagal — ${stored.error}`)
+  }
+
+  throw new Error(
+    'Foto sampul gagal diunggah ke Supabase Storage, artikel tidak diterbitkan. ' +
+      `Percobaan: ${failures.join(' | ')}`,
+  )
+}
+
 /**
  * Jalankan agen AI untuk memproduksi artikel berita & analisis pasar baru secara on-demand.
  * Menggunakan model LLM dari keyring aktif (Gemini/Groq/OpenRouter).
@@ -539,9 +643,15 @@ Artikel HARUS memenuhi kriteria:
     "Poin kunci eksekutif 4"
   ],
   "contentMarkdown": "Isi lengkap artikel minimal 400 kata. Anda sangat dianjurkan memadukan Markdown dan tag HTML seperti di Microsoft Word (seperti <u>garis bawah</u>, <mark>highlight poin penting</mark>, <strong>tebal</strong>, <em>miring</em>, <table> tabel komparasi finansial, <blockquote> kutipan analisis, <hr> garis pemisah, dsb) untuk penyajian riset yang sangat rapi dan profesional.",
+  "imageSearchQuery": "3-6 kata kunci BAHASA INGGRIS untuk mencari FOTO JURNALISTIK NYATA di internet yang cocok jadi sampul artikel ini. Sebut objek fisik yang bisa dipotret kamera, misal 'geothermal power plant turbine' atau 'copper mine heavy machinery'. DILARANG memakai kata abstrak seperti 'growth', 'opportunity', 'market sentiment', dan dilarang menyebut nama merek atau logo perusahaan.",
+  "imageAlt": "Teks alternatif gambar untuk pembaca tunanetra, Bahasa Indonesia, maksimal 120 karakter",
+  "imageCaption": "Keterangan foto gaya redaksi yang menghubungkan isi foto dengan isi artikel, Bahasa Indonesia, maksimal 160 karakter",
   "author": "AI Intelligence Desk",
   "readingTimeMinutes": 3
-}`
+}
+
+CATATAN FOTO: Anda TIDAK membuat atau menggambar gambar apa pun. Sistem redaksi yang akan mencari
+foto asli di internet memakai "imageSearchQuery" Anda, mengunduhnya, dan menyimpannya sendiri.`
 
   const response = await complete({
     messages: [
@@ -570,6 +680,9 @@ Artikel HARUS memenuhi kriteria:
     impactScore?: number
     keyTakeaways?: string[]
     contentMarkdown?: string
+    imageSearchQuery?: string
+    imageAlt?: string
+    imageCaption?: string
     author?: string
     readingTimeMinutes?: number
   }
@@ -605,22 +718,20 @@ Artikel HARUS memenuhi kriteria:
   const rawCandidate = parsed.slug || parsed.title || defaultTopic
   const cleanSlug = slugify(rawCandidate) || `analisis-${Date.now().toString(36)}`
 
-  // 1. Pilih foto internet terverifikasi (resolusi tinggi editorial sesuai topik)
-  const featuredImg = { ...resolveInternetPhoto(category, parsed.title || defaultTopic, targetSymbols) }
-
-  // 2. Unduh foto internet & unggah langsung ke Supabase Storage (bucket: 'ai investasi')
-  if (featuredImg.url) {
-    try {
-      console.log(`[NewsAgent] Mengunggah foto internet ke Supabase Storage untuk artikel: ${cleanSlug}...`)
-      const mirrorResult = await mirrorInternetImageToSupabase(featuredImg.url, cleanSlug)
-      if (mirrorResult.isMirrored) {
-        featuredImg.url = mirrorResult.url
-        console.log(`[NewsAgent] Foto tersimpan di Supabase Storage: ${featuredImg.url}`)
-      }
-    } catch (imgErr) {
-      console.warn('[NewsAgent] Peringatan unggah foto ke Supabase Storage, menggunakan foto internet asli:', imgErr)
-    }
-  }
+  // Cari foto asli di internet, unduh, konversi AVIF, unggah ke Supabase Storage.
+  // Urutannya mengikat: baris ini harus selesai lebih dulu, dan bila gagal ia
+  // melempar galat sehingga artikel tidak pernah tersimpan dengan sampul yang
+  // masih menumpang CDN pihak lain.
+  console.log(`[NewsAgent] Menyiapkan sampul untuk artikel: ${cleanSlug}...`)
+  const featuredImg = await acquireFeaturedPhoto({
+    slug: cleanSlug,
+    query: parsed.imageSearchQuery,
+    topic: parsed.title || defaultTopic,
+    category,
+    symbols: targetSymbols,
+    alt: parsed.imageAlt,
+    caption: parsed.imageCaption,
+  })
 
   let videoEmbed = CURATED_YOUTUBE_VIDEOS.ai_power_crisis
   if (category === 'ekonomi-makro' || category === 'crypto-fintech') {
@@ -629,7 +740,7 @@ Artikel HARUS memenuhi kriteria:
     videoEmbed = CURATED_YOUTUBE_VIDEOS.idx_indonesia_economy
   }
 
-  // 3. Selesai upload foto, baru buat data artikel dan simpan ke database
+  // Sampul sudah aman di bucket sendiri — sekarang artikelnya boleh dirakit.
   const newArticle: NewMarketNews = {
     slug: cleanSlug,
     title: parsed.title || defaultTopic,
@@ -654,8 +765,11 @@ Artikel HARUS memenuhi kriteria:
 }
 
 /**
- * Sinkronkan gambar artikel yang sudah ada di database agar juga ter-hosting
- * di Supabase Storage.
+ * Bawa sampul artikel lama ke bucket sendiri dalam bentuk AVIF.
+ *
+ * Dua hal yang dicari: sampul yang masih menumpang CDN pihak lain, dan sampul
+ * yang memang sudah di Supabase tapi masih JPEG dari sebelum pipeline AVIF ada.
+ * Keduanya diperlakukan sama — diunduh ulang, dikonversi, diunggah kembali.
  */
 export async function syncExistingNewsImagesToSupabase(): Promise<{ updated: number; skipped: number }> {
   const articles = await getMarketNewsList({ limit: 100 })
@@ -663,7 +777,10 @@ export async function syncExistingNewsImagesToSupabase(): Promise<{ updated: num
   let skipped = 0
 
   for (const article of articles) {
-    if (article.featuredImage?.url && !article.featuredImage.url.includes('supabase.co')) {
+    const url = article.featuredImage?.url
+    const needsMigration = Boolean(url) && !(url!.includes('supabase.co') && url!.endsWith('.avif'))
+
+    if (article.featuredImage?.url && needsMigration) {
       const res = await mirrorInternetImageToSupabase(article.featuredImage.url, article.slug)
       if (res.isMirrored) {
         await saveMarketNews({

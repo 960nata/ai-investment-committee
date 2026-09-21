@@ -42,9 +42,12 @@ export async function ensureNewsTable(): Promise<void> {
       content_markdown TEXT NOT NULL,
       author VARCHAR(64) NOT NULL DEFAULT 'AI Intelligence Desk',
       reading_time_minutes INTEGER NOT NULL DEFAULT 3,
+      views_count INTEGER NOT NULL DEFAULT 0,
       published_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    ALTER TABLE market_news ADD COLUMN IF NOT EXISTS views_count INTEGER NOT NULL DEFAULT 0;
 
     CREATE INDEX IF NOT EXISTS market_news_category_idx ON market_news (category);
     CREATE INDEX IF NOT EXISTS market_news_published_at_idx ON market_news (published_at DESC);
@@ -207,6 +210,32 @@ export async function updateMarketNews(
     .returning()
 
   return res[0] ?? null
+}
+
+/**
+ * Tambah jumlah tayang (view count) artikel berita secara atomik.
+ */
+export async function incrementNewsViews(idOrSlug: number | string): Promise<number> {
+  try {
+    await ensureNewsTable()
+
+    const condition = typeof idOrSlug === 'number'
+      ? eq(marketNews.id, idOrSlug)
+      : eq(marketNews.slug, idOrSlug)
+
+    const res = await db
+      .update(marketNews)
+      .set({
+        viewsCount: sql`${marketNews.viewsCount} + 1`,
+      })
+      .where(condition)
+      .returning({ viewsCount: marketNews.viewsCount })
+
+    return res[0]?.viewsCount ?? 0
+  } catch (err) {
+    console.error('[NewsViews] Gagal menambah view count:', err)
+    return 0
+  }
 }
 
 /**

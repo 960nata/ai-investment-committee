@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -12,7 +12,20 @@ import {
   IconCheck,
 } from '@/components/icons'
 
+/**
+ * useSearchParams() memaksa halaman ini keluar dari prarender statis, dan Next
+ * menolak build bila bailout-nya tidak dibatasi. Suspense di bawah yang menahan
+ * batas itu supaya kerangka halaman tetap terkirim lebih dulu.
+ */
 export default function UnifiedLoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
+  )
+}
+
+function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const defaultTab = searchParams.get('mode') === 'admin' ? 'admin' : 'user'

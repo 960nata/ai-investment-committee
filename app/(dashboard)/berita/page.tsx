@@ -23,9 +23,33 @@ export const metadata: Metadata = {
   },
 }
 
-export default async function BeritaPage() {
+interface Props {
+  searchParams: Promise<{ kategori?: string; q?: string }>
+}
+
+/** Kategori yang benar-benar dipakai di basis data. Selainnya diabaikan. */
+const KNOWN_CATEGORIES = [
+  'teknologi-ai',
+  'energi-komoditas',
+  'ekonomi-makro',
+  'saham-idx',
+  'crypto-fintech',
+]
+
+export default async function BeritaPage({ searchParams }: Props) {
+  const { kategori, q } = await searchParams
   await seedInitialNewsArticles()
+
+  // Kategori dari menu disaring di sini, bukan dipercaya mentah: alamat dengan
+  // kategori karangan sebaiknya membuka portal penuh, bukan halaman kosong.
+  const category = kategori && KNOWN_CATEGORIES.includes(kategori) ? kategori : 'semua'
   const articles = await getMarketNewsList({ limit: 40 })
 
-  return <NewsPortalClient initialArticles={articles} />
+  return (
+    <NewsPortalClient
+      initialArticles={articles}
+      initialCategory={category}
+      initialQuery={q?.trim() ?? ''}
+    />
+  )
 }

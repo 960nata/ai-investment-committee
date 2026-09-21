@@ -560,10 +560,15 @@ export const marketNews = pgTable(
     sentiment: varchar('sentiment', { length: 16 }).notNull().default('neutral'),
     impactScore: integer('impact_score').notNull().default(5),
     featuredImage: jsonb('featured_image').$type<{
+      /** URL AVIF di bucket sendiri. Sampul tidak pernah menunjuk CDN pihak lain. */
       url: string
       caption?: string
       credit?: string
       alt: string
+      /** Halaman sumber foto asli, ditautkan pada kredit demi kepatuhan lisensi. */
+      sourceUrl?: string
+      /** Kode lisensi foto, mis. "CC BY-SA 2.0". */
+      license?: string
     } | null>(),
     youtubeVideo: jsonb('youtube_video').$type<{
       videoId: string
@@ -575,6 +580,7 @@ export const marketNews = pgTable(
     contentMarkdown: text('content_markdown').notNull(),
     author: varchar('author', { length: 64 }).notNull().default('AI Intelligence Desk'),
     readingTimeMinutes: integer('reading_time_minutes').notNull().default(3),
+    viewsCount: integer('views_count').notNull().default(0),
     publishedAt: timestamp('published_at', { withTimezone: true }).notNull().defaultNow(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },

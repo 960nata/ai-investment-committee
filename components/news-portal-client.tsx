@@ -3,10 +3,13 @@
 import React, { useState } from 'react'
 import Link from 'next/link'
 import type { MarketNewsRow } from '@/lib/db/schema'
-import { IconClose, IconNews } from './icons'
+import { IconNews, IconEye } from './icons'
 
 interface Props {
   initialArticles: MarketNewsRow[]
+  /** Kategori pembuka dari alamat (?kategori=), dipakai menu header. */
+  initialCategory?: string
+  initialQuery?: string
 }
 
 const CATEGORIES = [
@@ -18,42 +21,14 @@ const CATEGORIES = [
   { id: 'crypto-fintech', label: 'Kripto & Fintech' },
 ]
 
-const HOT_PRESETS = [
-  {
-    topic: 'Krisis Listrik AI & Peluang Saham Panas Bumi BREN serta Tembaga AMMN',
-    category: 'energi-komoditas' as const,
-    symbols: ['NVDA', 'BREN.JK', 'AMMN.JK', 'TSM'],
-  },
-  {
-    topic: 'Dampak Pemangkasan Suku Bunga The Fed & Bank Indonesia Terhadap Arus Modal Saham Big Cap IHSG',
-    category: 'ekonomi-makro' as const,
-    symbols: ['BBCA.JK', 'BBRI.JK', 'BTCUSDT', 'GOLD'],
-  },
-  {
-    topic: 'Perang Chip Semikonduktor Global & Valuasi Saham AI Hardware vs Software',
-    category: 'teknologi-ai' as const,
-    symbols: ['NVDA', 'TSM', 'PLTR', 'ARM'],
-  },
-  {
-    topic: 'Rekor Pembelian Emas Bank Sentral Global dan Perlindungan Portofolio Safe Haven',
-    category: 'energi-komoditas' as const,
-    symbols: ['GOLD', 'ANTM.JK'],
-  },
-]
-
-export function NewsPortalClient({ initialArticles }: Props) {
-  const [articles, setArticles] = useState<MarketNewsRow[]>(initialArticles)
-  const [selectedCategory, setSelectedCategory] = useState<string>('semua')
-  const [searchQuery, setSearchQuery] = useState<string>('')
-  const [showGenerateModal, setShowGenerateModal] = useState<boolean>(false)
-  const [customTopic, setCustomTopic] = useState<string>('')
-  const [selectedPreset, setSelectedPreset] = useState<number>(0)
-  const [isGenerating, setIsGenerating] = useState<boolean>(false)
-  const [generatingStage, setGeneratingStage] = useState<string>('')
-  const [isSyncing, setIsSyncing] = useState<boolean>(false)
-  const [syncFeedback, setSyncFeedback] = useState<string | null>(null)
-  const [copyFeedback, setCopyFeedback] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+export function NewsPortalClient({
+  initialArticles,
+  initialCategory = 'semua',
+  initialQuery = '',
+}: Props) {
+  const [articles] = useState<MarketNewsRow[]>(initialArticles)
+  const [selectedCategory, setSelectedCategory] = useState<string>(initialCategory)
+  const [searchQuery, setSearchQuery] = useState<string>(initialQuery)
 
   const filteredArticles = articles.filter((a) => {
     const matchCategory =
@@ -71,87 +46,6 @@ export function NewsPortalClient({ initialArticles }: Props) {
   const heroArticle = filteredArticles[0] ?? null
   const subFeaturedArticles = filteredArticles.slice(1, 4)
   const remainingArticles = filteredArticles.slice(4)
-
-  function copyLlmContext() {
-    const context = articles
-      .slice(0, 10)
-      .map(
-        (a, i) =>
-          `[INTEL #${i + 1}] ${a.title}\nKategori: ${a.category} | Sentimen: ${a.sentiment.toUpperCase()} | Skor Dampak: ${a.impactScore}/10\nSimbol Terkait: ${a.mentionedSymbols.join(', ')}\nRingkasan: ${a.summary}\nPoin Kunci:\n${a.keyTakeaways.map((k) => `  - ${k}`).join('\n')}`,
-      )
-      .join('\n\n---\n\n')
-
-    navigator.clipboard.writeText(context)
-    setCopyFeedback('Konteks AI tersalin')
-    setTimeout(() => setCopyFeedback(null), 3000)
-  }
-
-  async function handleSyncImages() {
-    setIsSyncing(true)
-    setSyncFeedback(null)
-    try {
-      const res = await fetch('/api/v1/news', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'sync_images' }),
-      })
-      const data = await res.json()
-      if (data.success) {
-        setSyncFeedback(`Sinkronisasi selesai: ${data.updated} foto tersimpan ke Supabase Storage`)
-        const refreshed = await fetch('/api/v1/news').then((r) => r.json())
-        if (refreshed.articles) setArticles(refreshed.articles)
-      } else {
-        setSyncFeedback(data.error || 'Gagal sinkronisasi foto')
-      }
-    } catch {
-      setSyncFeedback('Gagal menghubungi server')
-    } finally {
-      setIsSyncing(false)
-      setTimeout(() => setSyncFeedback(null), 5000)
-    }
-  }
-
-  async function handleTriggerGenerate() {
-    setIsGenerating(true)
-    setError(null)
-    setGeneratingStage('1/3: Mengunduh foto editorial internet & mengunggah ke Supabase Storage...')
-
-    const timer = setTimeout(() => {
-      setGeneratingStage('2/3: AI Jurnalis menyusun analisis pasar & laporan komprehensif...')
-    }, 2600)
-
-    try {
-      const preset = HOT_PRESETS[selectedPreset]
-      const topic = customTopic.trim() !== '' ? customTopic.trim() : preset.topic
-      const category = preset.category
-      const targetSymbols = preset.symbols
-
-      const res = await fetch('/api/v1/news', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic, category, targetSymbols }),
-      })
-
-      clearTimeout(timer)
-      setGeneratingStage('3/3: Selesai! Menyimpan artikel ke database...')
-
-      const data = await res.json()
-      if (!res.ok || data.error) {
-        throw new Error(data.error ?? 'Gagal membuat artikel baru')
-      }
-
-      if (data.article) {
-        setArticles((prev) => [data.article, ...prev])
-        setShowGenerateModal(false)
-        setCustomTopic('')
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setIsGenerating(false)
-      setGeneratingStage('')
-    }
-  }
 
   return (
     <div className="news-portal">
@@ -181,55 +75,6 @@ export function NewsPortalClient({ initialArticles }: Props) {
             >
               {articles.length} telaah
             </span>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button
-              type="button"
-              className="seg"
-              onClick={copyLlmContext}
-              title="Salin ringkasan data untuk disuntikkan ke model AI"
-            >
-              {copyFeedback ?? 'Salin Konteks AI'}
-            </button>
-
-            <a
-              href="/api/v1/news/rss"
-              target="_blank"
-              rel="noreferrer"
-              className="seg"
-              title="Akses feed RSS 2.0 XML"
-            >
-              RSS
-            </a>
-
-            <button
-              type="button"
-              className="seg"
-              onClick={handleSyncImages}
-              disabled={isSyncing}
-              title="Unggah foto artikel yang belum ter-hosting ke Supabase Storage"
-              style={{
-                background: 'var(--bg-subtle)',
-                color: isSyncing ? 'var(--ink-mute)' : 'var(--ink)',
-              }}
-            >
-              {isSyncing ? 'Menyinkronkan...' : (syncFeedback ?? 'Sync Foto ke Supabase')}
-            </button>
-
-            <button
-              type="button"
-              className="seg"
-              onClick={() => setShowGenerateModal(true)}
-              style={{
-                background: 'var(--bg-card)',
-                color: 'var(--ink)',
-                borderColor: 'var(--ink-mute)',
-                fontWeight: 600,
-              }}
-            >
-              + Buat Analisis Baru
-            </button>
           </div>
         </div>
 
@@ -285,233 +130,6 @@ export function NewsPortalClient({ initialArticles }: Props) {
           </div>
         </div>
       </section>
-
-      {/* --- Modal Generator Berita AI --- */}
-      {showGenerateModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0, 0, 0, 0.75)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 999,
-            padding: 16,
-          }}
-        >
-          <div
-            style={{
-              background: 'var(--bg-card)',
-              border: '1px solid var(--line)',
-              borderRadius: 'var(--radius-md)',
-              maxWidth: 560,
-              width: '100%',
-              padding: 'var(--space-5)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 16,
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
-              <h3
-                style={{
-                  margin: 0,
-                  fontSize: 16,
-                  fontWeight: 600,
-                  color: 'var(--ink)',
-                }}
-              >
-                Buat Analisis Pasar Baru
-              </h3>
-              <button
-                type="button"
-                onClick={() => !isGenerating && setShowGenerateModal(false)}
-                disabled={isGenerating}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--ink-mute)',
-                  fontSize: 18,
-                  cursor: 'pointer',
-                }}
-              >
-                <IconClose size={16} />
-              </button>
-            </div>
-
-            <p
-              style={{
-                fontSize: 'var(--t-small)',
-                color: 'var(--ink-mute)',
-                margin: 0,
-                lineHeight: 1.5,
-              }}
-            >
-              Pilih tema atau ketik topik spesifik. Komite AI akan menyusun telaah
-              makro dan korelasi saham terkait.
-            </p>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <label
-                style={{
-                  fontSize: 'var(--t-micro)',
-                  fontWeight: 600,
-                  color: 'var(--ink-mute)',
-                  textTransform: 'uppercase',
-                  fontFamily: 'var(--mono)',
-                }}
-              >
-                Pilihan Tema Riset:
-              </label>
-              {HOT_PRESETS.map((p, idx) => (
-                <div
-                  key={idx}
-                  onClick={() => setSelectedPreset(idx)}
-                  style={{
-                    padding: '8px 12px',
-                    borderRadius: 'var(--radius-sm)',
-                    border:
-                      selectedPreset === idx
-                        ? '1px solid var(--ink-mute)'
-                        : '1px solid var(--line)',
-                    background:
-                      selectedPreset === idx
-                        ? 'var(--bg-subtle)'
-                        : 'transparent',
-                    cursor: 'pointer',
-                    fontSize: 'var(--t-small)',
-                    color: 'var(--ink)',
-                  }}
-                >
-                  <div style={{ fontWeight: 500 }}>{p.topic}</div>
-                  <div
-                    style={{
-                      fontSize: 'var(--t-micro)',
-                      color: 'var(--ink-mute)',
-                      marginTop: 4,
-                      fontFamily: 'var(--mono)',
-                    }}
-                  >
-                    Simbol: {p.symbols.join(', ')}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <label
-                style={{
-                  fontSize: 'var(--t-micro)',
-                  fontWeight: 600,
-                  color: 'var(--ink-mute)',
-                  textTransform: 'uppercase',
-                  fontFamily: 'var(--mono)',
-                }}
-              >
-                Atau Tulis Topik Mandiri:
-              </label>
-              <input
-                type="text"
-                placeholder="Misal: Dampak Kebijakan Ekspor Nikel ke Saham NCKL..."
-                value={customTopic}
-                onChange={(e) => setCustomTopic(e.target.value)}
-                disabled={isGenerating}
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: 'var(--radius-sm)',
-                  border: '1px solid var(--line)',
-                  background: 'var(--bg-subtle)',
-                  color: 'var(--ink)',
-                  fontSize: 'var(--t-small)',
-                }}
-              />
-            </div>
-
-            {error && (
-              <div
-                style={{
-                  padding: '8px 12px',
-                  border: '1px solid var(--line)',
-                  color: '#f87171',
-                  borderRadius: 4,
-                  fontSize: 'var(--t-small)',
-                }}
-              >
-                {error}
-              </div>
-            )}
-
-            {isGenerating && (
-              <div
-                style={{
-                  padding: '10px 14px',
-                  borderRadius: 'var(--radius-sm)',
-                  background: 'rgba(16, 185, 129, 0.08)',
-                  border: '1px solid rgba(16, 185, 129, 0.25)',
-                  color: 'var(--ink)',
-                  fontSize: 'var(--t-small)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 10,
-                }}
-              >
-                <span
-                  style={{
-                    display: 'inline-block',
-                    width: 8,
-                    height: 8,
-                    borderRadius: '50%',
-                    background: '#10b981',
-                    boxShadow: '0 0 8px #10b981',
-                  }}
-                />
-                <span style={{ fontFamily: 'var(--mono)', fontSize: 12 }}>
-                  {generatingStage || 'Memproses analisis...'}
-                </span>
-              </div>
-            )}
-
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'flex-end',
-                gap: 10,
-                marginTop: 8,
-              }}
-            >
-              <button
-                type="button"
-                className="seg"
-                onClick={() => setShowGenerateModal(false)}
-                disabled={isGenerating}
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                className="seg"
-                onClick={handleTriggerGenerate}
-                disabled={isGenerating}
-                style={{
-                  background: 'var(--ink)',
-                  color: 'var(--bg-card)',
-                  borderColor: 'var(--ink)',
-                  fontWeight: 600,
-                }}
-              >
-                {isGenerating ? 'Menyusun Telaah...' : 'Terbitkan Analisis'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* --- Showcase Berita Utama 2-Grid (60% Kiri Hero Card / 40% Kanan 3 Sub-Berita) --- */}
       {heroArticle && (
@@ -656,8 +274,13 @@ export function NewsPortalClient({ initialArticles }: Props) {
                     paddingTop: 10,
                   }}
                 >
-                  <span>
-                    {heroArticle.author} · {heroArticle.readingTimeMinutes} mnt baca
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <span>{heroArticle.author} · {heroArticle.readingTimeMinutes} mnt baca</span>
+                    <span>·</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <IconEye size={12} />
+                      {(heroArticle.viewsCount ?? 0).toLocaleString('id-ID')} tayangan
+                    </span>
                   </span>
                   <span
                     style={{
@@ -709,6 +332,11 @@ export function NewsPortalClient({ initialArticles }: Props) {
                       </span>
                       <span>·</span>
                       <span>{subArticle.readingTimeMinutes} mnt baca</span>
+                      <span>·</span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: 'var(--ink)' }}>
+                        <IconEye size={11} />
+                        {(subArticle.viewsCount ?? 0).toLocaleString('id-ID')}
+                      </span>
                       {subArticle.featuredImage?.url?.includes('supabase.co') && (
                         <>
                           <span>·</span>
@@ -882,6 +510,10 @@ export function NewsPortalClient({ initialArticles }: Props) {
                         month: 'short',
                         year: 'numeric',
                       })}
+                    </span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <IconEye size={12} style={{ color: 'var(--ink-faint)' }} />
+                      {(article.viewsCount ?? 0).toLocaleString('id-ID')}
                     </span>
                     <span style={{ textTransform: 'capitalize' }}>
                       {article.sentiment}
