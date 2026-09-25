@@ -8,6 +8,10 @@ import {
   date,
   numeric,
   integer,
+  bigint,
+  smallint,
+  doublePrecision,
+  real,
   boolean,
   jsonb,
   primaryKey,
@@ -371,8 +375,17 @@ export const featureDaily = pgTable(
       .references(() => instrument.id, { onDelete: 'cascade' }),
     date: date('date').notNull(),
     featureSetVersion: varchar('feature_set_version', { length: 32 }).notNull(),
-    /** Nilai mentah dan persentilnya, satu objek datar bernama-jelas. */
-    values: jsonb('values').$type<Record<string, number | null>>().notNull(),
+    /**
+     * Nilai fitur sebagai deret angka, sejajar dengan `feature_key_set.keys`
+     * untuk versi yang sama. Dulunya objek jsonb bernama-jelas, tetapi 159 nama
+     * kunci yang diulang di tiap baris menghabiskan tiga perempat ukurannya:
+     * ±2 KB per baris jadi ±0,5 KB. `real` (float4) cukup untuk indikator dan
+     * skor-z; harga mentah tetap `numeric` di `candle_daily`.
+     *
+     * Jangan dibaca langsung. Pakai fungsi di `queries.ts`, yang mengubahnya
+     * kembali jadi objek `{ nama: nilai }`.
+     */
+    values: real('values').array().$type<(number | null)[]>().notNull(),
     computedAt: timestamp('computed_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -381,7 +394,23 @@ export const featureDaily = pgTable(
   ],
 )
 
-export type FeatureRowRecord = typeof featureDaily.$inferSelect
+/**
+ * Urutan kunci fitur per versi — kamus untuk membaca `feature_daily.values`.
+ *
+ * Hanya boleh bertambah di ujung, tidak pernah diubah urutannya: deret yang
+ * sudah tersimpan menunjuk kunci lewat posisinya. Kunci baru (misalnya `_zcs`
+ * dari job lintas penampang) ditambahkan di belakang, dan baris lama yang
+ * lebih pendek otomatis terbaca null untuk kunci itu.
+ */
+export const featureKeySet = pgTable('feature_key_set', {
+  featureSetVersion: varchar('feature_set_version', { length: 32 }).primaryKey(),
+  keys: text('keys').array().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export type FeatureRowRecord = Omit<typeof featureDaily.$inferSelect, 'values'> & {
+  values: Record<string, number | null>
+}
 
 // ---------------------------------------------------------------------------
 // Turunan: skor harian
@@ -484,6 +513,21 @@ export const fundamentalQuarterly = pgTable(
     fiscalYear: integer('fiscal_year').notNull(),
     fiscalPeriod: varchar('fiscal_period', { length: 4 }).notNull(),
     currency: varchar('currency', { length: 8 }).notNull(),
+    /**
+     * Pengali satuan: nilai di `items` sudah dikalikan ini atau belum.
+     *
+     * EDGAR selalu melapor dalam satuan penuh, jadi di sana nilainya 1. XBRL IDX
+     * tidak: satu emiten melapor dalam jutaan, yang lain dalam miliar, dan
+     * atributnya ada di tiap elemen. Mengasumsikan satuan membuat rasio meleset
+     * seribu kali lipat — kesalahan sebesar itu justru lolos dari pemeriksaan
+     * yang mencari selisih kecil.
+     */
+    unitScale: integer('unit_scale').notNull().default(1),
+    /**
+     * Bulan tutup buku (1-12). Tidak semua emiten tutup buku di Desember, dan
+     * menyamakan "Q1" semua emiten berarti membandingkan kuartal yang berbeda.
+     */
+    fiscalYearEndMonth: smallint('fiscal_year_end_month'),
 
     /** Pos kanonik dan nilainya. Pos yang tidak ada tidak muncul di sini. */
     items: jsonb('items').$type<Record<string, number>>().notNull(),
@@ -509,6 +553,125 @@ export const fundamentalQuarterly = pgTable(
 )
 
 export type FundamentalRow = typeof fundamentalQuarterly.$inferSelect
+
+// ---------------------------------------------------------------------------
+// Kepemilikan (KSEI)
+// ---------------------------------------------------------------------------
+
+/**
+ * Urutan jenis investor di kolom `local` dan `foreign`, persis urutan kolom
+ * berkas KSEI: asuransi, korporasi, dana pensiun, bank, individu, reksa dana,
+ * perusahaan efek, yayasan, lainnya.
+ */
+export const KSEI_INVESTOR_TYPES = ['IS', 'CP', 'PF', 'IB', 'ID', 'MF', 'SC', 'FD', 'OT'] as const
+
+/**
+ * Komposisi kepemilikan efek per akhir bulan, dari berkas KSEI.
+ *
+ * Mengisi kelompok bobot "arus dana & kepemilikan" untuk saham IDX. Rinciannya
+ * disimpan sebagai dua deret sembilan angka, bukan delapan belas kolom: bentuk
+ * ini sejajar dengan berkas sumbernya dan tidak perlu diubah bila KSEI kelak
+ * menambah jenis investor.
+ */
+export const ownershipMonthly = pgTable(
+  'ownership_monthly',
+  {
+    instrumentId: integer('instrument_id')
+      .notNull()
+      .references(() => instrument.id, { onDelete: 'cascade' }),
+    /** Tanggal posisi — akhir bulan di nama berkas. */
+    asOf: date('as_of').notNull(),
+    /**
+     * Kapan data ini paling cepat bisa diketahui.
+     *
+     * Berkas posisi 31 Agustus baru terbit sekitar 1 September. Memakainya pada
+     * 31 Agustus di backtest adalah melihat masa depan, persis seperti memakai
+     * laporan keuangan sebelum tanggal terbitnya.
+     */
+    availableAt: date('available_at').notNull(),
+    sharesListed: bigint('shares_listed', { mode: 'number' }).notNull(),
+    price: numeric('price', { precision: 18, scale: 4 }),
+    /** Lembar milik investor lokal, urutan `KSEI_INVESTOR_TYPES`. */
+    local: bigint('local', { mode: 'number' }).array().notNull(),
+    /** Lembar milik investor asing, urutan `KSEI_INVESTOR_TYPES`. */
+    foreign: bigint('foreign', { mode: 'number' }).array().notNull(),
+    localTotal: bigint('local_total', { mode: 'number' }).notNull(),
+    foreignTotal: bigint('foreign_total', { mode: 'number' }).notNull(),
+    sourceId: varchar('source_id', { length: 32 }).notNull().default('ksei'),
+    fetchedAt: timestamp('fetched_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.instrumentId, t.asOf] }),
+    index('ownership_available_idx').on(t.instrumentId, t.availableAt),
+  ],
+)
+
+export type OwnershipRow = typeof ownershipMonthly.$inferSelect
+
+// ---------------------------------------------------------------------------
+// Makro
+// ---------------------------------------------------------------------------
+
+/**
+ * Deret makro: imbal hasil obligasi, inflasi, pertumbuhan PDB.
+ *
+ * Bukan untuk menilai saham satu per satu, melainkan mengisi parameter model
+ * jangka panjang — Rf, batas g_terminal, inflasi harapan. Satu tabel sempit
+ * untuk semua deret: jumlahnya puluhan, barisnya ribuan, dan tidak ada gunanya
+ * satu tabel per deret.
+ */
+export const macroSeries = pgTable(
+  'macro_series',
+  {
+    /** Kode deret di sumbernya, misalnya `DGS10` (FRED) atau `IDN:FP.CPI.TOTL.ZG`. */
+    seriesId: varchar('series_id', { length: 64 }).notNull(),
+    date: date('date').notNull(),
+    value: doublePrecision('value').notNull(),
+    source: varchar('source', { length: 24 }).notNull(),
+    fetchedAt: timestamp('fetched_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.seriesId, t.date] })],
+)
+
+// ---------------------------------------------------------------------------
+// Rekonsiliasi antar sumber
+// ---------------------------------------------------------------------------
+
+/**
+ * Selisih nilai satu pos antara dua sumber.
+ *
+ * Sumber peringkat lebih rendah tidak pernah menimpa yang lebih tinggi; fungsinya
+ * sebagai pemeriksa silang. Selisih di atas 5% dicatat di sini, di atas 20%
+ * ditandai untuk ditinjau manusia — selisih sebesar itu hampir selalu kesalahan
+ * satuan, mata uang, atau pemetaan pos, dan ketiganya bug, bukan pilihan.
+ */
+export const reconciliationFlag = pgTable(
+  'reconciliation_flag',
+  {
+    id: serial('id').primaryKey(),
+    instrumentId: integer('instrument_id')
+      .notNull()
+      .references(() => instrument.id, { onDelete: 'cascade' }),
+    period: varchar('period', { length: 12 }).notNull(),
+    item: varchar('item', { length: 48 }).notNull(),
+    sourceA: varchar('source_a', { length: 32 }).notNull(),
+    valueA: doublePrecision('value_a').notNull(),
+    sourceB: varchar('source_b', { length: 32 }).notNull(),
+    valueB: doublePrecision('value_b').notNull(),
+    relDiff: doublePrecision('rel_diff').notNull(),
+    /** `selisih` (5-20%) atau `tinjau_manual` (> 20%). */
+    severity: varchar('severity', { length: 16 }).notNull(),
+    /** Sumber yang nilainya dipakai — selalu yang peringkatnya lebih tinggi. */
+    chosenSource: varchar('chosen_source', { length: 32 }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+    note: text('note'),
+  },
+  (t) => [
+    uniqueIndex('reconciliation_uq').on(t.instrumentId, t.period, t.item, t.sourceA, t.sourceB),
+    index('reconciliation_open_idx').on(t.severity, t.resolvedAt),
+  ],
+)
 
 // ---------------------------------------------------------------------------
 // Backtest
@@ -591,6 +754,36 @@ export const marketNews = pgTable(
   ],
 )
 
+/**
+ * Versi artikel warta dalam bahasa lain.
+ *
+ * Hanya teks yang berubah per bahasa yang disimpan di sini. Angka dampak,
+ * simbol, sampul, dan tanggal tetap dibaca dari baris sumbernya, supaya kelima
+ * versi tidak mungkin saling menyimpang soal fakta.
+ */
+export const marketNewsTranslation = pgTable(
+  'market_news_translation',
+  {
+    newsId: integer('news_id')
+      .notNull()
+      .references(() => marketNews.id, { onDelete: 'cascade' }),
+    locale: varchar('locale', { length: 8 }).notNull(),
+    title: varchar('title', { length: 255 }).notNull(),
+    summary: text('summary').notNull(),
+    tags: jsonb('tags').$type<string[]>().notNull().default([]),
+    keyTakeaways: jsonb('key_takeaways').$type<string[]>().notNull().default([]),
+    contentMarkdown: text('content_markdown').notNull(),
+    imageAlt: text('image_alt'),
+    imageCaption: text('image_caption'),
+    /** Model yang menulis versi ini, untuk jejak audit. */
+    model: varchar('model', { length: 96 }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.newsId, t.locale] })],
+)
+
+export type MarketNewsTranslationRow = typeof marketNewsTranslation.$inferSelect
+
 export type MarketNewsRow = typeof marketNews.$inferSelect
 export type NewMarketNews = typeof marketNews.$inferInsert
 
@@ -605,6 +798,9 @@ export const appUser = pgTable(
     email: varchar('email', { length: 128 }).notNull(),
     name: varchar('name', { length: 128 }).notNull().default('Analis Komite'),
     role: varchar('role', { length: 32 }).notNull().default('user'), // 'admin' | 'user'
+    // Boleh kosong: akun yang dibuat manual lewat portal admin belum punya kata
+    // sandi, dan akun tanpa kata sandi memang tidak bisa dipakai masuk sendiri.
+    passwordHash: varchar('password_hash', { length: 255 }),
     isActive: boolean('is_active').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
@@ -617,6 +813,42 @@ export const appUser = pgTable(
 
 export type AppUserRow = typeof appUser.$inferSelect
 export type NewAppUser = typeof appUser.$inferInsert
+
+// ---------------------------------------------------------------------------
+// Catatan Kunjungan (untuk peta sebaran pengunjung)
+// ---------------------------------------------------------------------------
+
+/**
+ * Satu baris per muatan halaman.
+ *
+ * Tidak ada kolom alamat IP, dan itu disengaja — lihat catatan panjang di
+ * `lib/analytics/geo.ts`. `visitorHash` adalah sidik ber-garam yang hanya bisa
+ * menjawab "sama atau berbeda", bukan "siapa".
+ */
+export const visitLog = pgTable(
+  'visit_log',
+  {
+    id: serial('id').primaryKey(),
+    visitorHash: varchar('visitor_hash', { length: 32 }).notNull(),
+    path: varchar('path', { length: 255 }).notNull(),
+    country: varchar('country', { length: 4 }),
+    region: varchar('region', { length: 64 }),
+    city: varchar('city', { length: 128 }),
+    latitude: doublePrecision('latitude'),
+    longitude: doublePrecision('longitude'),
+    deviceClass: varchar('device_class', { length: 16 }).notNull().default('unknown'),
+    geoSource: varchar('geo_source', { length: 16 }).notNull().default('unknown'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('visit_log_created_at_idx').on(t.createdAt),
+    index('visit_log_visitor_idx').on(t.visitorHash),
+    index('visit_log_country_idx').on(t.country),
+  ],
+)
+
+export type VisitLogRow = typeof visitLog.$inferSelect
+export type NewVisitLog = typeof visitLog.$inferInsert
 
 // ---------------------------------------------------------------------------
 // Pengaturan Iklan & AdSense (4 Slot Strategis, Default Hidden)

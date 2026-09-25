@@ -23,6 +23,7 @@ import {
   IconPlay,
   IconRefresh,
 } from './icons'
+import { verdictLabel, verdictTone } from '@/lib/format/verdict'
 
 interface Turn {
   agent: string
@@ -212,7 +213,7 @@ export function CommitteeBoardroom({ symbol, market, name, onClose }: Props) {
   function handleShare() {
     if (!session) return
 
-    const verdictText = (session.verdict ?? 'ABSTAIN').toUpperCase()
+    const verdictText = verdictLabel(session.verdict).toUpperCase()
     const confidenceText = session.confidence != null ? `${session.confidence}%` : 'N/A'
     const rationaleText = (parsedKetua?.rationale as string) ?? session.rationale ?? ''
     const keyRiskText = (parsedKetua?.key_risk as string) ?? ''
@@ -227,9 +228,10 @@ export function CommitteeBoardroom({ symbol, market, name, onClose }: Props) {
       `[KONSENSUS TESIS]`,
       rationaleText,
       keyRiskText ? `\n[RISIKO UTAMA]\n${keyRiskText}` : '',
-      invalidationText ? `\n[SYARAT PEMBATALAN / CUT LOSS]\n${invalidationText}` : '',
+      invalidationText ? `\n[SYARAT PEMBATALAN]\n${invalidationText}` : '',
       ``,
       `— Ditelaah oleh 4 Agen AI Kuantitatif (Analis, Strateg, Pengawas Risiko, Ketua Komite)`,
+      `Bukan rekomendasi membeli atau menjual efek apa pun.`,
     ]
       .filter(Boolean)
       .join('\n')
@@ -255,38 +257,37 @@ export function CommitteeBoardroom({ symbol, market, name, onClose }: Props) {
   const tensionInfo = useMemo(() => {
     if (verdict === 'beli') {
       return {
-        label: 'Bull Dominan',
-        status: 'Bull Dominan · Tesis Lolos Uji Risiko',
+        label: 'Bukti Positif',
+        status: 'Bukti Positif · Tesis Lolos Uji Risiko',
         ratio: 0.8,
         state: 'ok' as State,
       }
     }
     if (verdict === 'jual') {
       return {
-        label: 'Bear Dominan',
-        status: 'Bear Dominan · Tekanan Risiko Tinggi',
+        label: 'Bukti Negatif',
+        status: 'Bukti Negatif · Kerapuhan Lebih Besar',
         ratio: 0.2,
         state: 'halted' as State,
       }
     }
     if (verdict === 'abstain') {
       return {
-        label: 'Deadlock',
-        status: 'Deadlock · Pengawas Risiko Memblokir Tesis',
+        label: 'Tidak Dinilai',
+        status: 'Tidak Dinilai · Keberatan Risiko Tak Terjawab',
         ratio: 0.35,
         state: 'degraded' as State,
       }
     }
     return {
-      label: 'Netral',
-      status: 'Netral · Menunggu Konfirmasi Volume',
+      label: 'Berimbang',
+      status: 'Bukti Berimbang · Menunggu Konfirmasi Volume',
       ratio: 0.5,
       state: 'unknown' as State,
     }
   }, [verdict])
 
-  const verdictTone: 'ok' | 'down' | 'warn' | 'neutral' =
-    verdict === 'beli' ? 'ok' : verdict === 'jual' ? 'down' : verdict === 'tahan' ? 'warn' : 'neutral'
+  const verdictToneValue = verdictTone(verdict)
 
   const turnAnalis = turns.find((t) => t.agent === 'analis')
   const turnStrateg = turns.find((t) => t.agent === 'strateg')
@@ -426,7 +427,7 @@ export function CommitteeBoardroom({ symbol, market, name, onClose }: Props) {
                 <span className="readout-label">PUTUSAN RESMI KOMITE</span>
               </div>
               <div className="readout-value" style={{ marginTop: 'var(--space-2)' }}>
-                <Tag tone={verdictTone}>{String(verdict ?? 'ABSTAIN').toUpperCase()}</Tag>
+                <Tag tone={verdictToneValue}>{verdictLabel(verdict).toUpperCase()}</Tag>
               </div>
               <p className="readout-note">Palu putusan resmi Ketua Komite (CIO)</p>
             </div>
@@ -1003,16 +1004,15 @@ function KetuaRenderer({ raw, session }: { raw: string; session: SessionData }) 
   const keyRisk = (parsed?.key_risk as string | undefined) ?? extractKey(raw, 'risiko utama')
   const invalidation = (parsed?.invalidation as string | undefined) ?? extractKey(raw, 'syarat pembatalan')
 
-  const verdictTone =
-    verdict === 'beli' ? 'ok' : verdict === 'jual' ? 'down' : verdict === 'tahan' ? 'warn' : 'neutral'
+  const tone = verdictTone(verdict)
 
   return (
     <div className="cio-decree-box">
       <div className="cio-verdict-row">
         <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t-small)', color: 'var(--ink-mute)', textTransform: 'uppercase' }}>
-          Putusan Final Ketua:
+          Pembacaan Ketua:
         </span>
-        <Tag tone={verdictTone}>{String(verdict).toUpperCase()}</Tag>
+        <Tag tone={tone}>{verdictLabel(verdict).toUpperCase()}</Tag>
       </div>
 
       <div className="cio-rationale-box">

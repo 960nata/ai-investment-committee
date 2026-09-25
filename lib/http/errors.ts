@@ -97,3 +97,21 @@ export function tooManyRequests(retryAfterSeconds: number): NextResponse {
 export const NO_STORE = {
   'cache-control': 'no-store, max-age=0',
 } as const
+
+/**
+ * Pesan galat yang menyertakan penyebab aslinya.
+ *
+ * drizzle membungkus galat Postgres jadi "Failed query: <SQL panjang>", dan
+ * penyebab sebenarnya — batas waktu, koneksi habis, disk penuh — tersimpan di
+ * `err.cause` yang tidak pernah ikut dicetak. Akibatnya log job hanya berisi
+ * SQL, tanpa satu kata pun tentang kenapa ia gagal.
+ */
+export function describeError(err: unknown): string {
+  if (!(err instanceof Error)) return String(err)
+  const head = err.message.startsWith('Failed query')
+    ? err.message.split('\n')[0].slice(0, 60) + '…'
+    : err.message
+  const cause = err.cause instanceof Error ? err.cause.message : err.cause ? String(err.cause) : ''
+  const code = err.cause && typeof err.cause === 'object' && 'code' in err.cause ? ` [${(err.cause as { code: unknown }).code}]` : ''
+  return cause ? `${head} — penyebab: ${cause}${code}` : head
+}

@@ -16,6 +16,7 @@ import { listBacktestRuns } from '@/lib/db/queries'
 import { describeIc, type EvaluationResult } from '@/lib/backtest/metrics'
 import type { FeatureIc } from '@/lib/backtest/runner'
 import { HORIZONS } from '@/lib/scoring/weights'
+import { requireUser } from '@/lib/auth/user-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,6 +29,10 @@ interface Metrics {
 }
 
 export default async function BacktestPage() {
+  // Penjagaan yang mengikat. `proxy.ts` sudah memantulkan pengunjung anonim
+  // lebih dulu, tetapi pemeriksaan di sini yang menjamin halaman ini tidak
+  // pernah merender data untuk orang tanpa sesi.
+  await requireUser('/backtest')
   let runs: Awaited<ReturnType<typeof listBacktestRuns>> = []
   let error: string | null = null
 

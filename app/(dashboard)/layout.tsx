@@ -9,6 +9,12 @@
  * Kegagalan basis data tidak boleh menjatuhkan seluruh kerangka. Kalau kueri
  * gagal, bar atas berkata "terputus" dan halaman di dalamnya tetap tergambar
  * beserta keterangan cara memperbaikinya.
+ *
+ * Kerangka ini hanya untuk yang sudah masuk. Pengunjung anonim tidak pernah
+ * sampai ke sini: `proxy.ts` memantulkannya ke halaman masuk lebih dulu, dan
+ * tiap halaman di bawahnya memeriksa ulang lewat `requireUser()`. Layout tidak
+ * ikut menjaga karena layout tidak dirender ulang saat berpindah halaman —
+ * penjagaan yang hanya ada di sini akan luput persis pada perpindahan.
  */
 
 import { IngestButton } from '@/components/ingest-button'
@@ -17,13 +23,15 @@ import { Topbar, type TopbarStatus } from '@/components/topbar'
 import { SidebarProvider } from '@/components/sidebar-context'
 import { describeAge, getDataFreshness } from '@/lib/db/queries'
 import { verifyAdminSession } from '@/lib/auth/admin-auth'
+import { getCurrentUser } from '@/lib/auth/user-auth'
 
 export const dynamic = 'force-dynamic'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const [status, isAdmin] = await Promise.all([
+  const [status, isAdmin, session] = await Promise.all([
     freshnessStatus(),
     verifyAdminSession().catch(() => false),
+    getCurrentUser(),
   ])
 
   return (
@@ -32,6 +40,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <Topbar
           status={status}
           isAdmin={isAdmin}
+          user={session ? { name: session.name, email: session.email } : null}
           action={
             process.env.NODE_ENV !== 'production' ? (
               <IngestButton job="ingest-crypto-daily" />

@@ -14,6 +14,7 @@ import {
   IconDatabase,
   IconLock,
   IconArrowRight,
+  IconRadar,
 } from '@/components/icons'
 import { getMarketNewsList, getAdSettings, getAppUsers } from '@/lib/db/news-queries'
 import { isSupabaseStorageConfigured } from '@/lib/storage/supabase-storage'
@@ -36,32 +37,64 @@ export default async function AdminOverviewPage() {
     <div className="admin-page-content" suppressHydrationWarning>
       {/* 1. HEADER HALAMAN ADMIN */}
       <div className="admin-page-hero" suppressHydrationWarning>
+        <span className="admin-hero-glow" aria-hidden="true" />
+
         <div className="admin-page-hero-main">
           <div className="admin-eyebrow mono">
             <span className="badge-live-pulse" style={{ width: '6px', height: '6px' }} />
             <span>PUSAT KENDALI SISTEM &amp; CMS</span>
           </div>
-          <h1 className="admin-page-headline">Dashboard Administrator Komite</h1>
+
+          <h1 className="admin-page-headline">
+            Dashboard <span className="admin-headline-accent">Administrator</span> Komite
+          </h1>
+
           <p className="admin-page-standfirst">
             Manajemen terpadu publikasi warta intelijen pasar, kurasi dampak geopolitik, pengaturan 4 slot sponsor/AdSense,
             dan kontrol hak akses tim.
           </p>
+
+          {/* Dua tindakan yang paling sering dituju, ditaruh di tempat mata
+              mendarat pertama kali. Sisanya tetap di kisi pintasan di bawah. */}
+          <div className="admin-hero-actions">
+            <Link href="/admin/berita/baru" className="btn btn-primary mono">
+              <IconPlus size={14} />
+              <span>Tulis Warta Baru</span>
+            </Link>
+            <Link href="/warta" target="_blank" className="btn btn-quiet mono admin-hero-action-quiet">
+              <IconExternalLink size={13} />
+              <span>Lihat Situs Publik</span>
+            </Link>
+          </div>
         </div>
 
         {/* Status System Chips */}
         <div className="admin-hero-chips mono" suppressHydrationWarning>
+          <div className="admin-hero-chips-head">
+            <IconLock size={11} />
+            <span>STATUS SESI &amp; SISTEM</span>
+          </div>
+
           <div className="admin-hero-chip">
             <span className="chip-indicator ok" />
-            <span>PostgreSQL: Aktif</span>
+            <span className="admin-hero-chip-name">PostgreSQL</span>
+            <span className="admin-hero-chip-value ok">Aktif</span>
           </div>
           <div className="admin-hero-chip">
             <span className={`chip-indicator ${storageReady ? 'ok' : 'warn'}`} />
-            <span>Storage: {storageReady ? 'Terhubung' : 'Belum Konfig'}</span>
+            <span className="admin-hero-chip-name">Storage</span>
+            <span className={`admin-hero-chip-value ${storageReady ? 'ok' : 'warn'}`}>
+              {storageReady ? <IconCheck size={11} /> : <IconAlert size={11} />}
+              {storageReady ? 'Terhubung' : 'Belum konfig'}
+            </span>
           </div>
           <div className="admin-hero-chip">
             <span className="chip-indicator ok" />
-            <span>Sesi: Super Admin</span>
+            <span className="admin-hero-chip-name">Sesi</span>
+            <span className="admin-hero-chip-value ok">Super Admin</span>
           </div>
+
+          <div className="admin-hero-chips-foot">{todayLabel()}</div>
         </div>
       </div>
 
@@ -204,6 +237,23 @@ export default async function AdminOverviewPage() {
           </div>
           <div className="admin-action-arrow mono">
             <span>Uji Tampilan</span>
+            <IconArrowRight size={13} />
+          </div>
+        </Link>
+
+        {/* Aksi 5: Analitik & Cyber Radar */}
+        <Link href="/admin/analytics" className="admin-action-card">
+          <div className="admin-action-icon-box" style={{ background: 'rgba(239, 68, 68, 0.12)', color: '#ef4444' }}>
+            <IconRadar size={20} />
+          </div>
+          <div className="admin-action-text">
+            <h3 className="admin-action-heading">Analitik &amp; Cyber Radar</h3>
+            <p className="admin-action-desc">
+              Peta geolokasi IP Leaflet, telemetri kunjungan per halaman, audit perangkat lengkap, dan mitigasi ancaman WAF.
+            </p>
+          </div>
+          <div className="admin-action-arrow mono">
+            <span>Buka Radar</span>
             <IconArrowRight size={13} />
           </div>
         </Link>
@@ -390,4 +440,15 @@ export default async function AdminOverviewPage() {
       </div>
     </div>
   )
+}
+
+/** Tanggal hari ini menurut jam Jakarta, ditulis panjang. */
+function todayLabel(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat('id-ID', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'Asia/Jakarta',
+  }).format(now)
 }

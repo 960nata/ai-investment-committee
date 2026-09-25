@@ -5,16 +5,19 @@
 import { db } from './client'
 import {
   marketNews,
+  marketNewsTranslation,
   adSettings,
   appUser,
   type MarketNewsRow,
+  type MarketNewsTranslationRow,
   type NewMarketNews,
   type AdSettingsRow,
   type NewAdSettings,
   type AppUserRow,
   type NewAppUser,
 } from './schema'
-import { desc, eq, and, sql, type SQL } from 'drizzle-orm'
+import { desc, eq, and, inArray, isNull, sql, type SQL } from 'drizzle-orm'
+import { SOURCE_LOCALE, TRANSLATED_LOCALES, type Locale } from '@/lib/i18n/locales'
 
 let tablesInitialized = false
 
@@ -52,6 +55,25 @@ export async function ensureNewsTable(): Promise<void> {
     CREATE INDEX IF NOT EXISTS market_news_category_idx ON market_news (category);
     CREATE INDEX IF NOT EXISTS market_news_published_at_idx ON market_news (published_at DESC);
 
+    -- Versi artikel dalam bahasa lain, ditulis ulang oleh agen warta sendiri.
+    -- Baris sumber (Indonesia) tetap di market_news; tabel ini hanya memuat teks
+    -- yang berubah per bahasa. Angka, simbol, gambar, dan skor dampak dibaca
+    -- dari baris sumbernya supaya kelima versi tidak bisa saling menyimpang.
+    CREATE TABLE IF NOT EXISTS market_news_translation (
+      news_id INTEGER NOT NULL REFERENCES market_news(id) ON DELETE CASCADE,
+      locale VARCHAR(8) NOT NULL,
+      title VARCHAR(255) NOT NULL,
+      summary TEXT NOT NULL,
+      tags JSONB NOT NULL DEFAULT '[]'::jsonb,
+      key_takeaways JSONB NOT NULL DEFAULT '[]'::jsonb,
+      content_markdown TEXT NOT NULL,
+      image_alt TEXT,
+      image_caption TEXT,
+      model VARCHAR(96),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (news_id, locale)
+    );
+
     CREATE TABLE IF NOT EXISTS ad_settings (
       id SERIAL PRIMARY KEY,
       slot_name VARCHAR(64) NOT NULL UNIQUE,
@@ -74,6 +96,10 @@ export async function ensureNewsTable(): Promise<void> {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       last_login_at TIMESTAMPTZ
     );
+
+    -- Kolom kata sandi ditambahkan belakangan; basis data yang sudah berjalan
+    -- lebih dulu tetap ikut terurus tanpa migrasi manual.
+    ALTER TABLE app_user ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255);
 
     CREATE INDEX IF NOT EXISTS app_user_role_idx ON app_user (role);
 
@@ -325,12 +351,35 @@ export async function updateAdSetting(
 // ---------------------------------------------------------------------------
 
 /**
- * Ambil daftar semua user.
+ * Kolom pengguna yang boleh meninggalkan lapisan ini.
+ *
+ * `passwordHash` sengaja tidak ada di sini. Satu-satunya yang berhak melihatnya
+ * adalah pemeriksa kata sandi, dan itu memakai `getAppUserByEmail()`. Kueri yang
+ * memilih seluruh kolom akan mengirim sidik kata sandi tiap pengguna ke portal
+ * admin di peramban — bukan karena ada yang memintanya, melainkan karena tidak
+ * ada yang menahannya.
  */
-export async function getAppUsers(): Promise<AppUserRow[]> {
+const PUBLIC_USER_COLUMNS = {
+  id: appUser.id,
+  email: appUser.email,
+  name: appUser.name,
+  role: appUser.role,
+  isActive: appUser.isActive,
+  createdAt: appUser.createdAt,
+  lastLoginAt: appUser.lastLoginAt,
+} as const
+
+export type PublicAppUser = {
+  [K in keyof typeof PUBLIC_USER_COLUMNS]: AppUserRow[K]
+}
+
+/**
+ * Ambil daftar semua user, tanpa sidik kata sandi.
+ */
+export async function getAppUsers(): Promise<PublicAppUser[]> {
   await ensureNewsTable()
 
-  return db.select().from(appUser).orderBy(desc(appUser.createdAt))
+  return db.select(PUBLIC_USER_COLUMNS).from(appUser).orderBy(desc(appUser.createdAt))
 }
 
 /**
@@ -349,9 +398,69 @@ export async function getAppUserByEmail(email: string): Promise<AppUserRow | nul
 }
 
 /**
+ * Daftarkan akun baru berikut kata sandinya.
+ *
+ * Surel yang sudah terpakai ditolak di sini, bukan di lapisan atas: satu-satunya
+ * tempat yang benar-benar tahu isi tabel adalah tabelnya sendiri, dan pemeriksaan
+ * "sudah ada atau belum" yang terpisah dari penyisipan selalu punya celah waktu
+ * di antaranya.
+ *
+ * Akun yang pernah dibuat admin tanpa kata sandi boleh mengklaim kata sandinya
+ * di sini — itulah cara undangan berubah jadi akun yang bisa dipakai. Akun yang
+ * kata sandinya sudah terisi tetap ditolak.
+ */
+export async function registerAppUser(input: {
+  email: string
+  name: string
+  passwordHash: string
+}): Promise<{ ok: true; user: PublicAppUser } | { ok: false; reason: 'taken' }> {
+  await ensureNewsTable()
+
+  const email = input.email.toLowerCase()
+
+  const rows = await db
+    .insert(appUser)
+    .values({
+      email,
+      name: input.name,
+      role: 'user',
+      isActive: true,
+      passwordHash: input.passwordHash,
+      lastLoginAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: appUser.email,
+      set: {
+        name: input.name,
+        passwordHash: input.passwordHash,
+        lastLoginAt: new Date(),
+      },
+      // Hanya baris undangan — yang belum punya kata sandi — yang boleh terisi.
+      setWhere: isNull(appUser.passwordHash),
+    })
+    .returning(PUBLIC_USER_COLUMNS)
+
+  if (rows.length === 0) return { ok: false, reason: 'taken' }
+  return { ok: true, user: rows[0] }
+}
+
+/**
+ * Catat waktu masuk terakhir.
+ *
+ * Kegagalan di sini sengaja tidak menggagalkan proses masuk. Stempel waktu
+ * adalah catatan, bukan syarat, dan menolak seseorang masuk karena satu kolom
+ * pencatatan gagal ditulis adalah pertukaran yang salah.
+ */
+export async function markUserLogin(id: number): Promise<void> {
+  await ensureNewsTable()
+
+  await db.update(appUser).set({ lastLoginAt: new Date() }).where(eq(appUser.id, id))
+}
+
+/**
  * Upsert user (misal saat login).
  */
-export async function upsertAppUser(user: NewAppUser): Promise<AppUserRow> {
+export async function upsertAppUser(user: NewAppUser): Promise<PublicAppUser> {
   await ensureNewsTable()
 
   const rows = await db
@@ -367,7 +476,7 @@ export async function upsertAppUser(user: NewAppUser): Promise<AppUserRow> {
         lastLoginAt: new Date(),
       },
     })
-    .returning()
+    .returning(PUBLIC_USER_COLUMNS)
 
   return rows[0]
 }
@@ -379,7 +488,7 @@ export async function updateUserRole(
   id: number,
   role: 'admin' | 'user',
   isActive?: boolean,
-): Promise<AppUserRow | null> {
+): Promise<PublicAppUser | null> {
   await ensureNewsTable()
 
   const payload: Partial<AppUserRow> = { role }
@@ -391,7 +500,7 @@ export async function updateUserRole(
     .update(appUser)
     .set(payload)
     .where(eq(appUser.id, id))
-    .returning()
+    .returning(PUBLIC_USER_COLUMNS)
 
   return res[0] ?? null
 }
@@ -404,4 +513,158 @@ export async function deleteAppUser(id: number): Promise<boolean> {
 
   const res = await db.delete(appUser).where(eq(appUser.id, id)).returning({ id: appUser.id })
   return res.length > 0
+}
+
+// ---------------------------------------------------------------------------
+// Versi bahasa lain
+// ---------------------------------------------------------------------------
+
+export interface NewsTranslationInput {
+  newsId: number
+  locale: Locale
+  title: string
+  summary: string
+  tags: string[]
+  keyTakeaways: string[]
+  contentMarkdown: string
+  imageAlt: string | null
+  imageCaption: string | null
+  model: string | null
+}
+
+export async function saveNewsTranslation(input: NewsTranslationInput): Promise<void> {
+  await ensureNewsTable()
+  await db
+    .insert(marketNewsTranslation)
+    .values({ ...input, createdAt: new Date() })
+    .onConflictDoUpdate({
+      target: [marketNewsTranslation.newsId, marketNewsTranslation.locale],
+      set: {
+        title: sql`excluded.title`,
+        summary: sql`excluded.summary`,
+        tags: sql`excluded.tags`,
+        keyTakeaways: sql`excluded.key_takeaways`,
+        contentMarkdown: sql`excluded.content_markdown`,
+        imageAlt: sql`excluded.image_alt`,
+        imageCaption: sql`excluded.image_caption`,
+        model: sql`excluded.model`,
+        createdAt: sql`excluded.created_at`,
+      },
+    })
+}
+
+/** Bahasa yang tersedia untuk satu artikel, termasuk bahasa sumbernya. */
+export async function listNewsLocales(newsId: number): Promise<Locale[]> {
+  await ensureNewsTable()
+  const rows = await db
+    .select({ locale: marketNewsTranslation.locale })
+    .from(marketNewsTranslation)
+    .where(eq(marketNewsTranslation.newsId, newsId))
+  const have = new Set(rows.map((r) => r.locale))
+  return [SOURCE_LOCALE, ...TRANSLATED_LOCALES.filter((l) => have.has(l))]
+}
+
+/**
+ * Gabungkan baris sumber dengan versi bahasanya.
+ *
+ * Hasilnya berbentuk sama dengan `MarketNewsRow`, jadi halaman artikel tidak
+ * perlu tahu versi mana yang sedang ia tampilkan. Fakta — dampak, simbol,
+ * tanggal, sampul — selalu datang dari baris sumber.
+ */
+function mergeTranslation(base: MarketNewsRow, t: MarketNewsTranslationRow): MarketNewsRow {
+  return {
+    ...base,
+    title: t.title,
+    summary: t.summary,
+    tags: t.tags.length > 0 ? t.tags : base.tags,
+    keyTakeaways: t.keyTakeaways,
+    contentMarkdown: t.contentMarkdown,
+    featuredImage: base.featuredImage
+      ? {
+          ...base.featuredImage,
+          alt: t.imageAlt ?? base.featuredImage.alt,
+          caption: t.imageCaption ?? base.featuredImage.caption,
+        }
+      : base.featuredImage,
+  }
+}
+
+/** Satu artikel dalam satu bahasa; null bila versi bahasa itu belum ditulis. */
+export async function getLocalizedNewsBySlug(
+  slug: string,
+  locale: Locale,
+): Promise<MarketNewsRow | null> {
+  const base = await getMarketNewsBySlug(slug)
+  if (!base || locale === SOURCE_LOCALE) return base
+
+  const rows = await db
+    .select()
+    .from(marketNewsTranslation)
+    .where(and(eq(marketNewsTranslation.newsId, base.id), eq(marketNewsTranslation.locale, locale)))
+    .limit(1)
+
+  return rows[0] ? mergeTranslation(base, rows[0]) : null
+}
+
+/** Daftar artikel yang sudah punya versi dalam satu bahasa, terbaru dulu. */
+export async function getLocalizedNewsList(locale: Locale, limit = 20): Promise<MarketNewsRow[]> {
+  if (locale === SOURCE_LOCALE) return getMarketNewsList({ limit })
+  await ensureNewsTable()
+
+  const rows = await db
+    .select({ base: marketNews, t: marketNewsTranslation })
+    .from(marketNews)
+    .innerJoin(
+      marketNewsTranslation,
+      and(eq(marketNewsTranslation.newsId, marketNews.id), eq(marketNewsTranslation.locale, locale)),
+    )
+    .orderBy(desc(marketNews.publishedAt))
+    .limit(Math.min(limit, 100))
+
+  return rows.map((r) => mergeTranslation(r.base, r.t))
+}
+
+/** Artikel yang masih kekurangan versi dalam salah satu bahasa, untuk diisi agen. */
+export async function listNewsMissingTranslations(
+  limit = 50,
+): Promise<{ article: MarketNewsRow; missing: Locale[] }[]> {
+  await ensureNewsTable()
+  const articles = await getMarketNewsList({ limit })
+  if (articles.length === 0) return []
+
+  const rows = await db
+    .select({ newsId: marketNewsTranslation.newsId, locale: marketNewsTranslation.locale })
+    .from(marketNewsTranslation)
+    .where(inArray(marketNewsTranslation.newsId, articles.map((a) => a.id)))
+
+  const have = new Map<number, Set<string>>()
+  for (const r of rows) {
+    const set = have.get(r.newsId) ?? new Set<string>()
+    set.add(r.locale)
+    have.set(r.newsId, set)
+  }
+
+  return articles
+    .map((article) => ({
+      article,
+      missing: TRANSLATED_LOCALES.filter((l) => !have.get(article.id)?.has(l)),
+    }))
+    .filter((x) => x.missing.length > 0)
+}
+
+
+/** Bahasa yang tersedia per artikel, sekali kueri — untuk sitemap. */
+export async function listNewsLocaleMap(): Promise<Map<number, Locale[]>> {
+  await ensureNewsTable()
+  const rows = await db
+    .select({ newsId: marketNewsTranslation.newsId, locale: marketNewsTranslation.locale })
+    .from(marketNewsTranslation)
+
+  const map = new Map<number, Locale[]>()
+  for (const r of rows) {
+    const list = map.get(r.newsId) ?? [SOURCE_LOCALE]
+    if (TRANSLATED_LOCALES.includes(r.locale as Exclude<Locale, 'id'>)) list.push(r.locale as Locale)
+    map.set(r.newsId, list)
+  }
+  return map
 }

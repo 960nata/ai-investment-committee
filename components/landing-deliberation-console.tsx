@@ -245,9 +245,9 @@ export function LandingDeliberationConsole({ instruments = [] }: LandingDelibera
       <div className="landing-section-container">
         {/* Section Header */}
         <div className="landing-section-head">
-          <div className="inline-flex items-center gap-2 mb-2">
+          <div className="landing-strip-title" style={{ marginBottom: '8px' }}>
             <span className="badge-live-pulse" />
-            <span className="mono bold" style={{ fontSize: '11px', color: 'var(--amber)', letterSpacing: '0.08em' }}>
+            <span className="mono bold" style={{ fontSize: '11px', color: 'var(--signal)', letterSpacing: '0.08em' }}>
               SIMULASI TERMINAL LIVE
             </span>
           </div>
@@ -347,9 +347,15 @@ export function LandingDeliberationConsole({ instruments = [] }: LandingDelibera
           {/* Committee Dialectics Tension Meter */}
           <div className="console-tension-bar">
             <div className="tension-info mono">
-              <span style={{ color: 'var(--green)' }}>🐂 Strateg (Bull): {sample.bullWeight}%</span>
-              <span style={{ color: 'var(--ink-faint)' }}>TENSI DIALEKTIKA SIDANG</span>
-              <span style={{ color: 'var(--red)' }}>🐻 Pengawas Risiko (Bear): {sample.bearWeight}%</span>
+              <span className="tension-side trend-up">
+                <IconTrendUp size={12} />
+                <span>Strateg (Bull): {sample.bullWeight}%</span>
+              </span>
+              <span className="tension-caption">TENSI DIALEKTIKA SIDANG</span>
+              <span className="tension-side trend-down">
+                <IconTrendDown size={12} />
+                <span>Pengawas Risiko (Bear): {sample.bearWeight}%</span>
+              </span>
             </div>
             <div className="tension-track">
               <div className="tension-bull-fill" style={{ width: `${sample.bullWeight}%` }} />

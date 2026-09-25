@@ -12,6 +12,7 @@
  */
 
 import { complete } from '@/lib/ai/registry'
+import { translateNewsToAllLocales } from '@/lib/agents/news-translator'
 import { saveMarketNews, getMarketNewsList } from '@/lib/db/news-queries'
 import {
   mirrorInternetImageToSupabase,
@@ -761,6 +762,20 @@ foto asli di internet memakai "imageSearchQuery" Anda, mengunduhnya, dan menyimp
 
   // Simpan ke database
   const saved = await saveMarketNews(newArticle)
+
+  // Versi empat bahasa lain ditulis sesudah sumbernya aman tersimpan. Kegagalan
+  // di sini tidak membatalkan artikel: versi yang belum jadi dilengkapi nanti
+  // oleh `translateMissingNews`, dan pembaca bahasa itu hanya belum melihatnya.
+  try {
+    const report = await translateNewsToAllLocales(saved)
+    console.log(
+      `[NewsAgent] ${saved.slug}: ${report.done.length} versi bahasa tersimpan, ` +
+        `${report.failed.length} gagal`,
+    )
+  } catch (err) {
+    console.warn('[NewsAgent] Penulisan versi bahasa lain gagal:', err)
+  }
+
   return saved
 }
 

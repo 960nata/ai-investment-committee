@@ -34,12 +34,17 @@ import { isDue, localSlot } from '@/lib/jobs/due'
 import { isQStashConfigured } from '@/lib/queue/qstash'
 import { cache } from '@/lib/cache/redis'
 import { fromDbMarket } from '@/lib/db/schema'
+import { requireUser } from '@/lib/auth/user-auth'
 
 export const dynamic = 'force-dynamic'
 
 export const metadata = { title: 'Pipeline' }
 
 export default async function PipelinePage() {
+  // Penjagaan yang mengikat. `proxy.ts` sudah memantulkan pengunjung anonim
+  // lebih dulu, tetapi pemeriksaan di sini yang menjamin halaman ini tidak
+  // pernah merender data untuk orang tanpa sesi.
+  await requireUser('/pipeline')
   const now = new Date()
 
   let data: {

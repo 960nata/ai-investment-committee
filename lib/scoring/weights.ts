@@ -96,10 +96,21 @@ export const GROUP_OF: Record<FeatureGroup, ScoreGroup> = {
   relatif: 'relatif',
   valuasi: 'valuasi',
   kualitas: 'pertumbuhan',
+  // KSEI. Hanya saham IDX yang punya datanya; untuk pasar lain kelompok ini
+  // tetap kosong dan terhitung sebagai lubang, bukan sebagai netral.
+  kepemilikan: 'arus_dana',
 }
 
 /** Kelompok yang belum punya fitur sama sekali, untuk ditampilkan apa adanya. */
-export const GROUPS_WITHOUT_FEATURES: ScoreGroup[] = ['arus_dana', 'sentimen']
+export const GROUPS_WITHOUT_FEATURES: ScoreGroup[] = ['sentimen']
+
+/**
+ * Kelompok yang fiturnya hanya ada untuk sebagian pasar. Disebut terbuka supaya
+ * pembaca tidak mengira kelompok itu berlaku rata di semua instrumen.
+ */
+export const GROUPS_PARTIAL: Partial<Record<ScoreGroup, string>> = {
+  arus_dana: 'Baru untuk saham IDX, dari data kepemilikan KSEI. Broker summary harian belum ada.',
+}
 
 /**
  * Versi model, ikut tersimpan di tiap baris skor.
@@ -107,7 +118,8 @@ export const GROUPS_WITHOUT_FEATURES: ScoreGroup[] = ['arus_dana', 'sentimen']
  * Naik setiap kali bobot atau rumus agregasi berubah. Tanpa ini, skor lama dan
  * skor baru terlihat sebanding padahal dihasilkan model yang berbeda.
  */
-export const MODEL_VERSION = 'skor-2026-09-a'
+// skor-2026-09-b: kelompok arus dana mulai terisi dari KSEI untuk saham IDX.
+export const MODEL_VERSION = 'skor-2026-09-b'
 
 /**
  * Kelas aset yang tidak akan pernah punya laporan keuangan.

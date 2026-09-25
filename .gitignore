@@ -36,6 +36,12 @@ yarn-error.log*
 .env.*
 *.env
 
+# Kecuali berkas contohnya, yang isinya hanya nama variabel dan penjelasannya —
+# tidak satu pun nilai sungguhan. Tanpa pengecualian ini, tiap variabel baru
+# hanya terdokumentasi di mesin orang yang menambahkannya, dan pemasangan
+# berikutnya menemukannya lewat fitur yang diam-diam tidak bekerja.
+!.env.example
+
 # Kunci, sertifikat, dan berkas kredensial lain
 *.pem
 *.key
@@ -58,4 +64,7 @@ next-env.d.ts
 CLAUDE.md
 .claude
 *claude*
+
+# temporary screenshots / audit dumps
+/*.png
 

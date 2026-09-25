@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { getMarketNewsList } from '@/lib/db/news-queries'
 import { seedInitialNewsArticles } from '@/lib/agents/news-agent'
 import { NewsPortalClient } from '@/components/news-portal-client'
+import { requireUser } from '@/lib/auth/user-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,6 +38,10 @@ const KNOWN_CATEGORIES = [
 ]
 
 export default async function BeritaPage({ searchParams }: Props) {
+  // Penjagaan yang mengikat. `proxy.ts` sudah memantulkan pengunjung anonim
+  // lebih dulu, tetapi pemeriksaan di sini yang menjamin halaman ini tidak
+  // pernah merender data untuk orang tanpa sesi.
+  await requireUser('/berita')
   const { kategori, q } = await searchParams
   await seedInitialNewsArticles()
 

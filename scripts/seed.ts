@@ -29,7 +29,8 @@ interface ScheduleSeed {
   hoursOfDay: number[]
   timezone: string
   tradingDaysOnly: boolean
-  market: MarketCode
+  /** null untuk job yang tidak terikat satu pasar. */
+  market: MarketCode | null
   enabled: boolean
   note: string
 }
@@ -51,6 +52,11 @@ const SCHEDULES: ScheduleSeed[] = [
   { jobName: 'ingest-global-daily', hoursOfDay: [7], timezone: 'Asia/Jakarta', tradingDaysOnly: true, market: 'GLOBAL', enabled: true, note: '07.00 WIB, indeks dunia dan berjangka' },
   { jobName: 'compute-features-global', hoursOfDay: [8], timezone: 'Asia/Jakarta', tradingDaysOnly: true, market: 'GLOBAL', enabled: true, note: '08.00 WIB, hari bursa' },
   { jobName: 'score-global', hoursOfDay: [9], timezone: 'Asia/Jakarta', tradingDaysOnly: true, market: 'GLOBAL', enabled: true, note: '09.00 WIB, setelah fitur selesai' },
+  // KSEI menerbitkan berkas akhir bulan beberapa hari kemudian. Dicek tiap hari
+  // bursa; bulan yang sudah tersimpan dilewati, jadi biayanya kecil.
+  { jobName: 'ingest-ksei-monthly', hoursOfDay: [16], timezone: 'Asia/Jakarta', tradingDaysOnly: true, market: 'IDX', enabled: true, note: '16.00 WIB, kepemilikan KSEI bila bulan baru terbit' },
+  // Deret makro berubah bulanan atau tahunan; sehari sekali lebih dari cukup.
+  { jobName: 'ingest-macro', hoursOfDay: [3], timezone: 'UTC', tradingDaysOnly: false, market: null, enabled: true, note: '03.00 UTC, suku bunga, inflasi, PDB' },
 ]
 
 async function seedSchedules(): Promise<void> {

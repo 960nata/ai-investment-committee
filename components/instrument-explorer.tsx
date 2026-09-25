@@ -16,8 +16,9 @@
  * masing-masing secara terpisah.
  */
 
-import { useEffect, useMemo, useState, useTransition } from 'react'
-import { CandlestickChart, type Candle } from './candlestick-chart'
+import { useCallback, useEffect, useMemo, useRef as useReactRef, useState, useTransition } from 'react'
+import { CandlestickChart, IntradayChart, type Candle, type IntradayCandle } from './candlestick-chart'
+import { CHART_HISTORY_YEARS, CHART_RANGES, type ChartRangeId } from '@/lib/format/chart-range'
 import { RegionFlag } from './flags'
 import { IconAlert, IconCandles, IconClose, IconCourt, IconRows } from './icons'
 import { AssetIcon } from './asset-icons'
@@ -53,13 +54,23 @@ interface Props {
   tabs: TabGroup[]
   initialInstrumentId: number | null
   initialCandles: Candle[]
+  /** Tab yang diminta lewat alamat, misalnya dari menu atau pita harga. */
+  initialTab?: string | null
 }
 
-export function InstrumentExplorer({ instruments, scores, tabs, initialInstrumentId, initialCandles }: Props) {
+export function InstrumentExplorer({
+  instruments,
+  scores,
+  tabs,
+  initialInstrumentId,
+  initialCandles,
+  initialTab: requestedTab,
+}: Props) {
   const initial = instruments.find((i) => i.id === initialInstrumentId)
 
   // Cari tab group mana yang memuat instrumen pembuka.
   const initialTab =
+    (requestedTab && tabs.some((t) => t.id === requestedTab) ? requestedTab : null) ??
     tabs.find((t) => t.children.some((c) => c.id === initial?.assetClass))?.id ??
     tabs[0]?.id ??
     'crypto'
@@ -70,10 +81,35 @@ export function InstrumentExplorer({ instruments, scores, tabs, initialInstrumen
   const [region, setRegion] = useState<RegionFilter>('semua')
   const [selectedId, setSelectedId] = useState(initialInstrumentId)
   const [candles, setCandles] = useState(initialCandles)
+  const [range, setRange] = useState<ChartRangeId>('1Y')
   const [showBoardroom, setShowBoardroom] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
   const [liveQuotes, setLiveQuotes] = useState<Record<string, LiveQuoteData>>({})
+  const [intradayCandles, setIntradayCandles] = useState<IntradayCandle[]>([])
+  const [intradayLoading, setIntradayLoading] = useState(false)
+
+  const isIntraday = range === '1D'
+  const intradayTimerRef = useReactRef<ReturnType<typeof setInterval> | null>(null)
+
+  /** Fetch intraday candles untuk simbol terpilih */
+  const fetchIntraday = useCallback(async (symbol: string, isInitial: boolean) => {
+    if (isInitial) setIntradayLoading(true)
+    try {
+      const res = await fetch(`/api/quotes/intraday?symbol=${encodeURIComponent(symbol)}`, {
+        signal: AbortSignal.timeout(10_000),
+      })
+      if (!res.ok) return
+      const body = await res.json()
+      if (body.candles?.length) setIntradayCandles(body.candles)
+    } catch {
+      // Diam-diam abaikan — grafik harian tetap tersedia
+    } finally {
+      if (isInitial) setIntradayLoading(false)
+    }
+  }, [])
+
+
 
   const activeGroup = tabs.find((t) => t.id === tab)
   const childIds = useMemo(
@@ -111,6 +147,28 @@ export function InstrumentExplorer({ instruments, scores, tabs, initialInstrumen
   )
 
   const selected = instruments.find((i) => i.id === selectedId) ?? null
+
+  // Polling intraday setiap 15 detik saat tab 1D aktif
+  useEffect(() => {
+    if (!isIntraday || !selected) {
+      setIntradayCandles([])
+      return
+    }
+
+    // Muat pertama kali
+    fetchIntraday(selected.symbol, true)
+
+    // Polling
+    const timer = setInterval(() => {
+      if (selected) fetchIntraday(selected.symbol, false)
+    }, 15_000)
+    intradayTimerRef.current = timer
+
+    return () => {
+      clearInterval(timer)
+      intradayTimerRef.current = null
+    }
+  }, [isIntraday, selected, fetchIntraday])
 
   // Polling kutipan harga realtime untuk instrumen terpilih dan baris yang sedang terlihat
   useEffect(() => {
@@ -171,7 +229,7 @@ export function InstrumentExplorer({ instruments, scores, tabs, initialInstrumen
 
     startTransition(async () => {
       try {
-        const response = await fetch(`/api/v1/instruments/${instrument.id}/candles?from=${yearsAgo(2)}`, {
+        const response = await fetch(`/api/v1/instruments/${instrument.id}/candles?from=${yearsAgo(CHART_HISTORY_YEARS)}`, {
           signal: AbortSignal.timeout(15_000),
         })
         if (!response.ok) throw new Error(`HTTP ${response.status}`)
@@ -276,7 +334,17 @@ export function InstrumentExplorer({ instruments, scores, tabs, initialInstrumen
               </span>
             )
           })()}
-          <span className="panel-meta">{pending ? 'memuat' : `${candles.length} candle`}</span>
+          <span className="panel-meta">
+            {isIntraday
+              ? intradayLoading ? 'memuat realtime...' : `${intradayCandles.length} candle · 5m`
+              : pending ? 'memuat' : `${candles.length} candle`}
+            {isIntraday && intradayCandles.length > 0 && (
+              <span className="live-pill" style={{ marginLeft: 6 }} title="Data diperbarui otomatis tiap 15 detik">
+                <span className="live-dot" />
+                Live
+              </span>
+            )}
+          </span>
           {selected && (
             <button
               type="button"
@@ -305,14 +373,56 @@ export function InstrumentExplorer({ instruments, scores, tabs, initialInstrumen
           )}
         </div>
 
+        <div className="chart-range-bar">
+          <div className="segmented" role="group" aria-label="Rentang grafik" translate="no">
+            {CHART_RANGES.map((r) => (
+              <button
+                key={r.id}
+                type="button"
+                className={`seg${r.id === '1D' ? ' seg-live' : ''}`}
+                aria-pressed={range === r.id}
+                onClick={() => setRange(r.id)}
+              >
+                {r.label}
+                {r.id === '1D' && range === '1D' && (
+                  <span className="live-dot" style={{ marginLeft: 4, verticalAlign: 'middle' }} />
+                )}
+              </button>
+            ))}
+          </div>
+          {isIntraday ? (
+            intradayCandles.length > 0 && (
+              <span className="chart-range-since">candle 5 menit · diperbarui otomatis</span>
+            )
+          ) : (
+            candles.length > 0 && (
+              <span className="chart-range-since">sejak {formatSince(candles)}</span>
+            )
+          )}
+        </div>
+
         <div className="chart chart-wide">
-          {error ? (
+          {isIntraday ? (
+            intradayLoading ? (
+              <Blank icon={<IconCandles size={22} />} title="Memuat grafik realtime...">
+                Mengambil data intraday 5 menit dari bursa.
+              </Blank>
+            ) : intradayCandles.length > 0 ? (
+              <IntradayChart data={intradayCandles} />
+            ) : (
+              <Blank icon={<IconCandles size={22} />} title="Tidak ada data intraday">
+                {selected
+                  ? `Data intraday belum tersedia untuk ${selected.symbol}. Pasar mungkin sedang tutup.`
+                  : 'Pilih instrumen di bawah untuk melihat grafiknya.'}
+              </Blank>
+            )
+          ) : error ? (
             <Blank icon={<IconAlert size={22} />} title="Grafik gagal dimuat">
               Coba muat ulang halaman. Kalau terus berulang, periksa apakah pipa data masih
               berjalan di halaman Pipeline.
             </Blank>
           ) : candles.length > 0 ? (
-            <CandlestickChart data={candles} />
+            <CandlestickChart data={candles} range={range} />
           ) : (
             <Blank icon={<IconCandles size={22} />} title="Belum ada candle">
               {selected
@@ -601,6 +711,18 @@ function formatPrice(value: number, currency: string): string {
     maxDigits = 4
   }
   return `${value.toLocaleString('id-ID', { minimumFractionDigits: minDigits, maximumFractionDigits: maxDigits })} ${currency}`
+}
+
+/** Tanggal candle tertua, supaya pembaca tahu tab 10 tahun memang bisa lebih pendek. */
+function formatSince(candles: Candle[]): string {
+  let oldest = candles[0].date
+  for (const c of candles) if (c.date < oldest) oldest = c.date
+  return new Date(`${oldest}T00:00:00Z`).toLocaleDateString('id-ID', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  })
 }
 
 function yearsAgo(n: number): string {

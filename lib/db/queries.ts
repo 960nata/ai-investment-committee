@@ -19,6 +19,7 @@ import {
   candleDaily,
   dataSourceHealth,
   featureDaily,
+  featureKeySet,
   fromDbMarket,
   fundamentalQuarterly,
   ingestQuarantine,
@@ -31,6 +32,7 @@ import {
   type AgentVerdict,
   type AssetClass,
   type DbMarket,
+  type FeatureRowRecord,
   type MarketCode,
 } from './schema'
 
@@ -774,6 +776,15 @@ export async function upsertFeatures(rows: FeatureInput[], chunkSize = 500): Pro
   let written = 0
   for (let i = 0; i < rows.length; i += chunkSize) {
     const slice = rows.slice(i, i + chunkSize)
+
+    const keysByVersion = new Map<string, string[]>()
+    for (const version of new Set(slice.map((r) => r.featureSetVersion))) {
+      const needed = slice
+        .filter((r) => r.featureSetVersion === version)
+        .flatMap((r) => Object.keys(r.values))
+      keysByVersion.set(version, await featureKeys(version, needed))
+    }
+
     const inserted = await db
       .insert(featureDaily)
       .values(
@@ -781,7 +792,7 @@ export async function upsertFeatures(rows: FeatureInput[], chunkSize = 500): Pro
           instrumentId: r.instrumentId,
           date: r.date,
           featureSetVersion: r.featureSetVersion,
-          values: r.values,
+          values: encodeFeatures(r.values, keysByVersion.get(r.featureSetVersion)!),
           computedAt: new Date(),
         })),
       )
@@ -800,14 +811,38 @@ export async function upsertFeatures(rows: FeatureInput[], chunkSize = 500): Pro
   return written
 }
 
+/**
+ * `feature_daily.values` dibaca sebagai float8[], bukan real[].
+ *
+ * Supabase menjalankan tiap sesi dengan `extra_float_digits = 0` dari berkas
+ * konfigurasi servernya, dan pooler-nya membuang parameter koneksi yang mencoba
+ * mengubahnya. Akibatnya `real` dikirim sebagai teks terpangkas 6 digit —
+ * 30.772232 tiba sebagai 30.7722, 109460.82 sebagai 109461 — tanpa satu pun
+ * galat, karena nilainya memang tersimpan utuh dan yang hilang hanya saat
+ * dibaca.
+ *
+ * Konversi real -> float8 persis tanpa pembulatan, dan float8 dikirim dengan 15
+ * digit bahkan saat extra_float_digits = 0. Jadi pembacaannya benar di mana pun
+ * kode ini berjalan, tanpa bergantung pada pengaturan server.
+ *
+ * Semua pembaca kolom ini wajib memakai ekspresi ini, bukan `featureDaily.values`.
+ */
+const featureValuesExact = sql<(number | null)[]>`${featureDaily.values}::float8[]`
+
 export async function getFeatures(
   instrumentId: number,
   featureSetVersion: string,
   from: string,
   to: string,
-) {
-  return db
-    .select()
+): Promise<FeatureRowRecord[]> {
+  const rows = await db
+    .select({
+      instrumentId: featureDaily.instrumentId,
+      date: featureDaily.date,
+      featureSetVersion: featureDaily.featureSetVersion,
+      values: featureValuesExact,
+      computedAt: featureDaily.computedAt,
+    })
     .from(featureDaily)
     .where(
       and(
@@ -818,11 +853,24 @@ export async function getFeatures(
       ),
     )
     .orderBy(featureDaily.date)
+
+  if (rows.length === 0) return []
+  const keys = await featureKeys(featureSetVersion)
+  return rows.map((r) => ({ ...r, values: decodeFeatures(r.values, keys) }))
 }
 
-export async function getLatestFeature(instrumentId: number, featureSetVersion: string) {
+export async function getLatestFeature(
+  instrumentId: number,
+  featureSetVersion: string,
+): Promise<FeatureRowRecord | null> {
   const rows = await db
-    .select()
+    .select({
+      instrumentId: featureDaily.instrumentId,
+      date: featureDaily.date,
+      featureSetVersion: featureDaily.featureSetVersion,
+      values: featureValuesExact,
+      computedAt: featureDaily.computedAt,
+    })
     .from(featureDaily)
     .where(
       and(
@@ -832,7 +880,92 @@ export async function getLatestFeature(instrumentId: number, featureSetVersion: 
     )
     .orderBy(desc(featureDaily.date))
     .limit(1)
-  return rows[0] ?? null
+  if (!rows[0]) return null
+  const keys = await featureKeys(featureSetVersion)
+  return { ...rows[0], values: decodeFeatures(rows[0].values, keys) }
+}
+
+// ---------------------------------------------------------------------------
+// Kamus kunci fitur
+// ---------------------------------------------------------------------------
+
+/**
+ * Kamus per versi, disimpan di memori proses. Hanya pernah bertambah, jadi
+ * salinan lama tetap benar untuk semua posisi yang dikenalnya — yang perlu
+ * dicek hanya apakah kunci yang diminta sudah ada di dalamnya.
+ */
+const featureKeyCache = new Map<string, string[]>()
+
+/**
+ * Urutan kunci untuk satu versi. Bila `needed` berisi kunci yang belum
+ * terdaftar, kunci itu ditambahkan di ujung dalam satu pernyataan atomik —
+ * dua job yang berjalan bersamaan tidak bisa menulis kamus yang saling
+ * menimpa, karena penambahan dihitung terhadap isi baris saat itu juga.
+ */
+async function featureKeys(featureSetVersion: string, needed: string[] = []): Promise<string[]> {
+  const cached = featureKeyCache.get(featureSetVersion)
+  const known = new Set(cached ?? [])
+  const missing = [...new Set(needed)].filter((k) => !known.has(k))
+
+  if (cached && missing.length === 0) return cached
+
+  let keys: string[]
+  if (missing.length === 0) {
+    const [row] = await db
+      .select({ keys: featureKeySet.keys })
+      .from(featureKeySet)
+      .where(eq(featureKeySet.featureSetVersion, featureSetVersion))
+    keys = row?.keys ?? []
+  } else {
+    const literal = toPgArrayLiteral(missing.map((k) => `"${k.replace(/["\\]/g, '\\$&')}"`))
+    const result = await db.execute<{ keys: string[] }>(sql`
+      insert into ${featureKeySet} (feature_set_version, keys)
+      values (${featureSetVersion}, ${literal}::text[])
+      on conflict (feature_set_version) do update
+      set keys = ${featureKeySet}.keys || coalesce(array(
+            select u.k
+            from unnest(excluded.keys) with ordinality as u(k, o)
+            where not (u.k = any(${featureKeySet}.keys))
+            order by u.o
+          ), '{}'),
+          updated_at = now()
+      returning keys
+    `)
+    keys = (result as unknown as { keys: string[] }[])[0].keys
+  }
+
+  featureKeyCache.set(featureSetVersion, keys)
+  return keys
+}
+
+function encodeFeatures(values: Record<string, number | null>, keys: string[]): (number | null)[] {
+  return keys.map((k) => {
+    const v = values[k]
+    return typeof v === 'number' && Number.isFinite(v) ? v : null
+  })
+}
+
+/**
+ * Posisi di luar panjang deret berarti kunci itu ditambahkan setelah baris ini
+ * ditulis.
+ *
+ * Driver postgres.js membaca elemen NULL di dalam `real[]` sebagai NaN, bukan
+ * null. Karena `encodeFeatures` tidak pernah menyimpan NaN, setiap angka yang
+ * tidak hingga di sini pasti berarti "tidak ada nilai" — dan harus kembali jadi
+ * null, sebab NaN yang lolos ke engine skor merusak setiap penjumlahan yang
+ * disentuhnya tanpa satu pun galat.
+ */
+function decodeFeatures(values: (number | null)[], keys: string[]): Record<string, number | null> {
+  const out: Record<string, number | null> = {}
+  for (let i = 0; i < keys.length; i++) {
+    const v = values[i]
+    out[keys[i]] = typeof v === 'number' && Number.isFinite(v) ? v : null
+  }
+  return out
+}
+
+function toPgArrayLiteral(items: string[]): string {
+  return `{${items.join(',')}}`
 }
 
 export interface FeatureCoverage {
@@ -914,7 +1047,7 @@ export async function loadCrossSectionRows(
       date: featureDaily.date,
       sector: instrument.sector,
       market: instrument.market,
-      values: featureDaily.values,
+      values: featureValuesExact,
     })
     .from(featureDaily)
     .innerJoin(instrument, eq(instrument.id, featureDaily.instrumentId))
@@ -927,11 +1060,13 @@ export async function loadCrossSectionRows(
       ),
     )
 
+  if (rows.length === 0) return []
+  const keys = await featureKeys(featureSetVersion)
   return rows.map((r) => ({
     instrumentId: r.instrumentId,
     date: r.date,
     peerGroup: r.sector ?? fromDbMarket(r.market),
-    values: r.values,
+    values: decodeFeatures(r.values, keys),
   }))
 }
 
@@ -945,10 +1080,10 @@ export interface FeaturePatch {
  * Sisipkan kunci baru ke baris fitur yang sudah ada, tanpa menyentuh isinya
  * yang lain.
  *
- * Memakai `||` jsonb, bukan menulis ulang seluruh objek, karena job ini berjalan
- * setelah job fitur dan hanya menambah kunci `_zcs` dan `_pcs`. Menulis ulang
- * berarti job yang belakangan bisa menghapus hasil job yang duluan hanya karena
- * ia tidak tahu kunci itu ada.
+ * Hanya posisi milik kunci di tambalan yang diganti; posisi lain dibiarkan apa
+ * adanya. Job ini berjalan setelah job fitur dan hanya menambah kunci `_zcs`
+ * dan `_pcs`. Menulis ulang seluruh deret berarti job yang belakangan bisa
+ * menghapus hasil job yang duluan hanya karena ia tidak tahu kunci itu ada.
  *
  * Baris yang belum ada sengaja tidak dibuat: nilai lintas penampang tidak berdiri
  * sendiri, ia hanya keterangan tambahan bagi fitur yang sudah dihitung.
@@ -960,21 +1095,45 @@ export async function mergeFeatureValues(
 ): Promise<number> {
   if (patches.length === 0) return 0
 
+  const keys = await featureKeys(
+    featureSetVersion,
+    patches.flatMap((p) => Object.keys(p.values)),
+  )
+  const position = new Map(keys.map((k, i) => [k, i + 1]))
+
   let updated = 0
   for (let i = 0; i < patches.length; i += chunkSize) {
     const slice = patches.slice(i, i + chunkSize)
     const tuples = sql.join(
-      slice.map(
-        (p) =>
-          sql`(${p.instrumentId}::int, ${p.date}::date, ${JSON.stringify(p.values)}::jsonb)`,
-      ),
+      slice.map((p) => {
+        const entries = Object.entries(p.values)
+        const idx = toPgArrayLiteral(entries.map(([k]) => String(position.get(k))))
+        const vals = toPgArrayLiteral(
+          entries.map(([, v]) => (typeof v === 'number' && Number.isFinite(v) ? String(v) : 'NULL')),
+        )
+        return sql`(${p.instrumentId}::int, ${p.date}::date, ${idx}::int[], ${vals}::real[])`
+      }),
       sql`, `,
     )
 
+    // Deret baru dibangun ulang per posisi: posisi yang ada di tambalan memakai
+    // nilai tambalan (termasuk null yang disengaja), sisanya nilai lama. Panjangnya
+    // mengikuti yang lebih panjang, supaya kunci yang baru ditambahkan ke kamus
+    // mendapat tempat di baris lama.
     const result = await db.execute(sql`
       update ${featureDaily} as f
-      set values = f.values || v.patch
-      from (values ${tuples}) as v(instrument_id, date, patch)
+      set values = array(
+        select case
+                 when array_position(v.idx, g.i) is not null then v.vals[array_position(v.idx, g.i)]
+                 else f.values[g.i]
+               end
+        from generate_series(
+               1,
+               greatest(coalesce(array_length(f.values, 1), 0), (select max(x) from unnest(v.idx) x))
+             ) as g(i)
+        order by g.i
+      )
+      from (values ${tuples}) as v(instrument_id, date, idx, vals)
       where f.instrument_id = v.instrument_id
         and f.date = v.date
         and f.feature_set_version = ${featureSetVersion}
@@ -1198,6 +1357,106 @@ export async function listLatestScores(modelVersion: string): Promise<LatestScor
   }))
 }
 
+/**
+ * Versi model yang benar-benar punya skor, yang terbaru dulu.
+ *
+ * Begitu `MODEL_VERSION` dinaikkan, versi barunya kosong sampai job skor
+ * berjalan. Beranda memakai ini supaya tetap menampilkan skor nyata dari versi
+ * sebelumnya — dengan nomor versinya tertulis — alih-alih diam-diam kosong.
+ */
+export async function getLatestScoredModelVersion(preferred: string): Promise<string | null> {
+  const rows = await db.execute<{ model_version: string }>(sql`
+    select model_version
+    from score_daily
+    group by model_version
+    order by (model_version = ${preferred}) desc, max(date) desc, model_version desc
+    limit 1
+  `)
+  return rows[0]?.model_version ?? null
+}
+
+/**
+ * Skor terbaru satu instrumen, seluruh horizon — untuk kartu contoh di beranda.
+ *
+ * Kueri terpisah dari `listLatestScores` karena beranda hanya butuh satu
+ * instrumen, dan menarik skor seluruh instrumen di halaman yang dibuka paling
+ * sering berarti membayar ratusan baris untuk menampilkan tiga.
+ */
+export async function getLatestScoresForSymbol(
+  symbol: string,
+  modelVersion: string,
+): Promise<{ name: string; scores: LatestScore[] } | null> {
+  const rows = await db.execute<{
+    name: string
+    instrument_id: number
+    horizon: 'pendek' | 'menengah' | 'panjang'
+    date: string
+    score: string
+    probability: string | null
+    confidence: LatestScore['confidence']
+    missing_weight: string
+    drivers: Record<string, unknown>
+    groups: Record<string, unknown>[]
+  }>(sql`
+    select i.name, s.instrument_id, s.horizon, s.date::text, s.score, s.probability,
+           s.confidence, s.missing_weight, s.drivers, s.groups
+    from instrument i
+    join lateral (
+      select distinct on (horizon) *
+      from score_daily
+      where instrument_id = i.id and model_version = ${modelVersion}
+      order by horizon, date desc
+    ) s on true
+    where i.symbol = ${symbol}
+  `)
+
+  if (rows.length === 0) return null
+  return {
+    name: rows[0].name,
+    scores: rows.map((r) => ({
+      instrumentId: r.instrument_id,
+      horizon: r.horizon,
+      date: r.date,
+      score: Number(r.score),
+      probability: r.probability === null ? null : Number(r.probability),
+      confidence: r.confidence,
+      missingWeight: Number(r.missing_weight),
+      drivers: r.drivers,
+      groups: r.groups,
+    })),
+  }
+}
+
+/**
+ * Berapa skor terbaru yang berlabel tiap tingkat keyakinan.
+ *
+ * Dipakai beranda untuk menyebut terang-terangan berapa banyak penilaian yang
+ * "tidak memadai". Angkanya harus datang dari sini, bukan ditulis tangan:
+ * angka tangan basi dalam seminggu dan berubah jadi klaim yang keliru.
+ */
+export async function getLatestScoreConfidenceCounts(
+  modelVersion: string,
+): Promise<{ total: number; byConfidence: Record<string, number> }> {
+  const rows = await db.execute<{ confidence: string; n: number }>(sql`
+    select confidence, count(*)::int as n
+    from (
+      select distinct on (instrument_id, horizon) confidence
+      from score_daily
+      where model_version = ${modelVersion}
+      order by instrument_id, horizon, date desc
+    ) latest
+    group by confidence
+  `)
+
+  const byConfidence: Record<string, number> = {}
+  let total = 0
+  for (const r of rows) {
+    byConfidence[r.confidence] = Number(r.n)
+    total += Number(r.n)
+  }
+  return { total, byConfidence }
+}
+
 export async function getScoreCoverage(): Promise<
   { modelVersion: string; rows: number; instruments: number; latestDate: string | null }[]
 > {
@@ -1227,6 +1486,10 @@ export interface FundamentalInput {
   fiscalYear: number
   fiscalPeriod: string
   currency: string
+  /** Pengali satuan nilai di `items`. EDGAR 1; XBRL IDX berbeda per emiten. */
+  unitScale?: number
+  /** Bulan tutup buku, 1-12. */
+  fiscalYearEndMonth?: number | null
   items: Record<string, number>
   missingItems: string[]
   completeness: number
@@ -1259,6 +1522,8 @@ export async function upsertFundamentals(rows: FundamentalInput[], chunkSize = 2
           periodEnd: sql`excluded.period_end`,
           reportedAt: sql`excluded.reported_at`,
           currency: sql`excluded.currency`,
+          unitScale: sql`excluded.unit_scale`,
+          fiscalYearEndMonth: sql`excluded.fiscal_year_end_month`,
           items: sql`excluded.items`,
           missingItems: sql`excluded.missing_items`,
           completeness: sql`excluded.completeness`,

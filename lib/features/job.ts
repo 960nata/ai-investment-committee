@@ -15,6 +15,8 @@ import {
   type FeatureInput,
 } from '@/lib/db/queries'
 import type { MarketCode } from '@/lib/db/schema'
+import { getOwnershipAsOf } from '@/lib/db/ownership-queries'
+import { describeError } from '@/lib/http/errors'
 import type { MaybeSeries, OhlcvSeries } from './indicators'
 import { computeFeatures, MIN_CANDLES_FOR_FEATURES } from './compute'
 
@@ -178,7 +180,11 @@ export async function runFeatureJob(input: FeatureJobInput): Promise<FeatureJobR
       // hari akan berarti ratusan perjalanan bolak-balik untuk satu instrumen.
       const fundamentals = await getFundamentalsAsOf(instrument.id, to, 80)
 
-      const computed = computeFeatures({ market, series, benchmarkClose, fundamentals })
+      // KSEI hanya mencatat efek di bursa Indonesia; pasar lain tidak ditanya
+      // sama sekali, supaya tidak ada kueri yang pasti kosong di tiap instrumen.
+      const ownership = market === 'IDX' ? await getOwnershipAsOf(instrument.id, to) : undefined
+
+      const computed = computeFeatures({ market, series, benchmarkClose, fundamentals, ownership })
 
       const dense = isoDaysAgo(DENSE_WINDOW_DAYS)
       const selected = computed.rows.filter((row, index) => {
@@ -198,7 +204,7 @@ export async function runFeatureJob(input: FeatureJobInput): Promise<FeatureJobR
       result.rowsWritten += await upsertFeatures(rows)
       result.itemsProcessed++
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
+      const message = describeError(err)
       console.error(`[Fitur] ${symbol} gagal:`, message)
       result.errors.push(`${symbol}: ${message}`)
       result.itemsFailed++

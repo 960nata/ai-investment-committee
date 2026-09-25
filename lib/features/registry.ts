@@ -25,6 +25,7 @@ export type FeatureGroup =
   | 'relatif'
   | 'valuasi'
   | 'kualitas'
+  | 'kepemilikan'
 
 /**
  * Peran fitur di dalam sistem.
@@ -637,6 +638,61 @@ export const FEATURES: FeatureSpec[] = [
     label: 'Piotroski F-Score',
     rationale:
       'Tujuh dari sembilan kriterianya mengukur perubahan, bukan tingkat, sehingga ia menangkap arah fundamental yang sedang menguat.',
+    normalise: true,
+  },
+  // --- kepemilikan (KSEI, hanya saham IDX) ----------------------------------
+  // Penyebutnya total lembar yang TERCATAT DI KSEI, bukan saham tercatat di
+  // bursa. KSEI hanya mencatat efek di sistem tanpa warkat: untuk BBCA lokal +
+  // asing 52,5 miliar lembar dari 123,3 miliar yang tercatat. Membagi dengan
+  // saham tercatat membuat porsi asing BBCA tampak 29% padahal 69%.
+  {
+    name: 'asing_pct',
+    group: 'kepemilikan',
+    role: 'display',
+    direction: null,
+    label: 'Porsi kepemilikan asing',
+    rationale:
+      'Ditampilkan sebagai konteks. Tinggi-rendahnya porsi asing sendiri tidak punya arah ekonomi yang jelas; yang punya arah adalah perubahannya.',
+    normalise: false,
+  },
+  {
+    name: 'asing_chg_1b',
+    group: 'kepemilikan',
+    role: 'score',
+    direction: 1,
+    label: 'Perubahan porsi asing, 1 bulan',
+    rationale:
+      'Arus beli investor asing di pasar berkembang terdokumentasi berkorelasi positif dengan imbal hasil jangka pendek berikutnya; kenaikan porsi asing adalah bentuk bulanan dari arus itu.',
+    normalise: true,
+  },
+  {
+    name: 'asing_chg_3b',
+    group: 'kepemilikan',
+    role: 'score',
+    direction: 1,
+    label: 'Perubahan porsi asing, 3 bulan',
+    rationale:
+      'Akumulasi asing yang bertahan satu kuartal lebih sulit dijelaskan sebagai derau daripada lonjakan satu bulan.',
+    normalise: true,
+  },
+  {
+    name: 'institusi_pct',
+    group: 'kepemilikan',
+    role: 'display',
+    direction: null,
+    label: 'Porsi kepemilikan institusi',
+    rationale:
+      'Konteks struktur pemegang saham: semua jenis investor kecuali individu, lokal maupun asing.',
+    normalise: false,
+  },
+  {
+    name: 'institusi_chg_3b',
+    group: 'kepemilikan',
+    role: 'score',
+    direction: 1,
+    label: 'Perubahan porsi institusi, 3 bulan',
+    rationale:
+      'Institusi memperdagangkan informasi lebih banyak daripada ritel; peralihan kepemilikan dari individu ke institusi cenderung mendahului kinerja harga.',
     normalise: true,
   },
 ]

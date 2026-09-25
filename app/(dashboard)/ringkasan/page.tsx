@@ -16,7 +16,6 @@ import {
   IconCandles,
   IconClock,
   IconDatabase,
-  IconFlask,
   IconPlug,
   IconQueue,
   IconRows,
@@ -37,29 +36,132 @@ import { MODEL_VERSION } from '@/lib/scoring/weights'
 import type { HorizonView } from '@/components/score-panel'
 import { isQStashConfigured } from '@/lib/queue/qstash'
 import { cache } from '@/lib/cache/redis'
+import { requireUser } from '@/lib/auth/user-auth'
+import { CHART_HISTORY_YEARS } from '@/lib/format/chart-range'
 
 export const dynamic = 'force-dynamic'
 
-const CHART_RANGE_DAYS = 730
+const CHART_RANGE_DAYS = CHART_HISTORY_YEARS * 366
 
-export default async function OverviewPage() {
+interface OverviewPageProps {
+  searchParams: Promise<{ symbol?: string; tab?: string }>
+}
+
+export default async function OverviewPage({ searchParams }: OverviewPageProps) {
+  // Penjagaan yang mengikat. `proxy.ts` sudah memantulkan pengunjung anonim
+  // lebih dulu, tetapi pemeriksaan di sini yang menjamin halaman ini tidak
+  // pernah merender data untuk orang tanpa sesi.
+  const session = await requireUser('/ringkasan')
+  // Tautan dari menu dan pita harga membawa aset atau kelas aset yang diminta.
+  // Tanpa dibaca di sini, setiap tautan menu mendarat di halaman yang sama dan
+  // menunya berhenti berarti apa-apa.
+  const { symbol, tab } = await searchParams
+
   let data: Awaited<ReturnType<typeof load>> | null = null
   let error: string | null = null
 
   try {
-    data = await load()
+    data = await load({ symbol, tab })
   } catch (err) {
     error = err instanceof Error ? err.message : String(err)
   }
 
   return (
     <>
-      <header className="masthead">
-        <p className="eyebrow">Terminal Kuantitatif &amp; Rapat Komite AI</p>
-        <h1 className="headline">Ringkasan Pasar &amp; Keputusan Investasi</h1>
-        <p className="standfirst">
-          Pemantauan harga realtime, grafik candlestick 448 instrumen, dan transkrip deliberasi 4 agen AI komite investasi.
-        </p>
+      <header className="deck-hero">
+        <span className="deck-hero-glow" aria-hidden="true" />
+
+        <div className="deck-hero-body">
+          <div className="deck-hero-main">
+            <p className="deck-hero-badge mono">
+              <span className="badge-live-pulse" />
+              <span>
+                TERMINAL KOMITE &middot; SESI{' '}
+                {session.role === 'admin' ? 'ADMINISTRATOR' : 'ANALIS'}
+              </span>
+            </p>
+
+            <h1 className="deck-hero-title">
+              <span className="deck-hero-greeting">
+                {greeting()}, {firstName(session.name)}.
+              </span>
+              <span className="deck-hero-headline">
+                Ringkasan Pasar &amp; <span className="deck-hero-accent">Putusan Komite</span>
+              </span>
+            </h1>
+
+            <p className="deck-hero-lead">
+              Harga terkini, grafik candlestick lintas kelas aset, dan transkrip deliberasi empat
+              agen AI &mdash; semuanya dibaca dari basis data yang sama, jadi tiap angka di layar
+              ini bisa ditelusuri balik ke barisnya sendiri.
+            </p>
+
+            <div className="deck-hero-meta mono">
+              <span className="deck-hero-date">{todayLabel()}</span>
+
+              {data && (
+                <>
+                  <span className="deck-hero-chip">
+                    <Lamp state={freshnessState(data.stats.freshness)} />
+                    {freshnessLabel(data.stats.freshness)}
+                  </span>
+                  <span className="deck-hero-chip">
+                    <IconQueue size={12} />
+                    antrean {data.queueConfigured ? 'terjadwal' : 'manual'}
+                  </span>
+                  <span className="deck-hero-chip">
+                    <IconDatabase size={12} />
+                    cache {data.cacheAvailable ? 'aktif' : 'nonaktif'}
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Empat bacaan mesin. Bukan hiasan: ini yang menjawab "boleh percaya
+              angka di bawah atau tidak" sebelum satu grafik pun dibuka. */}
+          {data && (
+            <div className="deck-hero-readouts">
+              <Readout
+                icon={<IconRows size={14} />}
+                label="Instrumen aktif"
+                value={formatCount(data.stats.instrumentCount)}
+                note={`${data.tabs.length} kelas aset punya isi`}
+              />
+              <Readout
+                icon={<IconCandles size={14} />}
+                label="Candle harian"
+                value={formatCount(data.stats.candleCount)}
+                note={
+                  data.stats.latestCandleDate
+                    ? `terakhir ${data.stats.latestCandleDate}`
+                    : 'belum ada lilin tersimpan'
+                }
+              />
+              <Readout
+                icon={<IconPlug size={14} />}
+                label="Adapter data"
+                value={`${data.healthy}/${data.adapterCount}`}
+                note={data.adapterSummary}
+                track={{
+                  value: data.adapterCount > 0 ? data.healthy / data.adapterCount : null,
+                  state: data.adapterState,
+                }}
+              />
+              <Readout
+                icon={<IconClock size={14} />}
+                label="Pembaruan"
+                value={describeAge(data.stats.ageMinutes)}
+                quiet={data.stats.freshness !== 'fresh'}
+                note={
+                  data.stats.quarantinedCount > 0
+                    ? `${formatCount(data.stats.quarantinedCount)} baris dikarantina`
+                    : 'tidak ada baris dikarantina'
+                }
+              />
+            </div>
+          )}
+        </div>
       </header>
 
       {error && <DatabaseNotice detail={error} />}
@@ -71,6 +173,7 @@ export default async function OverviewPage() {
           tabs={data.tabs}
           initialInstrumentId={data.initialInstrumentId}
           initialCandles={data.initialCandles}
+          initialTab={data.initialTab}
         />
       )}
 
@@ -122,7 +225,7 @@ function Readout({
   )
 }
 
-async function load() {
+async function load({ symbol, tab }: { symbol?: string; tab?: string } = {}) {
   const [stats, health, instruments, scores] = await Promise.all([
     getDashboardStats(),
     listAdapterHealth(),
@@ -153,7 +256,26 @@ async function load() {
   // panjang. Bukan yang pertama menurut abjad — grafik kosong sebagai kesan
   // pertama membuat seluruh halaman terlihat rusak padahal datanya ada di
   // instrumen sebelah.
+  const requested = symbol?.trim().toUpperCase()
+  const requestedMatch = requested
+    ? instruments.find((i) => i.symbol.toUpperCase() === requested) ??
+      instruments.find((i) => i.symbol.toUpperCase().startsWith(requested))
+    : undefined
+
+  // Tab yang diminta menu dipetakan ke grup tab yang benar-benar ada isinya.
+  const requestedGroup = tab
+    ? TAB_LAYOUT.find((group) => group.id === tab || group.children.some((c) => c.id === tab))
+    : undefined
+  const groupClasses = requestedGroup?.children.map((c) => c.id) ?? []
+  const inRequestedGroup = groupClasses.length
+    ? [...instruments]
+        .filter((i) => groupClasses.includes(i.assetClass))
+        .sort((a, b) => b.candleCount - a.candleCount)[0]
+    : undefined
+
   const opening =
+    requestedMatch ??
+    inRequestedGroup ??
     instruments.find((i) => i.symbol === 'BTCUSDT' && i.candleCount > 0) ??
     [...instruments].sort((a, b) => b.candleCount - a.candleCount)[0]
   const initialInstrumentId = opening?.id ?? null
@@ -183,8 +305,17 @@ async function load() {
     }))
     .filter((group) => group.children.length > 0)
 
+  // Tab pembuka mengikuti aset yang benar-benar terpilih, bukan permintaan
+  // mentah: kalau ?tab= menunjuk kelas yang kosong, tab dan grafiknya akan
+  // bicara tentang dua hal berbeda.
+  const initialTab =
+    tabs.find((t) => t.children.some((c) => c.id === opening?.assetClass))?.id ??
+    requestedGroup?.id ??
+    null
+
   return {
     stats,
+    initialTab,
     adapterCount: health.length,
     healthy,
     adapterState: adapterState(health.map((h) => h.status)),
@@ -238,4 +369,61 @@ function isoDaysAgo(days: number): string {
   const d = new Date()
   d.setUTCDate(d.getUTCDate() - days)
   return d.toISOString().slice(0, 10)
+}
+
+// ---------------------------------------------------------------------------
+// Sapaan kepala halaman
+// ---------------------------------------------------------------------------
+
+/** Zona waktu acuan seluruh sapaan dan tanggal di kepala halaman. */
+const DISPLAY_TZ = 'Asia/Jakarta'
+
+/**
+ * Sapaan menurut jam Jakarta, bukan jam peladen.
+ *
+ * Peladennya berjalan di UTC, dan "selamat pagi" yang dihitung dari UTC akan
+ * salah tujuh jam bagi hampir semua pembacanya. `hourCycle: 'h23'` dipilih
+ * eksplisit supaya tengah malam terbaca 0, bukan 24.
+ */
+function greeting(now: Date = new Date()): string {
+  const hour = Number(
+    new Intl.DateTimeFormat('en-GB', {
+      hour: 'numeric',
+      hourCycle: 'h23',
+      timeZone: DISPLAY_TZ,
+    }).format(now),
+  )
+
+  if (hour < 11) return 'Selamat pagi'
+  if (hour < 15) return 'Selamat siang'
+  if (hour < 19) return 'Selamat sore'
+  return 'Selamat malam'
+}
+
+/**
+ * Nama panggilan dari nama lengkap.
+ *
+ * Kepala halaman menyapa satu orang, dan nama tiga suku kata di tengah judul
+ * membuat barisnya patah di tempat yang salah. Nama kosong jatuh ke sebutan
+ * netral, bukan ke ruang kosong yang membuat kalimatnya terlihat rusak.
+ */
+function firstName(name: string): string {
+  const first = name.trim().split(/\s+/)[0]
+  return first || 'Analis'
+}
+
+/** Tanggal hari ini menurut jam Jakarta, ditulis panjang. */
+function todayLabel(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat('id-ID', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: DISPLAY_TZ,
+  }).format(now)
+}
+
+/** Angka besar dengan pemisah ribuan lokal. */
+function formatCount(n: number): string {
+  return new Intl.NumberFormat('id-ID').format(n)
 }

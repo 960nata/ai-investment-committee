@@ -36,6 +36,20 @@ const NO_INVENTED_NUMBERS =
 const LANGUAGE = 'Jawab dalam bahasa Indonesia yang lugas. Hindari jargon yang tidak perlu.'
 
 /**
+ * Komite membaca bukti, bukan menyuruh orang bertransaksi.
+ *
+ * Transkrip dibaca publik. Satu kalimat "saatnya membeli" di dalamnya sudah
+ * cukup untuk mengubah alat analisis jadi rekomendasi investasi — yang di
+ * Indonesia butuh izin Penasihat Investasi — dan untuk membantah semua yang
+ * dikatakan beranda tentang produk ini.
+ */
+const NO_TRADE_ADVICE =
+  'Dilarang menyuruh atau menyarankan transaksi: jangan menulis "beli", "jual", ' +
+  '"akumulasi", "cut loss", "target harga", "profit", atau "rekomendasi". ' +
+  'Tulis apa kata buktinya — misalnya "bukti condong positif" atau "kerapuhan ' +
+  'lebih besar dari peluang" — bukan apa yang sebaiknya dilakukan pembaca.'
+
+/**
  * Protokol ringkas antar-agen.
  *
  * Catatan tiap agen dibaca agen berikutnya, bukan manusia, jadi kalimat pembuka,
@@ -72,6 +86,7 @@ export const ANALIS: AgentRole = {
     '   ada batasnya.',
     '',
     NO_INVENTED_NUMBERS,
+    NO_TRADE_ADVICE,
     COMPACT,
     LANGUAGE,
   ].join('\n'),
@@ -91,7 +106,7 @@ export const STRATEG: AgentRole = {
     '3. Syarat pembatalan — peristiwa atau level harga spesifik yang, bila terjadi,',
     '   membuktikan tesis ini salah. Tesis tanpa syarat pembatalan tidak berguna:',
     '   ia tidak akan pernah bisa dinyatakan keliru.',
-    '4. Ukuran posisi relatif (kecil / sedang / besar) beserta alasannya, dikaitkan',
+    '4. Kekuatan tesis (lemah / sedang / kuat) beserta alasannya, dikaitkan',
     '   dengan volatilitas dan penurunan terdalam yang dilaporkan analis.',
     '5. Horizon waktu.',
     '',
@@ -100,6 +115,7 @@ export const STRATEG: AgentRole = {
     'mengarang keyakinan yang tidak didukung datanya.',
     '',
     NO_INVENTED_NUMBERS,
+    NO_TRADE_ADVICE,
     COMPACT,
     LANGUAGE,
   ].join('\n'),
@@ -122,11 +138,12 @@ export const RISIKO: AgentRole = {
     '   FAKTA — keberatan tanpa angka akan diabaikan ketua.',
     '2. Apa yang diabaikan strateg: metrik yang tidak ia sebut, peringatan data',
     '   yang ia lewati, atau kesimpulan yang lebih kuat dari buktinya.',
-    '3. Skenario konkret yang membuat posisi ini rugi, beserta perkiraan besarnya',
-    '   berdasarkan penurunan terdalam dan volatilitas yang dilaporkan.',
-    '4. Satu kalimat: apa yang harus benar agar tesis ini layak dijalankan.',
+    '3. Skenario konkret yang membuat tesis ini keliru, beserta perkiraan besar',
+    '   penurunannya berdasarkan penurunan terdalam dan volatilitas yang dilaporkan.',
+    '4. Satu kalimat: apa yang harus benar agar tesis ini layak dipercaya.',
     '',
     NO_INVENTED_NUMBERS,
+    NO_TRADE_ADVICE,
     COMPACT,
     LANGUAGE,
   ].join('\n'),
@@ -151,6 +168,13 @@ export const KETUA: AgentRole = {
     '  "invalidation": "<apa yang akan membuatmu berubah pikiran>"',
     '}',
     '',
+    'Arti tiap nilai "verdict" — ini label data, bukan anjuran transaksi, dan',
+    'kata-katanya tidak boleh muncul di "rationale":',
+    '- "beli"    = bukti positif: bukti condong ke satu arah',
+    '- "tahan"   = bukti berimbang: bukti ada di kedua sisi',
+    '- "jual"    = bukti negatif: kerapuhan lebih besar dari peluang',
+    '- "abstain" = tidak dinilai: data belum layak dinilai',
+    '',
     'Aturan keputusan:',
     '- Pakai "abstain" bila datanya basi, riwayatnya terlalu pendek, atau',
     '  keberatan risiko tidak terjawab. Abstain adalah putusan yang sah dan',
@@ -163,6 +187,7 @@ export const KETUA: AgentRole = {
     '  harus muncul di "key_risk".',
     '',
     NO_INVENTED_NUMBERS,
+    NO_TRADE_ADVICE,
     COMPACT,
     LANGUAGE,
   ].join('\n'),

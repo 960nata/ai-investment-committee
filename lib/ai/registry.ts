@@ -34,8 +34,8 @@ interface ProviderEntry {
  * jadi menambah penyedia baru cukup dengan mengisi variabel env-nya.
  */
 const ADAPTERS: LlmAdapter[] = [
-  geminiAdapter, // kolam kunci terbesar
-  groqAdapter, // latensi terendah
+  groqAdapter, // latensi terendah, sangat cepat (~300ms) untuk terjemahan & komite
+  geminiAdapter, // kolam kunci cadangan terbesar
   openRouterAdapter, // model gratis, kuota harian
   deepSeekAdapter,
   mistralAdapter,

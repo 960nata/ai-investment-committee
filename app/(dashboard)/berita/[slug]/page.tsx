@@ -8,6 +8,7 @@ import { ArticleActions } from '@/components/article-actions'
 import { IconCandles, IconNews, IconEye } from '@/components/icons'
 import { NewsSidebar } from '@/components/news-sidebar'
 import { AdSlot } from '@/components/ad-slot'
+import { requireUser } from '@/lib/auth/user-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -54,6 +55,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function BeritaDetailPage({ params }: Props) {
   const { slug } = await params
+
+  // Versi terminal dari artikel ini terkunci; versi publiknya ada di
+  // `/warta/[slug]` dan boleh dibaca siapa saja.
+  await requireUser(`/berita/${slug}`)
+
   await seedInitialNewsArticles()
   const article = await getMarketNewsBySlug(slug)
 

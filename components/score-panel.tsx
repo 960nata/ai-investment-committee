@@ -33,9 +33,10 @@ export interface HorizonView {
 }
 
 const LABEL: Record<string, { title: string; question: string }> = {
-  pendek: { title: 'Pendek', question: '1–10 hari perdagangan' },
-  menengah: { title: 'Menengah', question: '1–6 bulan' },
-  panjang: { title: 'Panjang', question: '1–5 tahun' },
+  // Sama dengan HORIZONS di lib/scoring/weights.ts: 5, 63, dan 252 hari bursa.
+  pendek: { title: 'Pendek', question: '±1 minggu (5 hari bursa)' },
+  menengah: { title: 'Menengah', question: '±1 kuartal (63 hari bursa)' },
+  panjang: { title: 'Panjang', question: '±1 tahun (252 hari bursa)' },
 }
 
 export function ScorePanel({ horizons, asOf }: { horizons: HorizonView[]; asOf: string | null }) {

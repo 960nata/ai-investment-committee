@@ -9,7 +9,8 @@ import {
   IconArrowRight,
   IconAlert,
   IconGauge,
-  IconCheck,
+  IconEye,
+  IconEyeOff,
 } from '@/components/icons'
 
 /**
@@ -17,45 +18,59 @@ import {
  * menolak build bila bailout-nya tidak dibatasi. Suspense di bawah yang menahan
  * batas itu supaya kerangka halaman tetap terkirim lebih dulu.
  */
-export default function UnifiedLoginPage() {
+export default function UserLoginPage() {
   return (
     <Suspense fallback={null}>
-      <LoginForm />
+      <UserLoginForm />
     </Suspense>
   )
 }
 
-function LoginForm() {
+/**
+ * Alamat tujuan setelah masuk.
+ *
+ * Hanya jalur relatif yang diterima. Alamat lengkap dari luar — termasuk yang
+ * diawali `//` dan dibaca peramban sebagai host lain — akan mengubah halaman
+ * masuk jadi papan loncat ke situs mana pun, dan tautan seperti itu terlihat
+ * sah persis sampai detik terakhir.
+ */
+function safeNextPath(raw: string | null): string {
+  if (!raw) return '/ringkasan'
+  if (!raw.startsWith('/') || raw.startsWith('//')) return '/ringkasan'
+  return raw
+}
+
+function UserLoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const defaultTab = searchParams.get('mode') === 'admin' ? 'admin' : 'user'
+  const nextPath = safeNextPath(searchParams.get('next'))
 
-  const [activeTab, setActiveTab] = useState<'user' | 'admin'>(defaultTab)
-  const [pin, setPin] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  async function handleAdminSubmit(e: React.FormEvent) {
-    e.preventDefault()
+  async function handleUserSubmit(event: React.FormEvent) {
+    event.preventDefault()
     setError(null)
     setLoading(true)
 
     try {
-      const res = await fetch('/api/v1/admin/auth', {
+      const res = await fetch('/api/v1/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin }),
+        body: JSON.stringify({ email, password }),
       })
 
       const data = await res.json()
       if (!res.ok || !data.ok) {
-        setError(data.error || 'PIN otorisasi admin tidak valid.')
+        setError(data.error || 'Surel atau kata sandi salah.')
         setLoading(false)
         return
       }
 
-      // Berhasil otorisasi admin, arahkan ke dashboard admin
-      router.push('/admin')
+      router.push(nextPath)
       router.refresh()
     } catch {
       setError('Gagal menghubungi server autentikasi.')
@@ -64,18 +79,7 @@ function LoginForm() {
   }
 
   return (
-    <div
-      suppressHydrationWarning
-      style={{
-        minHeight: '100vh',
-        backgroundColor: 'var(--surface-0)',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '24px 16px',
-      }}
-    >
+    <div className="auth-page">
       {/* Brand Header */}
       <div style={{ marginBottom: '24px', textAlign: 'center' }}>
         <Link href="/" className="landing-brand" style={{ display: 'inline-flex' }}>
@@ -87,272 +91,162 @@ function LoginForm() {
           </span>
         </Link>
         <p className="mono" style={{ fontSize: '11px', color: 'var(--ink-faint)', marginTop: '6px' }}>
-          PLATFORM ANALISIS PASAR &amp; PUSAT KENDALI
+          PLATFORM ANALISIS PASAR &amp; KONSENSUS AI
         </p>
       </div>
 
-      {/* Main Login Card */}
-      <div
-        className="admin-card"
-        suppressHydrationWarning
-        style={{
-          width: '100%',
-          maxWidth: '440px',
-          border: '1px solid var(--line-strong)',
-          boxShadow: '0 12px 40px rgba(0,0,0,0.6)',
-          padding: '24px',
-        }}
-      >
-        {/* Tab Selector: Pengguna vs Admin */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '6px',
-            background: 'var(--surface-0)',
-            padding: '4px',
-            borderRadius: 'var(--radius-sm)',
-            border: '1px solid var(--line)',
-            marginBottom: '20px',
-          }}
-        >
-          <button
-            type="button"
-            className="mono"
-            onClick={() => {
-              setActiveTab('user')
-              setError(null)
-            }}
-            style={{
-              padding: '8px 12px',
-              fontSize: '12px',
-              fontWeight: 600,
-              background: activeTab === 'user' ? 'var(--surface-2)' : 'transparent',
-              color: activeTab === 'user' ? 'var(--ink)' : 'var(--ink-mute)',
-              border: activeTab === 'user' ? '1px solid var(--line-strong)' : '1px solid transparent',
-              borderRadius: 'var(--radius-xs)',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-              transition: 'all 0.15s ease',
-            }}
-          >
-            <IconGauge size={13} />
-            <span>Pengguna</span>
-          </button>
-
-          <button
-            type="button"
-            className="mono"
-            onClick={() => {
-              setActiveTab('admin')
-              setError(null)
-            }}
-            style={{
-              padding: '8px 12px',
-              fontSize: '12px',
-              fontWeight: 600,
-              background: activeTab === 'admin' ? 'var(--surface-2)' : 'transparent',
-              color: activeTab === 'admin' ? 'var(--signal)' : 'var(--ink-mute)',
-              border: activeTab === 'admin' ? '1px solid var(--line-strong)' : '1px solid transparent',
-              borderRadius: 'var(--radius-xs)',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-              transition: 'all 0.15s ease',
-            }}
-          >
-            <IconLock size={13} />
-            <span>Administrator</span>
-          </button>
-        </div>
-
-        {/* Tab 1: Pengguna / User Biasa */}
-        {activeTab === 'user' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div>
-              <h2 style={{ fontSize: '15px', fontWeight: 600, margin: '0 0 6px', color: 'var(--ink)' }}>
-                Terminal Pasar &amp; Analisis AI
-              </h2>
-              <p style={{ fontSize: '12px', color: 'var(--ink-soft)', margin: 0, lineHeight: 1.5 }}>
-                Akses langsung ke seluruh grafik harga, rekomendasi 4 AI, dan data 400+ instrumen saham IDX, kripto, dan emas tanpa perlu kata sandi.
-              </p>
-            </div>
-
-            <div
-              style={{
-                background: 'var(--surface-0)',
-                border: '1px solid var(--line)',
-                borderRadius: 'var(--radius-sm)',
-                padding: '12px',
-                fontSize: '11px',
-                color: 'var(--ink-soft)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '6px',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <IconCheck size={13} style={{ color: 'var(--green)' }} />
-                <span>Ringkasan &amp; Deliberasi 4 AI Terbuka</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <IconCheck size={13} style={{ color: 'var(--green)' }} />
-                <span>Katalog Kripto, Saham IDX, Emas &amp; Komoditas</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <IconCheck size={13} style={{ color: 'var(--green)' }} />
-                <span>Warta Intelijen Pasar Makro &amp; Analisis Berita</span>
-              </div>
-            </div>
-
-            <Link
-              href="/ringkasan"
-              className="btn btn-primary"
-              style={{
-                width: '100%',
-                padding: '10px',
-                justifyContent: 'center',
-                fontFamily: 'var(--mono)',
-                fontSize: '13px',
-                textDecoration: 'none',
-              }}
-            >
-              <IconGauge size={14} />
-              <span>Buka Terminal Pasar</span>
-              <IconArrowRight size={14} />
-            </Link>
+      <div className="auth-card" suppressHydrationWarning>
+        {error && (
+          <div className="auth-error">
+            <IconAlert size={14} style={{ color: 'var(--halted)', flexShrink: 0 }} />
+            <span>{error}</span>
           </div>
         )}
 
-        {/* Tab 2: Administrator */}
-        {activeTab === 'admin' && (
-          <form onSubmit={handleAdminSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div>
-              <h2 style={{ fontSize: '15px', fontWeight: 600, margin: '0 0 6px', color: 'var(--signal)' }}>
-                Portal Administrator
-              </h2>
-              <p style={{ fontSize: '12px', color: 'var(--ink-soft)', margin: 0, lineHeight: 1.5 }}>
-                Akses kendali khusus untuk menulis dan mengedit warta berita, mengunggah gambar, serta konfigurasi slot iklan.
-              </p>
-            </div>
-
-            {error && (
-              <div
+        <form onSubmit={handleUserSubmit} className="auth-form">
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+              <span
                 style={{
-                  display: 'flex',
+                  display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '8px',
-                  padding: '8px 12px',
-                  background: 'var(--halted-dim)',
-                  border: '1px solid var(--halted)',
-                  borderRadius: 'var(--radius-sm)',
-                  color: 'var(--ink)',
-                  fontSize: '12px',
+                  justifyContent: 'center',
+                  width: '26px',
+                  height: '26px',
+                  borderRadius: 'var(--radius-xs)',
+                  background: 'rgba(79, 157, 142, 0.15)',
+                  color: 'var(--accent, #4f9d8e)',
                 }}
               >
-                <IconAlert size={14} style={{ color: 'var(--halted)', flexShrink: 0 }} />
-                <span>{error}</span>
-              </div>
-            )}
-
-            <div>
-              <label
-                htmlFor="admin-pin-input"
-                className="mono"
-                style={{
-                  display: 'block',
-                  fontSize: '11px',
-                  color: 'var(--ink-soft)',
-                  marginBottom: '6px',
-                  textTransform: 'uppercase',
-                }}
-              >
-                PIN / Kunci Akses Admin:
-              </label>
-              <input
-                id="admin-pin-input"
-                type="password"
-                className="mono"
-                placeholder="Masukkan PIN Admin..."
-                value={pin}
-                onChange={(e) => setPin(e.target.value)}
-                required
-                autoFocus
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  background: 'var(--surface-0)',
-                  border: '1px solid var(--line)',
-                  borderRadius: 'var(--radius-sm)',
-                  color: 'var(--ink)',
-                  fontSize: '14px',
-                  outline: 'none',
-                }}
-              />
+                <IconGauge size={14} />
+              </span>
+              <h1 className="auth-title" style={{ margin: 0 }}>
+                Masuk ke Terminal
+              </h1>
             </div>
+            <p className="auth-lead">
+              Grafik harga langsung, putusan 4 agen AI, dan katalog 400+ instrumen analisis kuantitatif.
+            </p>
+          </div>
 
-            <button
-              type="submit"
-              disabled={loading || !pin}
-              className="btn btn-primary"
-              style={{
-                width: '100%',
-                padding: '10px',
-                justifyContent: 'center',
-                fontFamily: 'var(--mono)',
-                fontSize: '13px',
-                background: 'var(--signal)',
-                color: '#000',
-                fontWeight: 600,
-              }}
-            >
-              <IconLock size={14} />
-              <span>{loading ? 'Memverifikasi...' : 'Masuk sebagai Admin'}</span>
-              <IconArrowRight size={14} />
-            </button>
+          <div className="auth-field">
+            <label htmlFor="login-email" className="mono auth-label">
+              Alamat Surel
+            </label>
+            <input
+              id="login-email"
+              type="email"
+              autoComplete="email"
+              className="auth-input"
+              placeholder="nama@surel.com"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+              autoFocus
+            />
+          </div>
 
-            {/* Quick Demo Credential Helper */}
-            <div
-              style={{
-                background: 'var(--surface-0)',
-                border: '1px solid var(--line)',
-                borderRadius: 'var(--radius-sm)',
-                padding: '10px',
-                fontSize: '11px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
-              <div className="mono">
-                <span style={{ color: 'var(--ink-mute)' }}>PIN Demo: </span>
-                <code style={{ color: 'var(--signal)' }}>komite-admin-2026</code>
-              </div>
+          <div className="auth-field">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <label htmlFor="login-password" className="mono auth-label">
+                Kata Sandi
+              </label>
               <button
                 type="button"
-                className="btn btn-quiet mono"
-                style={{ fontSize: '10px', padding: '3px 8px' }}
-                onClick={() => setPin('komite-admin-2026')}
+                onClick={() => setShowPassword(!showPassword)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--ink-mute)',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '11px',
+                  fontFamily: 'var(--mono)',
+                  padding: 0,
+                }}
               >
-                Gunakan PIN Ini
+                {showPassword ? <IconEyeOff size={13} /> : <IconEye size={13} />}
+                <span>{showPassword ? 'Sembunyikan' : 'Lihat'}</span>
               </button>
             </div>
-          </form>
-        )}
+            <input
+              id="login-password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="current-password"
+              className="auth-input"
+              placeholder="••••••••"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+            />
+          </div>
 
-        {/* Back Link */}
-        <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--line)', textAlign: 'center' }}>
-          <Link
-            href="/"
-            className="mono"
-            style={{ fontSize: '11px', color: 'var(--ink-faint)', textDecoration: 'none' }}
+          <button
+            type="submit"
+            disabled={loading || !email || !password}
+            className="btn btn-primary auth-submit"
           >
+            <IconGauge size={14} />
+            <span>{loading ? 'Memverifikasi...' : 'Masuk ke Terminal'}</span>
+            <IconArrowRight size={14} />
+          </button>
+
+          <p className="auth-switch">
+            Belum punya akun? <Link href="/daftar">Daftar gratis</Link>
+          </p>
+        </form>
+
+        {/* Pemisah eksplisit untuk akses Administrator */}
+        <div
+          style={{
+            marginTop: '20px',
+            padding: '12px 14px',
+            borderRadius: 'var(--radius-sm)',
+            background: 'rgba(250, 134, 42, 0.05)',
+            border: '1px solid rgba(250, 134, 42, 0.22)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ color: 'var(--signal)' }}>
+              <IconLock size={15} />
+            </span>
+            <div>
+              <div style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--ink)' }}>
+                Pengelola atau Redaksi?
+              </div>
+              <div className="mono" style={{ fontSize: '10px', color: 'var(--ink-mute)' }}>
+                Login Administrator terpisah
+              </div>
+            </div>
+          </div>
+          <Link
+            href="/admin/login"
+            className="btn btn-quiet mono"
+            style={{
+              fontSize: '11px',
+              padding: '4px 10px',
+              borderColor: 'rgba(250, 134, 42, 0.4)',
+              color: 'var(--signal)',
+              textDecoration: 'none',
+              flexShrink: 0,
+            }}
+          >
+            Portal Admin &rarr;
+          </Link>
+        </div>
+
+        <div className="auth-foot">
+          <Link href="/" className="mono">
             &larr; Kembali ke Beranda
+          </Link>
+          <Link href="/warta" className="mono">
+            Baca Warta Terbuka &rarr;
           </Link>
         </div>
       </div>

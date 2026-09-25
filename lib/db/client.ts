@@ -50,6 +50,10 @@ function connect(): Database {
     max: MAX_CONNECTIONS,
     idle_timeout: 20,
     connect_timeout: 10,
+    // extra_float_digits sengaja TIDAK dipasang di sini: pooler Supabase
+    // membuang parameter koneksi itu, jadi nilainya tetap 0 dari berkas
+    // konfigurasi server. Pembacaan `real` yang presisi ditangani di kueri
+    // lewat `featureValuesExact` di queries.ts.
     connection: { statement_timeout: STATEMENT_TIMEOUT_MS },
   })
 

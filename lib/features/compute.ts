@@ -44,6 +44,7 @@ import {
 } from './indicators'
 import { FEATURES, normalisedFeatureNames } from './registry'
 import { computeFundamentalFeatures, type FundamentalPeriod } from './fundamentals'
+import { ownershipSeries, type OwnershipPointLite } from '@/lib/ownership/features'
 
 /**
  * Versi set fitur, ikut tersimpan di tiap baris.
@@ -57,6 +58,11 @@ import { computeFundamentalFeatures, type FundamentalPeriod } from './fundamenta
  *   fs-2026-09-b  volatilitas pindah ke imbal hasil logaritmik, histogram MACD
  *                 dibagi harga, ditambah ADX, momentum 12-1, %b, rasio
  *                 volatilitas, akumulasi–distribusi, dan robust z-score
+ *   fs-2026-09-c  (2026-09-24) kunci kepemilikan KSEI ditambahkan di ujung
+ *                 kamus, tanpa menaikkan versi: kamus kunci per versi memang
+ *                 hanya bertambah, dan baris lama terbaca null untuk kunci baru.
+ *                 Menaikkan versi berarti menyimpan seluruh riwayat fitur dua
+ *                 kali selama transisi, dan basis datanya tidak punya ruang itu.
  *   fs-2026-09-c  lapisan fundamental: valuasi, profitabilitas, kesehatan,
  *                 kualitas laba, pertumbuhan, Altman, dan Piotroski
  */
@@ -104,6 +110,11 @@ export interface ComputeInput {
    * 1 April adalah melihat masa depan.
    */
   fundamentals?: FundamentalPeriod[]
+  /**
+   * Posisi kepemilikan KSEI, hanya untuk saham IDX. Dipilih per tanggal menurut
+   * `availableAt`, dengan alasan yang sama seperti `reportedAt` di atas.
+   */
+  ownership?: OwnershipPointLite[]
 }
 
 export interface ComputeResult {
@@ -264,6 +275,20 @@ export function computeFeatures(input: ComputeInput): ComputeResult {
     for (const [name, serie] of Object.entries(
       fundamentalSeries(date, close, input.fundamentals),
     )) {
+      raw[name] = serie
+    }
+  }
+
+  // --- kepemilikan (KSEI) ---------------------------------------------------
+  // Kuncinya selalu ada untuk semua pasar, isinya hanya terisi untuk saham IDX.
+  // Sama seperti fundamental: kunci yang hilang terbaca sebagai fitur yang tidak
+  // dikenal, sedangkan nilai kosong terbaca sebagai data yang memang belum ada.
+  for (const spec of FEATURES) {
+    if (spec.group !== 'kepemilikan') continue
+    raw[spec.name] = new Array<number | null>(length).fill(null)
+  }
+  if (input.ownership && input.ownership.length > 0) {
+    for (const [name, serie] of Object.entries(ownershipSeries(date, input.ownership))) {
       raw[name] = serie
     }
   }

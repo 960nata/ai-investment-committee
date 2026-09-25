@@ -34,6 +34,11 @@ import {
 import { computeFeatures, FEATURE_SET_VERSION } from '../lib/features/compute'
 import { FEATURES, normalisedFeatureNames } from '../lib/features/registry'
 import { normaliseCrossSection, type CrossSectionRow } from '../lib/features/cross-section'
+import { deflateRawSync } from 'node:zlib'
+import { parseKsei, unzipSingleEntry, kseiAvailableAt } from '../lib/ownership/ksei'
+import { computeOwnershipFeatures, ownershipSeries, type OwnershipPointLite } from '../lib/ownership/features'
+import { crossPeriodIssues, reconcileValues, reconcileItems } from '../lib/fundamentals/quality'
+import { capTerminalGrowth } from '../lib/macro/sources'
 
 // ---------------------------------------------------------------------------
 // Kerangka uji minimal
@@ -709,6 +714,184 @@ test('kelompok tanpa cukup nilai menghasilkan kosong, bukan angka karangan', () 
   for (const r of normaliseCrossSection(rows, ['per'])) {
     assert(r.values.per_zcs === null, 'tanpa pembanding, tidak ada nilai yang sah')
   }
+})
+
+// ---------------------------------------------------------------------------
+// KSEI & fitur kepemilikan
+// ---------------------------------------------------------------------------
+
+const KSEI_HEADER =
+  'Date|Code|Type|Sec. Num|Price|Local IS|Local CP|Local PF|Local IB|Local ID|Local MF|Local SC|Local FD|Local OT|Total|Foreign IS|Foreign CP|Foreign PF|Foreign IB|Foreign ID|Foreign MF|Foreign SC|Foreign FD|Foreign OT|Total'
+
+test('pengurai KSEI membaca baris saham dan membuang obligasi', () => {
+  const text = [
+    KSEI_HEADER,
+    '31-AUG-2026|BBCA|EQUITY|123275050000|6475|1|2|3|4|10|5|6|7|8|46|10|20|30|40|50|60|70|80|90|450',
+    '31-AUG-2026|FR0100|CORPORATE BOND|1000|100|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0',
+  ].join('\r\n')
+  const rows = parseKsei(text)
+  assert(rows.length === 1, `hanya saham yang boleh terbaca, dapat ${rows.length}`)
+  assert(rows[0].code === 'BBCA' && rows[0].asOf === '2026-08-31', 'kode atau tanggal salah')
+  assert(rows[0].local[4] === 10 && rows[0].foreign[8] === 90, 'kolom per jenis investor tergeser')
+  assert(rows[0].localTotal === 46 && rows[0].foreignTotal === 450, 'total salah terbaca')
+})
+
+test('pengurai KSEI menerima nama bulan huruf kecil dari berkas lama', () => {
+  // Berkas Januari 2017 menulis "31-Jan-2017". Menolaknya membuang sebulan
+  // penuh tanpa satu galat pun.
+  const rows = parseKsei([KSEI_HEADER, '31-Jan-2017|AALI|EQUITY|1924688333|15775|1|1|1|1|1|1|1|1|1|9|1|1|1|1|1|1|1|1|1|9'].join('\r\n'))
+  assert(rows.length === 1 && rows[0].asOf === '2017-01-31', `tanggal huruf kecil harus terbaca, dapat ${JSON.stringify(rows[0]?.asOf)}`)
+})
+
+test('pengurai KSEI menolak kolom yang urutannya berubah, bukan diam-diam membaca angka salah', () => {
+  const swapped = KSEI_HEADER.replace('Local IS|Local CP', 'Local CP|Local IS')
+  let threw = false
+  try {
+    parseKsei([swapped, '31-AUG-2026|X|EQUITY|1|1|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0'].join('\n'))
+  } catch {
+    threw = true
+  }
+  assert(threw, 'kolom yang tertukar harus melempar galat')
+})
+
+test('zip satu entri dibuka dengan benar tanpa pustaka zip', () => {
+  const body = Buffer.from(`${KSEI_HEADER}\n31-AUG-2026|AAAA|EQUITY|1|1|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0\n`)
+  const data = deflateRawSync(body)
+  const name = Buffer.from('Balancepos.txt')
+  const local = Buffer.alloc(30)
+  local.writeUInt32LE(0x04034b50, 0); local.writeUInt16LE(8, 8)
+  local.writeUInt32LE(data.length, 18); local.writeUInt32LE(body.length, 22); local.writeUInt16LE(name.length, 26)
+  const central = Buffer.alloc(46)
+  central.writeUInt32LE(0x02014b50, 0); central.writeUInt16LE(8, 10)
+  central.writeUInt32LE(data.length, 20); central.writeUInt32LE(body.length, 24)
+  central.writeUInt16LE(name.length, 28); central.writeUInt32LE(0, 42)
+  const cdOffset = local.length + name.length + data.length
+  const eocd = Buffer.alloc(22)
+  eocd.writeUInt32LE(0x06054b50, 0); eocd.writeUInt16LE(1, 8); eocd.writeUInt16LE(1, 10)
+  eocd.writeUInt32LE(central.length + name.length, 12); eocd.writeUInt32LE(cdOffset, 16)
+  const zip = Buffer.concat([local, name, data, central, name, eocd])
+  assert(unzipSingleEntry(zip).equals(body), 'isi zip tidak sama dengan aslinya')
+})
+
+const own = (asOf: string, foreign: number, local: number, individu = 0): OwnershipPointLite => ({
+  asOf,
+  availableAt: kseiAvailableAt(asOf),
+  local: [0, 0, 0, 0, individu, 0, 0, 0, local - individu],
+  foreign: [0, 0, 0, 0, 0, 0, 0, 0, foreign],
+  localTotal: local,
+  foreignTotal: foreign,
+})
+
+test('porsi asing dibagi total tercatat di KSEI, bukan saham tercatat di bursa', () => {
+  // BBCA Agustus 2026: asing 36,3 M, lokal 16,1 M, tercatat di bursa 123,3 M.
+  const v = computeOwnershipFeatures([own('2026-08-31', 36_318_241_721, 16_135_449_399)], '2026-09-10')
+  assert(v.asing_pct !== null && Math.abs(v.asing_pct - 69.24) < 0.01, `porsi asing BBCA harus ±69%, dapat ${v.asing_pct}`)
+})
+
+test('perubahan porsi dihitung terhadap posisi sebulan dan tiga bulan sebelumnya', () => {
+  const pts = [own('2026-08-31', 60, 40), own('2026-07-31', 55, 45), own('2026-06-30', 52, 48), own('2026-05-29', 50, 50)]
+  const v = computeOwnershipFeatures(pts, '2026-09-10')
+  assert(v.asing_chg_1b !== null && Math.abs(v.asing_chg_1b - 5) < 1e-9, `perubahan 1 bulan harus 5 poin, dapat ${v.asing_chg_1b}`)
+  assert(v.asing_chg_3b !== null && Math.abs(v.asing_chg_3b - 10) < 1e-9, `perubahan 3 bulan harus 10 poin, dapat ${v.asing_chg_3b}`)
+})
+
+test('porsi institusi mengecualikan individu lokal maupun asing', () => {
+  const v = computeOwnershipFeatures([own('2026-08-31', 50, 50, 20)], '2026-09-10')
+  assert(v.institusi_pct !== null && Math.abs(v.institusi_pct - 80) < 1e-9, `institusi harus 80%, dapat ${v.institusi_pct}`)
+})
+
+test('posisi KSEI tidak dipakai sebelum berkasnya terbit', () => {
+  const dates = ['2026-08-31', '2026-09-03', '2026-09-05', '2026-09-08']
+  const s = ownershipSeries(dates, [own('2026-08-31', 60, 40), own('2026-07-31', 55, 45)])
+  // Posisi 31 Agustus baru tersedia 5 September; sebelum itu yang berlaku posisi Juli.
+  assert(s.asing_pct[0] !== null && Math.abs((s.asing_pct[0] as number) - 55) < 1e-9, '31 Agustus harus masih memakai posisi Juli')
+  assert(Math.abs((s.asing_pct[1] as number) - 55) < 1e-9, '3 September harus masih memakai posisi Juli')
+  assert(Math.abs((s.asing_pct[2] as number) - 60) < 1e-9, 'sejak 5 September posisi Agustus baru boleh dipakai')
+})
+
+test('posisi yang sudah basi tidak dipakai seolah-olah terkini', () => {
+  const v = computeOwnershipFeatures([own('2026-05-29', 60, 40)], '2026-09-10')
+  assert(v.asing_pct === null, 'posisi lebih dari 70 hari harus terbaca kosong, bukan angka lama')
+})
+
+test('fitur kepemilikan selalu punya kunci meski pasar tanpa data KSEI', () => {
+  const kepemilikan = FEATURES.filter((f) => f.group === 'kepemilikan').map((f) => f.name)
+  assert(kepemilikan.length === 5, `harus ada 5 fitur kepemilikan, ada ${kepemilikan.length}`)
+  const scored = FEATURES.filter((f) => f.group === 'kepemilikan' && f.role === 'score')
+  assert(scored.every((f) => f.direction !== null && f.normalise), 'fitur skor wajib punya arah dan dinormalisasi')
+  const levels = FEATURES.filter((f) => f.name === 'asing_pct' || f.name === 'institusi_pct')
+  assert(levels.every((f) => f.role === 'display'), 'level kepemilikan tidak punya arah, jadi hanya untuk ditampilkan')
+})
+
+// ---------------------------------------------------------------------------
+// Kualitas fundamental, rekonsiliasi, dan batas g_terminal
+// ---------------------------------------------------------------------------
+
+const q = (period: string, periodEnd: string, items: Record<string, number>) =>
+  ({ period, periodType: 'kuartal' as const, periodEnd, items })
+
+test('pendapatan yang melonjak lebih dari lima kali setahun ditandai sebagai kemungkinan salah satuan', () => {
+  const issues = crossPeriodIssues([
+    q('2025-Q2', '2025-06-30', { pendapatan: 1_000 }),
+    q('2026-Q2', '2026-06-30', { pendapatan: 1_000_000 }),
+  ])
+  assert(issues.some((i) => i.period === '2026-Q2' && i.reason.startsWith('pendapatan')), 'lonjakan seribu kali harus tertangkap')
+})
+
+test('pertumbuhan pendapatan yang wajar tidak ditandai', () => {
+  const issues = crossPeriodIssues([
+    q('2025-Q2', '2025-06-30', { pendapatan: 1_000 }),
+    q('2026-Q2', '2026-06-30', { pendapatan: 2_650 }),
+  ])
+  assert(issues.length === 0, `pertumbuhan 165% masih wajar, tapi dapat ${JSON.stringify(issues)}`)
+})
+
+test('kuartal dibandingkan dengan kuartal setahun lalu meski tanggal akhirnya bergeser', () => {
+  const issues = crossPeriodIssues([
+    q('2025-Q1', '2025-03-29', { pendapatan: 100 }),
+    q('2026-Q1', '2026-03-28', { pendapatan: 900 }),
+  ])
+  assert(issues.length === 1, 'pergeseran sehari akhir periode tidak boleh membuat perbandingan terlewat')
+})
+
+test('lonjakan saham beredar dilaporkan, bukan diperlakukan sebagai pendapatan', () => {
+  const issues = crossPeriodIssues([
+    q('2023-Q2', '2023-06-30', { saham_beredar: 2_470 }),
+    q('2024-Q2', '2024-06-30', { saham_beredar: 24_600 }),
+  ])
+  assert(issues.length === 1 && issues[0].reason.startsWith('saham'), 'pemecahan 10:1 harus terlapor sebagai perubahan saham')
+})
+
+test('rekonsiliasi: selisih di bawah 5% bukan temuan', () => {
+  assert(reconcileValues({ source: 'sec-edgar', value: 100 }, { source: 'eodhd', value: 104 }) === null, '4% harus diloloskan')
+})
+
+test('rekonsiliasi: sumber berperingkat lebih tinggi selalu dipakai, siapa pun yang disebut lebih dulu', () => {
+  const r = reconcileValues({ source: 'eodhd', value: 150 }, { source: 'idx-xbrl', value: 100 })
+  assert(r !== null && r.chosenSource === 'idx-xbrl' && r.chosenValue === 100, `harus memakai idx-xbrl, dapat ${JSON.stringify(r)}`)
+  assert(r.severity === 'tinjau_manual', 'selisih 50% harus ditinjau manusia')
+})
+
+test('rekonsiliasi: selisih 5-20% dicatat tanpa ditinjau manual', () => {
+  const r = reconcileValues({ source: 'sec-edgar', value: 100 }, { source: 'fmp', value: 110 })
+  assert(r !== null && r.severity === 'selisih', `10% harus tercatat sebagai selisih, dapat ${JSON.stringify(r)}`)
+})
+
+test('rekonsiliasi hanya membandingkan pos yang ada di kedua sumber', () => {
+  const out = reconcileItems(
+    { source: 'sec-edgar', items: { pendapatan: 100, laba_bersih: 10 } },
+    { source: 'eodhd', items: { pendapatan: 130 } },
+  )
+  assert(out.length === 1 && out[0].item === 'pendapatan', 'laba_bersih tidak ada di sumber kedua, jadi tidak dibandingkan')
+})
+
+test('pertumbuhan terminal dibatasi PDB nominal', () => {
+  const capped = capTerminalGrowth(0.12, 0.075)
+  assert(capped.capped && capped.value === 0.075, `12% harus dipotong ke 7,5%, dapat ${JSON.stringify(capped)}`)
+  const ok = capTerminalGrowth(0.04, 0.075)
+  assert(!ok.capped && ok.value === 0.04, 'di bawah batas tidak diubah')
+  const noData = capTerminalGrowth(0.1, null)
+  assert(noData.capped && noData.value === 0.03, 'tanpa data PDB, batasnya 3% yang konservatif')
 })
 
 // ---------------------------------------------------------------------------

@@ -9,10 +9,12 @@ import {
   IconTrash,
   IconPlus,
 } from '@/components/icons'
-import type { AppUserRow } from '@/lib/db/schema'
+// Sengaja tipe tanpa sidik kata sandi: barisnya sampai ke peramban, dan tipe
+// yang memuat kolom itu akan membuat pengirimannya terlihat wajar.
+import type { PublicAppUser } from '@/lib/db/news-queries'
 
-export function UsersClient({ initialUsers }: { initialUsers: AppUserRow[] }) {
-  const [users, setUsers] = useState<AppUserRow[]>(initialUsers)
+export function UsersClient({ initialUsers }: { initialUsers: PublicAppUser[] }) {
+  const [users, setUsers] = useState<PublicAppUser[]>(initialUsers)
   const [feedback, setFeedback] = useState<string | null>(null)
 
   // Form Tambah User

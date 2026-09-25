@@ -25,6 +25,8 @@ import { runFeatureJob } from '@/lib/features/job'
 import { runScoreJob } from '@/lib/scoring/job'
 import { runFundamentalJob } from '@/lib/fundamentals/job'
 import { runCommittee } from '@/lib/agents/committee'
+import { runKseiJob } from '@/lib/ownership/job'
+import { runMacroJob } from '@/lib/macro/job'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,6 +45,8 @@ const HANDLERS: Record<string, (payload: JobPayload) => Promise<BatchResult>> = 
   'score-us': scoreBatch,
   'score-global': scoreBatch,
   'fundamental-us': fundamentalBatch,
+  'ingest-ksei-monthly': kseiBatch,
+  'ingest-macro': macroBatch,
   'komite-review': reviewCommittee,
 }
 
@@ -305,5 +309,35 @@ async function fundamentalBatch(payload: JobPayload): Promise<BatchResult> {
     quarantined: outcome.quarantined,
     errors: outcome.errors,
     extra: { fundamentalRows: outcome.rowsWritten, skipped: outcome.skipped },
+  }
+}
+
+/**
+ * KSEI bulanan. Tidak berbatch per simbol seperti job lain: satu berkas memuat
+ * seluruh bursa, jadi satu panggilan mengambil tiga bulan terakhir sekaligus
+ * dan melewati yang sudah tersimpan.
+ */
+async function kseiBatch(): Promise<BatchResult> {
+  const r = await runKseiJob()
+  return {
+    itemsProcessed: r.monthsProcessed,
+    itemsFailed: r.errors.length,
+    candlesWritten: r.rowsWritten,
+    quarantined: 0,
+    errors: r.errors,
+    extra: { monthsMissing: r.monthsMissing, unmatchedCodes: r.unmatchedCodes, ownershipRows: r.rowsWritten },
+  }
+}
+
+/** Deret makro, seluruh riwayat diambil ulang — sumbernya merevisi angka lama. */
+async function macroBatch(): Promise<BatchResult> {
+  const r = await runMacroJob()
+  return {
+    itemsProcessed: r.seriesProcessed,
+    itemsFailed: r.errors.length,
+    candlesWritten: r.rowsWritten,
+    quarantined: 0,
+    errors: r.errors,
+    extra: { macroRows: r.rowsWritten },
   }
 }

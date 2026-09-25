@@ -17,6 +17,8 @@ import { runFeatureJob } from '../lib/features/job'
 import { runScoreJob } from '../lib/scoring/job'
 import { runFundamentalJob } from '../lib/fundamentals/job'
 import { runCrossSectionJob } from '../lib/features/cross-section-job'
+import { runKseiJob } from '../lib/ownership/job'
+import { runMacroJob, macroAssumptions } from '../lib/macro/job'
 import type { MarketCode } from '../lib/db/schema'
 
 const JOBS = [
@@ -34,6 +36,8 @@ const JOBS = [
   'score-global',
   'fundamental-us',
   'normalise-cross-section',
+  'ingest-ksei-monthly',
+  'ingest-macro',
 ] as const
 
 type JobName = (typeof JOBS)[number]
@@ -76,6 +80,36 @@ async function main(): Promise<void> {
     return
   }
 
+  // KSEI satu berkas per bulan untuk seluruh bursa, jadi tidak disaring per
+  // instrumen di sini. --from/--to dalam YYYY-MM; riwayat tersedia sejak 2015.
+  if (job === 'ingest-ksei-monthly') {
+    console.log(`\n${job} · KSEI`)
+    const started = Date.now()
+    const result = await runKseiJob({ from: flag('from'), to: flag('to'), refresh: process.argv.includes('--refresh') })
+    console.log(`  ${result.monthsProcessed} bulan diproses, ${result.monthsSkipped} dilewati (sudah ada)`)
+    console.log(`  ${result.rowsWritten} baris kepemilikan ditulis`)
+    if (result.monthsMissing.length) console.log(`  bulan tanpa berkas: ${result.monthsMissing.join(', ')}`)
+    if (result.unmatchedCodes) console.log(`  ${result.unmatchedCodes} saham dipantau tidak ada di berkas ${result.unmatchedMonth}`)
+    for (const e of result.errors.slice(0, 10)) console.log(`  ! ${e}`)
+    console.log(`  selesai dalam ${((Date.now() - started) / 1000).toFixed(1)} detik\n`)
+    return
+  }
+
+  if (job === 'ingest-macro') {
+    console.log(`\n${job} · FRED + World Bank`)
+    const started = Date.now()
+    const result = await runMacroJob()
+    console.log(`  ${result.seriesProcessed} deret, ${result.rowsWritten} baris ditulis`)
+    for (const e of result.errors) console.log(`  ! ${e}`)
+    const a = await macroAssumptions()
+    console.log(`  Rf AS ${a.rfUs ? (a.rfUs.value * 100).toFixed(2) + '% per ' + a.rfUs.asOf : 'kosong'}`)
+    console.log(`  Rf Indonesia: belum ada sumber otomatis`)
+    console.log(`  ERP Indonesia (asumsi): ${(a.erpIndonesia * 100).toFixed(1)}%`)
+    console.log(`  batas g_terminal: IDN ${(a.terminalGrowthCap.IDN * 100).toFixed(2)}% · USA ${(a.terminalGrowthCap.USA * 100).toFixed(2)}%`)
+    console.log(`  selesai dalam ${((Date.now() - started) / 1000).toFixed(1)} detik\n`)
+    return
+  }
+
   const market = marketOf(job)
   const instruments = await listInstruments(market)
 
@@ -94,6 +128,8 @@ async function main(): Promise<void> {
     console.log(`  ${result.itemsProcessed} berhasil, ${result.itemsFailed} gagal`)
     console.log(`  ${result.rowsWritten} baris laporan ditulis, ${result.quarantined} dikarantina`)
     for (const s of result.skipped.slice(0, 10)) console.log(`  - ${s.symbol}: ${s.reason}`)
+    if (result.warnings.length) console.log(`  ${result.warnings.length} peringatan (baris tetap ditulis):`)
+    for (const w of result.warnings.slice(0, 10)) console.log(`  ~ ${w}`)
     for (const e of result.errors.slice(0, 10)) console.log(`  ! ${e}`)
   } else if (job.startsWith('score-')) {
     const result = await runScoreJob({ symbols, market })

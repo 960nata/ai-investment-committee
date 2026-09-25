@@ -263,6 +263,96 @@ export const ITEMS: ItemSpec[] = [
       'Depreciation',
     ],
   },
+
+  // --- pelengkap umum (2026-09-24) -----------------------------------------
+  // Tidak wajib, supaya kelengkapan baris yang sudah ada tidak turun
+  // mendadak hanya karena daftar pos bertambah. Kelengkapan mengukur pos yang
+  // dibutuhkan rumus inti; pos-pos di bawah memperkaya, bukan menentukan.
+  {
+    name: 'eps_dasar',
+    group: 'laba_rugi',
+    label: 'Laba per saham dasar',
+    kind: 'durasi',
+    required: false,
+    usGaap: ['EarningsPerShareBasic', 'EarningsPerShareBasicAndDiluted'],
+  },
+  {
+    name: 'piutang',
+    group: 'neraca',
+    label: 'Piutang usaha',
+    kind: 'sesaat',
+    required: false,
+    usGaap: ['AccountsReceivableNetCurrent', 'ReceivablesNetCurrent'],
+    notApplicableTo: ['bank'],
+  },
+  {
+    name: 'utang_jangka_pendek',
+    group: 'neraca',
+    label: 'Utang jangka pendek',
+    kind: 'sesaat',
+    required: false,
+    usGaap: ['DebtCurrent', 'ShortTermBorrowings', 'LongTermDebtCurrent', 'CommercialPaper'],
+  },
+  {
+    name: 'penerbitan_saham',
+    group: 'arus_kas',
+    label: 'Penerbitan saham',
+    kind: 'durasi',
+    required: false,
+    // Pasangan pembelian kembali. Tanpa keduanya dilusi bersih tidak terlihat.
+    usGaap: ['ProceedsFromIssuanceOfCommonStock', 'ProceedsFromStockOptionsExercised'],
+  },
+
+  // --- khusus bank ----------------------------------------------------------
+  // Hanya pos yang benar-benar punya elemen baku di us-gaap. CAR, NPL, CASA,
+  // dan BOPO adalah rasio regulator yang TIDAK ada di taksonomi itu; bank AS
+  // melaporkannya di dokumen terpisah, bukan sebagai fakta XBRL. Yang bisa
+  // dihitung dari pos di bawah: LDR (kredit/simpanan), NIM mendekati (bunga
+  // bersih/aset), biaya kredit (beban kerugian/kredit), dan rasio cadangan.
+  {
+    name: 'pendapatan_bunga_bersih',
+    group: 'laba_rugi',
+    label: 'Pendapatan bunga bersih',
+    kind: 'durasi',
+    required: false,
+    usGaap: ['InterestIncomeExpenseNet', 'InterestIncomeExpenseOperatingNet'],
+  },
+  {
+    name: 'beban_kerugian_kredit',
+    group: 'laba_rugi',
+    label: 'Beban kerugian kredit',
+    kind: 'durasi',
+    required: false,
+    usGaap: ['ProvisionForLoanLeaseAndOtherLosses', 'ProvisionForLoanAndLeaseLosses', 'ProvisionForLoanLossesExpensed'],
+  },
+  {
+    name: 'kredit_bersih',
+    group: 'neraca',
+    label: 'Kredit yang disalurkan (bersih)',
+    kind: 'sesaat',
+    required: false,
+    usGaap: [
+      'LoansAndLeasesReceivableNetReportedAmount',
+      'FinancingReceivableExcludingAccruedInterestAfterAllowanceForCreditLoss',
+      'LoansAndLeasesReceivableNetOfDeferredIncome',
+    ],
+  },
+  {
+    name: 'cadangan_kerugian_kredit',
+    group: 'neraca',
+    label: 'Cadangan kerugian kredit',
+    kind: 'sesaat',
+    required: false,
+    usGaap: ['FinancingReceivableAllowanceForCreditLosses', 'LoansAndLeasesReceivableAllowance'],
+  },
+  {
+    name: 'simpanan',
+    group: 'neraca',
+    label: 'Simpanan nasabah',
+    kind: 'sesaat',
+    required: false,
+    usGaap: ['Deposits'],
+  },
 ]
 
 export const REQUIRED_ITEMS = ITEMS.filter((i) => i.required).map((i) => i.name)

@@ -15,6 +15,7 @@ import {
   listInstruments,
   type InstrumentView,
 } from '@/lib/db/queries'
+import { requireUser } from '@/lib/auth/user-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,6 +30,10 @@ interface Row extends InstrumentView {
 }
 
 export default async function InstrumentsPage() {
+  // Penjagaan yang mengikat. `proxy.ts` sudah memantulkan pengunjung anonim
+  // lebih dulu, tetapi pemeriksaan di sini yang menjamin halaman ini tidak
+  // pernah merender data untuk orang tanpa sesi.
+  await requireUser('/instruments')
   let rows: Row[] = []
   let error: string | null = null
 

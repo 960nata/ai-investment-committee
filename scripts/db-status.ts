@@ -85,6 +85,42 @@ async function main(): Promise<void> {
       )
     }
 
+    // Sumber bulanan dan tahunan tidak kelihatan basi dari grafik harian. Tanggal
+    // terakhirnya perlu dilihat langsung: KSEI yang berhenti tiga bulan lalu
+    // membuat fitur kepemilikan diam-diam kosong setelah 70 hari.
+    const [ksei] = await sql<{ terakhir: string | null; baris: number; saham: number }[]>`
+      select max(as_of)::text terakhir, count(*)::int baris,
+             count(distinct instrument_id)::int saham
+      from ownership_monthly`
+    console.log('\nKesegaran sumber')
+    console.log(
+      `  KSEI       ${(ksei.terakhir ?? 'belum ada').padEnd(10)} · ${ksei.baris.toLocaleString('id-ID')} baris · ${ksei.saham} saham`,
+    )
+
+    const macro = await sql<{ seri: string; terakhir: string; titik: number }[]>`
+      select series_id seri, max(date)::text terakhir, count(*)::int titik
+      from macro_series group by 1 order by 1`
+    for (const m of macro) {
+      console.log(`  makro      ${m.terakhir.padEnd(10)} · ${m.seri} (${m.titik} titik)`)
+    }
+
+    const funda = await sql<{ pasar: string; terakhir: string | null; baris: number; fye: number }[]>`
+      select i.market pasar, max(f.reported_at)::text terakhir, count(*)::int baris,
+             count(f.fiscal_year_end_month)::int fye
+      from fundamental_quarterly f join instrument i on i.id = f.instrument_id
+      group by 1 order by 1`
+    for (const f of funda) {
+      console.log(
+        `  fundamental ${f.pasar.padEnd(9)} ${(f.terakhir ?? '-').padEnd(10)} · ${f.baris} laporan · ${f.fye} berakhir-tahun-fiskal terisi`,
+      )
+    }
+
+    const [flags] = await sql<{ terbuka: number; manual: number }[]>`
+      select count(*)::int terbuka,
+             count(*) filter (where severity = 'tinjau_manual')::int manual
+      from reconciliation_flag where resolved_at is null`
+    console.log(`  rekonsiliasi ${flags.terbuka} selisih terbuka, ${flags.manual} perlu tinjau manual`)
+
     if (process.argv.includes('--vacuum')) {
       // VACUUM biasa, bukan FULL. FULL menulis ulang seluruh tabel ke berkas
       // baru dan butuh ruang kosong sebesar tabelnya — persis yang tidak ada

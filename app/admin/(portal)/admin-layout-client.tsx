@@ -15,6 +15,8 @@ import {
   IconMenu,
   IconClose,
   IconDatabase,
+  IconRadar,
+  IconShield,
 } from '@/components/icons'
 import { AdminLogoutButton } from './admin-logout-btn'
 
@@ -28,7 +30,9 @@ export function AdminLayoutClient({ children }: AdminLayoutClientProps) {
 
   // Cari judul modul aktif untuk breadcrumb topbar
   let moduleTitle = 'Ringkasan Sistem'
-  if (pathname.startsWith('/admin/berita/baru')) {
+  if (pathname.startsWith('/admin/analytics')) {
+    moduleTitle = 'Analitik & Cyber Radar'
+  } else if (pathname.startsWith('/admin/berita/baru')) {
     moduleTitle = 'Tulis Warta Baru'
   } else if (pathname.includes('/edit')) {
     moduleTitle = 'Edit Warta Berita'
@@ -113,6 +117,24 @@ export function AdminLayoutClient({ children }: AdminLayoutClientProps) {
             >
               <IconGauge size={15} />
               <span>Ringkasan Admin</span>
+            </Link>
+
+            <Link
+              href="/admin/analytics"
+              className={`admin-nav-link ${pathname.startsWith('/admin/analytics') ? 'active' : ''}`}
+              onClick={() => setMobileOpen(false)}
+            >
+              <IconRadar size={15} />
+              <span>Analitik Pengunjung</span>
+            </Link>
+
+            <Link
+              href="/admin/keamanan"
+              className={`admin-nav-link ${pathname.startsWith('/admin/keamanan') ? 'active' : ''}`}
+              onClick={() => setMobileOpen(false)}
+            >
+              <IconShield size={15} />
+              <span>Pemantau Serangan</span>
             </Link>
           </div>
 

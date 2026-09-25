@@ -39,6 +39,13 @@ const BATCH_SIZE = 25
  */
 const COMMITTEE_BATCH_SIZE = 2
 
+/**
+ * Job yang bekerja atas seluruh sumbernya sekaligus, bukan per simbol: satu
+ * berkas KSEI memuat semua saham, satu deret makro tidak punya simbol. Dibagi
+ * per batch, job ini akan jalan berulang kali untuk pekerjaan yang sama.
+ */
+const WHOLE_SOURCE_JOBS = new Set(['ingest-ksei-monthly', 'ingest-macro'])
+
 function batchSizeFor(jobName: string): number {
   return jobName.startsWith('komite-') ? COMMITTEE_BATCH_SIZE : BATCH_SIZE
 }
@@ -133,6 +140,18 @@ async function dispatchOne(schedule: JobScheduleRow, now: Date): Promise<JobOutc
 
   try {
     const market = schedule.market ? fromDbMarket(schedule.market) : 'CRYPTO'
+
+    if (WHOLE_SOURCE_JOBS.has(schedule.jobName)) {
+      const result = await publishJob({
+        jobName: schedule.jobName,
+        batchKey: `${decision.slot}-b0`,
+        symbols: [],
+        market,
+      })
+      await markScheduleRan(schedule.jobName, now)
+      return { job: schedule.jobName, dispatched: true, batches: 1, symbols: 0, delivery: result.delivery }
+    }
+
     const instruments = await listInstruments(market)
 
     // Basis data yang masih kosong tetap bisa memulai dirinya sendiri dari daftar
