@@ -7,9 +7,53 @@
  * lalu mengirimkan ID Token ke /api/v1/auth/google untuk membuat sesi pengguna aman.
  */
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import type { Auth, AuthProvider, UserCredential } from 'firebase/auth'
 import { IconGoogle, IconAlert } from './icons'
+
+interface PreparedAuth {
+  auth: Auth
+  provider: AuthProvider
+  signInWithPopup: (auth: Auth, provider: AuthProvider) => Promise<UserCredential>
+  credentialFromResult: (result: UserCredential) => { idToken?: string } | null
+}
+
+/**
+ * Konfigurasi dan SDK Firebase disiapkan sebelum tombol diklik. Peramban
+ * seluler (terutama Safari iOS) hanya mengizinkan popup yang dibuka langsung
+ * dari ketukan pengguna; kalau di antaranya ada `await fetch` atau `import()`,
+ * izin itu sudah kedaluwarsa dan popup diblokir.
+ */
+async function prepareAuth(): Promise<PreparedAuth> {
+  const configRes = await fetch('/api/v1/auth/google/config')
+  const configJson = await configRes.json()
+
+  if (!configRes.ok || !configJson.ok || !configJson.config) {
+    throw new Error(
+      configJson.error || 'Konfigurasi autentikasi Google belum siap di server.',
+    )
+  }
+
+  const { initializeApp, getApps, getApp } = await import('firebase/app')
+  const { getAuth, GoogleAuthProvider, signInWithPopup } = await import('firebase/auth')
+
+  const app = getApps().length === 0 ? initializeApp(configJson.config) : getApp()
+  const auth = getAuth(app)
+  auth.languageCode = 'id'
+
+  const provider = new GoogleAuthProvider()
+  provider.addScope('email')
+  provider.addScope('profile')
+  provider.setCustomParameters({ prompt: 'select_account' })
+
+  return {
+    auth,
+    provider,
+    signInWithPopup,
+    credentialFromResult: (result) => GoogleAuthProvider.credentialFromResult(result),
+  }
+}
 
 interface GoogleSignInButtonProps {
   label?: string
@@ -33,45 +77,44 @@ export function GoogleSignInButton({
     if (onError) onError(msg)
   }
 
+  const prepared = useRef<Promise<PreparedAuth> | null>(null)
+  const readyAuth = useRef<PreparedAuth | null>(null)
+
+  useEffect(() => {
+    const pending = prepareAuth()
+    pending.then(
+      (ready) => {
+        readyAuth.current = ready
+      },
+      // Galat persiapan baru ditampilkan saat tombol diklik, bukan saat halaman dibuka.
+      () => {},
+    )
+    prepared.current = pending
+  }, [])
+
   async function handleGoogleLogin() {
     reportError(null)
     setLoading(true)
 
     try {
-      // 1. Ambil konfigurasi web publik Firebase dari server
-      const configRes = await fetch('/api/v1/auth/google/config')
-      const configJson = await configRes.json()
-
-      if (!configRes.ok || !configJson.ok || !configJson.config) {
-        throw new Error(
-          configJson.error ||
-            'Konfigurasi autentikasi Google belum siap di server.',
-        )
+      let ready = readyAuth.current
+      if (!ready) {
+        // Jalur lambat: persiapan belum selesai. Popup mungkin tetap diblokir di
+        // seluler, tapi klik berikutnya akan memakai jalur cepat di atas.
+        if (!prepared.current) prepared.current = prepareAuth()
+        try {
+          ready = await prepared.current
+          readyAuth.current = ready
+        } catch (err) {
+          // Coba siapkan ulang di klik berikutnya, misalnya setelah jaringan pulih.
+          prepared.current = null
+          throw err
+        }
       }
 
-      // 2. Impor modul Firebase Auth secara lazy (code-splitting)
-      const { initializeApp, getApps, getApp } = await import('firebase/app')
-      const { getAuth, GoogleAuthProvider, signInWithPopup } = await import(
-        'firebase/auth'
-      )
-
-      const app =
-        getApps().length === 0
-          ? initializeApp(configJson.config)
-          : getApp()
-
-      const auth = getAuth(app)
-      auth.languageCode = 'id'
-
-      const provider = new GoogleAuthProvider()
-      provider.addScope('email')
-      provider.addScope('profile')
-      provider.setCustomParameters({
-        prompt: 'select_account',
-      })
-
-      // 3. Buka popup Google Sign-In
-      const result = await signInWithPopup(auth, provider)
+      // Tanpa `await` apa pun sebelum baris ini di jalur cepat, sehingga popup
+      // masih terhitung sebagai hasil ketukan pengguna.
+      const result = await ready.signInWithPopup(ready.auth, ready.provider)
       const user = result.user
 
       if (!user.email) {
@@ -81,10 +124,9 @@ export function GoogleSignInButton({
       }
 
       const idToken = await user.getIdToken()
-      const credential = GoogleAuthProvider.credentialFromResult(result)
-      const googleIdToken = credential?.idToken
+      const googleIdToken = ready.credentialFromResult(result)?.idToken
 
-      // 4. Verifikasi token ke server Komite & pasang sesi HTTP-only cookie
+      // Verifikasi token ke server Komite & pasang sesi HTTP-only cookie
       const authRes = await fetch('/api/v1/auth/google', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -104,7 +146,7 @@ export function GoogleSignInButton({
         )
       }
 
-      // 5. Berhasil: navigasi ke halaman tujuan
+      // Berhasil: navigasi ke halaman tujuan
       router.push(nextPath)
       router.refresh()
     } catch (err: unknown) {
@@ -126,7 +168,7 @@ export function GoogleSignInButton({
 
       if (errCode === 'auth/popup-blocked') {
         reportError(
-          'Jendela popup Google diblokir oleh peramban. Harap izinkan popup di peramban Anda.',
+          'Jendela popup Google diblokir peramban. Ketuk tombolnya sekali lagi, atau izinkan popup untuk situs ini.',
         )
         return
       }
