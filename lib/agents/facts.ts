@@ -382,13 +382,29 @@ function round(value: number, digits: number): number {
 }
 
 /**
+ * Harga dengan lima digit signifikan. Model tidak butuh `4326.9485` untuk
+ * menilai tren; digit ekor hanya menambah token di setiap giliran.
+ */
+function price(value: number | null): string {
+  if (value === null) return 'n/a'
+  return String(Number(value.toPrecision(5)))
+}
+
+/** Candle bulanan yang dikirim ke model; snapshot tetap menyimpan dua belas. */
+const PROMPT_MONTHS = 6
+
+/**
  * Ubah fakta menjadi blok teks untuk model.
  *
  * Sengaja tabel datar, bukan JSON bersarang: model lebih jarang salah membaca
  * angka dari baris berlabel daripada dari struktur bertingkat, dan `null` yang
  * ditulis "tidak tersedia" lebih sulit disalahartikan sebagai nol.
+ *
+ * `summary` membuang tabel candle. Pengawas risiko dan ketua menilai tesis yang
+ * sudah disusun di atas tabel itu; mengirim ulang tabelnya ke mereka hanya
+ * menggandakan token tanpa menambah bukti.
  */
-export function factsToPrompt(facts: MarketFacts): string {
+export function factsToPrompt(facts: MarketFacts, detail: 'full' | 'summary' = 'full'): string {
   const fmt = (value: number | null, suffix = '%') =>
     value === null ? 'tidak tersedia' : `${value}${suffix}`
 
@@ -398,57 +414,48 @@ export function factsToPrompt(facts: MarketFacts): string {
       ? 'SEGAR — data terkini, bukan kelemahan'
       : `BASI — melewati ambang ${staleLimit} hari`
 
+  const r = facts.returns
   const lines = [
-    `Instrumen: ${facts.symbol} (${facts.name}) — pasar ${facts.market}, mata uang ${facts.currency}`,
-    `Kesegaran data  : candle terakhir ${facts.asOf}, ${facts.staleDays} hari lalu (${freshness})`,
-    `Panjang riwayat : ${facts.candleCount} candle harian sejak ${facts.historyStart} (≈${facts.historyYears} tahun), semua dari database harga`,
-    `Harga penutupan terakhir: ${facts.lastClose}`,
-    ``,
-    `Imbal hasil 1 hari   : ${fmt(facts.returns.d1)}`,
-    `Imbal hasil 7 hari   : ${fmt(facts.returns.d7)}`,
-    `Imbal hasil 30 hari  : ${fmt(facts.returns.d30)}`,
-    `Imbal hasil 90 hari  : ${fmt(facts.returns.d90)}`,
-    `Imbal hasil 1 tahun  : ${fmt(facts.returns.d365)}`,
-    `Imbal hasil 2 tahun  : ${fmt(facts.returns.y2)}`,
-    `Imbal hasil 3 tahun  : ${fmt(facts.returns.y3)}`,
-    `Imbal hasil 5 tahun  : ${fmt(facts.returns.y5)}`,
-    ``,
-    `Volatilitas disetahunkan (1 thn)     : ${fmt(facts.annualisedVolatility)}`,
-    `Volatilitas disetahunkan (riwayat)   : ${fmt(facts.volatilityFullHistory)}`,
-    `Penurunan terdalam (1 thn)           : ${fmt(facts.maxDrawdown)}`,
-    `Penurunan terdalam (seluruh riwayat) : ${fmt(facts.maxDrawdownFullHistory)}`,
+    `Instrumen: ${facts.symbol} (${facts.name}) — pasar ${facts.market}, ${facts.currency}`,
+    `Kesegaran data: candle terakhir ${facts.asOf}, ${facts.staleDays} hari lalu (${freshness})`,
+    `Panjang riwayat: ${facts.candleCount} candle harian sejak ${facts.historyStart} (≈${facts.historyYears} tahun)`,
+    `Harga terakhir: ${price(facts.lastClose)}`,
+    `Imbal hasil 1h/7h/30h/90h: ${fmt(r.d1)} / ${fmt(r.d7)} / ${fmt(r.d30)} / ${fmt(r.d90)}`,
+    `Imbal hasil 1th/2th/3th/5th: ${fmt(r.d365)} / ${fmt(r.y2)} / ${fmt(r.y3)} / ${fmt(r.y5)}`,
+    `Volatilitas tahunan 1th / riwayat: ${fmt(facts.annualisedVolatility)} / ${fmt(facts.volatilityFullHistory)}`,
+    `Penurunan terdalam 1th / riwayat: ${fmt(facts.maxDrawdown)} / ${fmt(facts.maxDrawdownFullHistory)}`,
     facts.range52w
-      ? `Rentang 52 minggu        : ${facts.range52w.low} – ${facts.range52w.high} (harga di posisi ${facts.range52w.positionPct}% dari bawah)`
-      : `Rentang 52 minggu        : tidak tersedia`,
+      ? `Rentang 52 minggu: ${price(facts.range52w.low)}–${price(facts.range52w.high)}, harga di ${facts.range52w.positionPct}% dari bawah`
+      : `Rentang 52 minggu: tidak tersedia`,
     facts.historyHigh
-      ? `Puncak riwayat           : ${facts.historyHigh.value} pada ${facts.historyHigh.date} (harga sekarang ${facts.historyHigh.pctFromHigh}% dari puncak)`
-      : `Puncak riwayat           : tidak tersedia`,
-    `SMA20 / SMA50 / SMA200   : ${facts.sma.s20 ?? 'n/a'} / ${facts.sma.s50 ?? 'n/a'} / ${facts.sma.s200 ?? 'n/a'}`,
-    `Kemiringan SMA200 (20 candle): ${fmt(facts.sma200SlopePct)}`,
-    `Harga vs SMA50           : ${fmt(facts.priceVsSma50Pct)}`,
-    `Arah tren                : ${facts.trend}`,
-    `Rasio volume 20v100      : ${fmt(facts.volumeRatio20v100, 'x')}`,
+      ? `Puncak riwayat: ${price(facts.historyHigh.value)} (${facts.historyHigh.date}), harga ${facts.historyHigh.pctFromHigh}% dari puncak`
+      : `Puncak riwayat: tidak tersedia`,
+    `SMA20/50/200: ${price(facts.sma.s20)} / ${price(facts.sma.s50)} / ${price(facts.sma.s200)}; kemiringan SMA200 20 candle ${fmt(facts.sma200SlopePct)}`,
+    `Harga vs SMA50: ${fmt(facts.priceVsSma50Pct)}; tren ${facts.trend}; rasio volume 20v100 ${fmt(facts.volumeRatio20v100, 'x')}`,
   ]
 
   const candleTable = (title: string, rows: PeriodCandle[]) => {
     if (rows.length === 0) return
-    lines.push(``, `${title} (periode: buka / tertinggi / terendah / tutup, perubahan):`)
+    lines.push(``, `${title} (tertinggi / terendah / tutup, perubahan):`)
     for (const c of rows) {
       const note = c.partial ? ' [belum lengkap]' : ''
       lines.push(
-        `${c.period}: ${c.open} / ${c.high} / ${c.low} / ${c.close}, ${fmt(c.changePct)}${note}`,
+        `${c.period}: ${price(c.high)} / ${price(c.low)} / ${price(c.close)}, ${fmt(c.changePct)}${note}`,
       )
     }
   }
 
-  candleTable('CANDLE TAHUNAN', facts.yearly)
-  candleTable('CANDLE BULANAN 12 TERAKHIR', facts.monthly)
-
-  if (facts.warnings.length > 0) {
-    lines.push(``, `PERINGATAN DATA:`, ...facts.warnings.map((w) => `- ${w}`))
-  } else {
-    lines.push(``, `PERINGATAN DATA: tidak ada — seluruh angka di atas layak dipakai.`)
+  if (detail === 'full') {
+    candleTable('CANDLE TAHUNAN', facts.yearly)
+    candleTable(`CANDLE BULANAN ${PROMPT_MONTHS} TERAKHIR`, facts.monthly.slice(-PROMPT_MONTHS))
   }
+
+  lines.push(
+    ``,
+    facts.warnings.length > 0
+      ? `PERINGATAN DATA:\n${facts.warnings.map((w) => `- ${w}`).join('\n')}`
+      : `PERINGATAN DATA: tidak ada — seluruh angka layak dipakai.`,
+  )
 
   return lines.join('\n')
 }

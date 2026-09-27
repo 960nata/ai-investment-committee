@@ -24,6 +24,11 @@ export interface AgentRole {
   maxOutputTokens: number
   /** Ketua menjawab dalam JSON karena hasilnya masuk ke kolom database. */
   json?: boolean
+  /**
+   * Seberapa lengkap blok FAKTA untuk peran ini. Yang menyusun tesis butuh tabel
+   * candle; yang menilai tesis cukup metrik ringkasnya.
+   */
+  facts: 'full' | 'summary'
 }
 
 const NO_INVENTED_NUMBERS =
@@ -44,8 +49,8 @@ const DATA_QUALITY =
   'riwayat" adalah hal terpisah: jumlah candle dan tahun yang dianalisis. Riwayat ' +
   'baru disebut pendek bila kurang dari satu tahun. Semua angka FAKTA dihitung ' +
   'sistem dari candle harian tersimpan, bukan perkiraan; jangan meragukan ' +
-  'keabsahannya kecuali bagian PERINGATAN DATA menyebut masalah. Pakai candle ' +
-  'tahunan dan bulanan untuk menilai konteks jangka panjang, bukan hanya pergerakan terakhir.'
+  'keabsahannya kecuali bagian PERINGATAN DATA menyebut masalah. Bila tabel candle ' +
+  'tahunan dan bulanan tersedia, pakai untuk menilai konteks jangka panjang, bukan hanya pergerakan terakhir.'
 
 const LANGUAGE = 'Jawab dalam bahasa Indonesia yang lugas. Hindari jargon yang tidak perlu.'
 
@@ -84,6 +89,7 @@ export const ANALIS: AgentRole = {
   title: 'Analis Data',
   temperature: 0.1,
   maxOutputTokens: 420,
+  facts: 'full',
   system: [
     'Kamu analis data kuantitatif di sebuah komite investasi.',
     '',
@@ -112,6 +118,7 @@ export const STRATEG: AgentRole = {
   title: 'Strateg Portofolio',
   temperature: 0.5,
   maxOutputTokens: 460,
+  facts: 'full',
   system: [
     'Kamu strateg portofolio. Kamu baru saja menerima laporan dari analis data.',
     '',
@@ -142,6 +149,7 @@ export const RISIKO: AgentRole = {
   title: 'Pengawas Risiko',
   temperature: 0.3,
   maxOutputTokens: 420,
+  facts: 'summary',
   system: [
     'Kamu pengawas risiko. Tugasmu MENYERANG tesis strateg, bukan menyeimbangkannya.',
     '',
@@ -173,6 +181,7 @@ export const KETUA: AgentRole = {
   title: 'Ketua Komite',
   temperature: 0.2,
   maxOutputTokens: 380,
+  facts: 'summary',
   json: true,
   system: [
     'Kamu ketua komite investasi. Kamu sudah membaca laporan analis, tesis strateg,',

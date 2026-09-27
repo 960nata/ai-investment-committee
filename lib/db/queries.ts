@@ -732,6 +732,46 @@ export async function listLatestVerdicts(limit = 20) {
     .limit(limit)
 }
 
+/**
+ * Rapat selesai terakhir yang menilai candle yang sama dengan versi komite yang
+ * sama. Dipakai untuk melewati rapat ulang ketika harga belum bergerak: empat
+ * panggilan model di atas fakta yang identik hanya menghasilkan putusan yang
+ * sama dengan biaya yang sama.
+ *
+ * Hanya rapat yang benar-benar sampai ke ketua yang dihitung. Abstain yang
+ * dijatuhkan sebelum model dipanggil (data basi, riwayat kurang) tidak disalin,
+ * karena alasannya bisa berubah hanya dengan berjalannya waktu.
+ */
+export async function findReusableAgentSession(data: {
+  market: MarketCode
+  symbol: string
+  asOf: string
+  committeeVersion: string
+  excludeSessionId: number
+}) {
+  const rows = await db
+    .select()
+    .from(agentSession)
+    .where(
+      and(
+        eq(agentSession.market, toDbMarket(data.market)),
+        eq(agentSession.symbol, data.symbol),
+        eq(agentSession.status, 'done'),
+        sql`${agentSession.id} <> ${data.excludeSessionId}`,
+        sql`${agentSession.factsSnapshot}->>'asOf' = ${data.asOf}`,
+        sql`${agentSession.factsSnapshot}->>'committeeVersion' = ${data.committeeVersion}`,
+        sql`exists (select 1 from ${agentMessage} where ${agentMessage.sessionId} = ${agentSession.id} and ${agentMessage.agent} = 'ketua')`,
+      ),
+    )
+    .orderBy(desc(agentSession.finishedAt))
+    .limit(1)
+
+  const session = rows[0] ?? null
+  if (!session) return null
+
+  return { session, turns: await getAgentTranscript(session.id) }
+}
+
 export async function getLatestAgentSessionForSymbol(market: MarketCode, symbol: string) {
   const sessions = await db
     .select()

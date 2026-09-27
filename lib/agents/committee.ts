@@ -24,6 +24,7 @@ import { complete } from '@/lib/ai/registry'
 import type { LlmMessage } from '@/lib/ai/types'
 import {
   closeAgentSession,
+  findReusableAgentSession,
   getAgentTranscript,
   getInstrumentBySymbol,
   openAgentSession,
@@ -41,6 +42,13 @@ import { COMMITTEE, type AgentRole } from './roles'
 import { parseVerdict, type CommitteeVerdict } from './verdict'
 
 export { parseVerdict, type CommitteeVerdict }
+
+/**
+ * Versi prompt dan berkas fakta komite. Naikkan setiap kali isi FAKTA atau
+ * peran berubah: putusan lama hanya dipakai ulang bila versinya sama, jadi
+ * perbaikan prompt langsung berlaku tanpa menunggu candle baru.
+ */
+export const COMMITTEE_VERSION = '2026-09-27.1'
 
 
 export interface CommitteeResult {
@@ -62,10 +70,15 @@ export interface CommitteeInput {
   symbol: string
   /** Kunci idempotensi. Rapat dengan kunci sama tidak akan dijalankan dua kali. */
   sessionKey: string
+  /**
+   * Pakai ulang putusan rapat lain yang menilai candle terakhir yang sama.
+   * Bawaannya aktif; rapat paksa admin mematikannya.
+   */
+  reuse?: boolean
 }
 
 export async function runCommittee(input: CommitteeInput): Promise<CommitteeResult> {
-  const { market, symbol, sessionKey } = input
+  const { market, symbol, sessionKey, reuse = true } = input
 
   const instrument = await getInstrumentBySymbol(market, symbol)
   const session = await openAgentSession({
@@ -120,11 +133,22 @@ export async function runCommittee(input: CommitteeInput): Promise<CommitteeResu
 
   // --- Tahap 2: rapat ------------------------------------------------------
 
-  const factsBlock = `FAKTA (satu-satunya sumber angka yang boleh kamu pakai):\n\n${factsToPrompt(facts)}`
+  const snapshot = { ...facts, committeeVersion: COMMITTEE_VERSION } as Record<string, unknown>
 
   // Giliran yang sudah tercatat dilewati; inilah yang membuat rapat bisa
   // dilanjutkan setelah invocation sebelumnya kehabisan waktu.
   const existing = await getAgentTranscript(session.id)
+
+  if (reuse && existing.length === 0) {
+    const reused = await reusePreviousSession(session.id, market, symbol, facts, snapshot)
+    if (reused) return reused
+  }
+
+  const factsBlocks = {
+    full: `FAKTA (satu-satunya sumber angka yang boleh kamu pakai):\n\n${factsToPrompt(facts, 'full')}`,
+    summary: `FAKTA (satu-satunya sumber angka yang boleh kamu pakai):\n\n${factsToPrompt(facts, 'summary')}`,
+  }
+
   const turns: CommitteeResult['turns'] = existing.map((m) => ({
     agent: m.agent,
     content: m.content,
@@ -136,7 +160,7 @@ export async function runCommittee(input: CommitteeInput): Promise<CommitteeResu
   for (const [seq, role] of COMMITTEE.entries()) {
     if (existing.some((m) => m.seq === seq)) continue
 
-    const messages = buildMessages(role, factsBlock, turns)
+    const messages = buildMessages(role, factsBlocks[role.facts], turns)
 
     try {
       const response = await complete({
@@ -172,7 +196,7 @@ export async function runCommittee(input: CommitteeInput): Promise<CommitteeResu
       await closeAgentSession({
         sessionId: session.id,
         status: 'failed',
-        factsSnapshot: facts as unknown as Record<string, unknown>,
+        factsSnapshot: snapshot,
         error: `Giliran ${role.name} gagal: ${message}`.slice(0, 2000),
       })
       // Dilempar supaya worker membalas 5xx dan QStash mencoba lagi; giliran yang
@@ -209,7 +233,7 @@ export async function runCommittee(input: CommitteeInput): Promise<CommitteeResu
     ]
       .filter(Boolean)
       .join(' '),
-    factsSnapshot: facts as unknown as Record<string, unknown>,
+    factsSnapshot: snapshot,
   })
 
   return {
@@ -221,6 +245,70 @@ export async function runCommittee(input: CommitteeInput): Promise<CommitteeResu
     confidence: parsed.confidence,
     rationale: parsed.rationale,
     turns,
+    facts,
+  }
+}
+
+/**
+ * Salin rapat lain yang menilai candle terakhir yang sama, tanpa memanggil model.
+ *
+ * Giliran disalin ke rapat baru — bukan sekadar dirujuk — supaya halaman yang
+ * membaca rapat terbaru tetap menampilkan transkrip lengkap. Hitungan token
+ * sengaja dikosongkan: tidak ada token yang dibelanjakan untuk salinan ini.
+ */
+async function reusePreviousSession(
+  sessionId: number,
+  market: MarketCode,
+  symbol: string,
+  facts: MarketFacts,
+  snapshot: Record<string, unknown>,
+): Promise<CommitteeResult | null> {
+  const previous = await findReusableAgentSession({
+    market,
+    symbol,
+    asOf: facts.asOf,
+    committeeVersion: COMMITTEE_VERSION,
+    excludeSessionId: sessionId,
+  })
+  if (!previous) return null
+
+  // Putusan ketua yang tidak bisa diurai berakhir sebagai abstain darurat; itu
+  // kegagalan model, bukan penilaian, jadi tidak layak disalin.
+  const ketua = parseVerdict(previous.turns.find((t) => t.agent === 'ketua')?.content ?? null)
+  if (!ketua) return null
+
+  for (const turn of previous.turns) {
+    await recordAgentMessage({
+      sessionId,
+      seq: turn.seq,
+      agent: turn.agent,
+      content: turn.content,
+      providerId: turn.providerId,
+      model: turn.model,
+    })
+  }
+
+  await closeAgentSession({
+    sessionId,
+    status: 'done',
+    verdict: previous.session.verdict,
+    confidence: previous.session.confidence,
+    rationale: previous.session.rationale,
+    factsSnapshot: { ...snapshot, reusedFromSessionId: previous.session.id },
+  })
+
+  return {
+    sessionId,
+    symbol,
+    market,
+    status: 'done',
+    verdict: previous.session.verdict,
+    confidence: previous.session.confidence,
+    rationale: ketua.rationale,
+    skippedReason:
+      `Belum ada candle baru sejak rapat #${previous.session.id} (data per ${facts.asOf}); ` +
+      'putusannya dipakai ulang tanpa memanggil model.',
+    turns: previous.turns.map((t) => ({ agent: t.agent, content: t.content })),
     facts,
   }
 }
@@ -284,7 +372,7 @@ async function abstain(
     verdict: 'abstain',
     confidence: 0,
     rationale: reason,
-    factsSnapshot: facts ? (facts as unknown as Record<string, unknown>) : null,
+    factsSnapshot: facts ? { ...facts, committeeVersion: COMMITTEE_VERSION } : null,
   })
 
   console.log(`[Komite] ${market}:${symbol} abstain — ${reason}`)

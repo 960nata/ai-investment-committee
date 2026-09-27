@@ -153,6 +153,8 @@ export async function POST(request: Request) {
       market: target.market,
       symbol: target.symbol,
       sessionKey,
+      // Rapat paksa memang dimaksudkan membelanjakan rapat baru.
+      reuse: !forced,
     })
 
     // Rapat yang dilewati tidak memanggil model sama sekali — hasilnya dibaca
