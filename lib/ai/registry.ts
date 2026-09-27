@@ -10,14 +10,7 @@
  * latensinya paling rendah; yang di bawah adalah jaring pengaman berbayar.
  */
 
-import { geminiAdapter } from './providers/gemini'
-import {
-  deepSeekAdapter,
-  groqAdapter,
-  mistralAdapter,
-  nvidiaAdapter,
-  openRouterAdapter,
-} from './providers/openai-compatible'
+import { LLM_ADAPTERS } from './adapters'
 import { collectKeys, nextKey, penalise, poolStatus, type PooledKey } from './keyring'
 import { recordLlmCall } from './telemetry'
 import { LlmError, type LlmAdapter, type LlmRequest, type LlmResponse } from './types'
@@ -29,19 +22,6 @@ interface ProviderEntry {
   adapter: LlmAdapter
   pool: PooledKey[]
 }
-
-/**
- * Urutan prioritas. Penyedia tanpa satu pun kunci di env langsung dilewati,
- * jadi menambah penyedia baru cukup dengan mengisi variabel env-nya.
- */
-const ADAPTERS: LlmAdapter[] = [
-  groqAdapter, // latensi terendah, sangat cepat (~300ms) untuk terjemahan & komite
-  geminiAdapter, // kolam kunci cadangan terbesar
-  openRouterAdapter, // model gratis, kuota harian
-  deepSeekAdapter,
-  mistralAdapter,
-  nvidiaAdapter,
-]
 
 /**
  * GITHUB_TOKEN sengaja TIDAK dipasang di sini meski GitHub Models menerima
@@ -57,7 +37,7 @@ let entries: ProviderEntry[] | null = null
 function getEntries(): ProviderEntry[] {
   if (entries) return entries
 
-  entries = ADAPTERS.map((adapter) => ({
+  entries = LLM_ADAPTERS.map((adapter) => ({
     adapter,
     pool: collectKeys(adapter.envPrefix),
   })).filter((entry) => {
@@ -127,6 +107,7 @@ export async function complete(request: LlmRequest): Promise<LlmResponse> {
         break
       }
 
+      const startedAt = Date.now()
       try {
         const response = await adapter.complete(request, key.value, key.index)
         console.log(
@@ -135,7 +116,7 @@ export async function complete(request: LlmRequest): Promise<LlmResponse> {
         )
         void recordLlmCall({
           providerId: adapter.id,
-          model: adapter.model,
+          model: response.model,
           keyIndex: key.index,
           keyFingerprint: key.fingerprint,
           success: true,
@@ -161,7 +142,7 @@ export async function complete(request: LlmRequest): Promise<LlmResponse> {
           errorKind: llmError.kind,
           inputTokens: 0,
           outputTokens: 0,
-          latencyMs: 400,
+          latencyMs: Date.now() - startedAt,
         })
 
         attempts.push({

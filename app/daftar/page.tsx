@@ -18,6 +18,7 @@ import {
   IconGauge,
   IconCheck,
 } from '@/components/icons'
+import { GoogleSignInButton } from '@/components/google-sign-in-button'
 
 export default function DaftarPage() {
   return (
@@ -118,6 +119,17 @@ function RegisterForm() {
               Gratis, tanpa kartu kredit. Sekali daftar, seluruh terminal terbuka: grafik harga,
               putusan empat agen AI, katalog instrumen, dan laboratorium backtest.
             </p>
+          </div>
+
+          {/* Daftar Cepat dengan Google */}
+          <GoogleSignInButton
+            label="Daftar Cepat dengan Google"
+            nextPath={nextPath}
+            onError={(msg) => setError(msg)}
+          />
+
+          <div className="auth-divider">
+            <span>atau isi data mandiri</span>
           </div>
 
           <div className="auth-field">

@@ -1,45 +1,58 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import type { AiTokensDashboardData, KeyAnalyticsItem } from '@/lib/ai/telemetry'
+import type { ApexOptions } from 'apexcharts'
+import type { AiTokensDashboardData, TimeRange } from '@/lib/ai/telemetry'
 import { ApexChartWrapper } from './apex-chart-wrapper'
-import { KeyDetailModal } from './key-detail-modal'
+import { UsageDetailModal } from './usage-detail-modal'
 import {
-  IconGauge,
-  IconPulse,
-  IconAlert,
-  IconCheck,
-  IconLock,
-  IconSearch,
-  IconTarget,
-  IconRows,
-  IconFlow,
-  IconClose,
-} from '@/components/icons'
+  chartOptions,
+  compact,
+  sparklineOptions,
+  COLOR_429,
+  COLOR_INPUT,
+  COLOR_LATENCY,
+  COLOR_OTHER_ERR,
+  COLOR_OUTPUT,
+  COLOR_SUCCESS,
+  SERIES_COLORS,
+} from './chart-options'
+import { IconAlert, IconLock, IconPulse, IconSearch, IconClose } from '@/components/icons'
 
 interface AiTokensDashboardClientProps {
   initialData: AiTokensDashboardData
 }
 
+const RANGE_LABELS: Record<TimeRange, string> = {
+  '24h': '24 Jam Terakhir',
+  '7d': '7 Hari Terakhir',
+  '30d': '30 Hari Terakhir',
+}
+
+function fmt(v: number | null | undefined, suffix = ''): string {
+  return v == null ? '—' : `${v.toLocaleString('id-ID')}${suffix}`
+}
+
+function rateColor(rate: number | null): string | undefined {
+  if (rate == null) return undefined
+  return rate >= 95 ? COLOR_SUCCESS : rate >= 80 ? '#f59e0b' : COLOR_429
+}
+
 export function AiTokensDashboardClient({ initialData }: AiTokensDashboardClientProps) {
   const [data, setData] = useState<AiTokensDashboardData>(initialData)
-  const [timeRange, setTimeRange] = useState<'24h' | '7d' | '30d'>('24h')
-  const [providerFilter, setProviderFilter] = useState<string>('all')
-  const [modelFilter, setModelFilter] = useState<string>('all')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [selectedKeyForModal, setSelectedKeyForModal] = useState<KeyAnalyticsItem | null>(null)
   const [loading, setLoading] = useState(false)
+  const [providerFilter, setProviderFilter] = useState<string>('all')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [modal, setModal] = useState<{ providerId: string; keyId?: string } | null>(null)
 
-  // Fetch data ulang saat timeRange / filter berubah
-  async function refreshData(nextRange: '24h' | '7d' | '30d', prov = providerFilter, mod = modelFilter) {
-    setTimeRange(nextRange)
+  const timeRange = data.range
+  const rangeLabel = RANGE_LABELS[timeRange]
+
+  async function refreshData(nextRange: TimeRange) {
     setLoading(true)
     try {
-      const res = await fetch(`/api/v1/admin/ai-tokens?range=${nextRange}&provider=${prov}&model=${mod}`)
-      if (res.ok) {
-        const json = await res.json()
-        setData(json)
-      }
+      const res = await fetch(`/api/v1/admin/ai-tokens?range=${nextRange}`, { cache: 'no-store' })
+      if (res.ok) setData(await res.json())
     } catch (err) {
       console.error('Gagal memperbarui data AI Tokens:', err)
     } finally {
@@ -47,15 +60,9 @@ export function AiTokensDashboardClient({ initialData }: AiTokensDashboardClient
     }
   }
 
-  // Filter keys berdasarkan search query
   const filteredKeys = useMemo(() => {
     let result = data.keys
-    if (providerFilter !== 'all') {
-      result = result.filter((k) => k.providerId === providerFilter)
-    }
-    if (modelFilter !== 'all') {
-      result = result.filter((k) => k.model === modelFilter)
-    }
+    if (providerFilter !== 'all') result = result.filter((k) => k.providerId === providerFilter)
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase()
       result = result.filter(
@@ -67,135 +74,41 @@ export function AiTokensDashboardClient({ initialData }: AiTokensDashboardClient
       )
     }
     return result
-  }, [data.keys, providerFilter, modelFilter, searchQuery])
+  }, [data.keys, providerFilter, searchQuery])
 
-  // --- Konfigurasi ApexCharts Utama ---
+  const { overview, series, categories } = data
+  const topModel = data.models[0]
+  const hasActivity = overview.requests > 0
 
-  // Chart 1: Total API Requests (Sukses vs 429 TooManyRequests)
-  const requestsTimelineOptions: ApexCharts.ApexOptions = {
-    chart: {
-      type: 'area',
-      toolbar: { show: false },
-      background: 'transparent',
-      fontFamily: 'inherit',
-      zoom: { enabled: false },
-    },
-    theme: { mode: 'dark' },
-    colors: ['#10b981', '#ef4444', '#64748b'],
-    stroke: { curve: 'smooth', width: 2 },
-    fill: {
-      type: 'gradient',
-      gradient: {
-        shadeIntensity: 1,
-        opacityFrom: 0.45,
-        opacityTo: 0.05,
-        stops: [0, 90, 100],
-      },
-    },
-    dataLabels: { enabled: false },
-    xaxis: {
-      categories: data.timeSeries.categories,
-      labels: {
-        style: { colors: '#94a3b8', fontSize: '11px', fontFamily: 'monospace' },
-      },
-      axisBorder: { color: 'rgba(255,255,255,0.1)' },
-      axisTicks: { color: 'rgba(255,255,255,0.1)' },
-    },
-    yaxis: {
-      labels: {
-        style: { colors: '#94a3b8', fontSize: '11px', fontFamily: 'monospace' },
-      },
-    },
-    grid: {
-      borderColor: 'rgba(255, 255, 255, 0.07)',
-      strokeDashArray: 3,
-    },
-    legend: {
-      position: 'top',
-      horizontalAlign: 'right',
-      labels: { colors: '#cbd5e1' },
-      fontSize: '12px',
-    },
-    tooltip: {
-      theme: 'dark',
-      y: { formatter: (v) => `${v.toLocaleString()} req` },
-    },
-  }
-
-  const requestsTimelineSeries = [
-    { name: 'Panggilan Sukses', data: data.timeSeries.requestsSuccess },
-    { name: '429 TooManyRequests', data: data.timeSeries.requests429 },
-    { name: 'Galat Lainnya', data: data.timeSeries.requestsOtherErrors },
+  // --- Grafik utama ---
+  const requestsOptions = chartOptions('area', categories, {
+    colors: [COLOR_SUCCESS, COLOR_429, COLOR_OTHER_ERR],
+    unit: ' req',
+  })
+  const requestsSeries = [
+    { name: 'Panggilan sukses', data: series.success },
+    { name: '429 TooManyRequests', data: series.rateLimited },
+    { name: 'Galat lain', data: series.otherErrors },
   ]
 
-  // Chart 2: Input & Output Tokens
-  const tokensTimelineOptions: ApexCharts.ApexOptions = {
-    chart: {
-      type: 'bar',
-      stacked: true,
-      toolbar: { show: false },
-      background: 'transparent',
-      fontFamily: 'inherit',
-    },
-    theme: { mode: 'dark' },
-    colors: ['#8b5cf6', '#f59e0b'],
-    plotOptions: {
-      bar: {
-        borderRadius: 3,
-        columnWidth: '60%',
-      },
-    },
-    dataLabels: { enabled: false },
-    xaxis: {
-      categories: data.timeSeries.categories,
-      labels: {
-        style: { colors: '#94a3b8', fontSize: '11px', fontFamily: 'monospace' },
-      },
-      axisBorder: { color: 'rgba(255,255,255,0.1)' },
-    },
-    yaxis: {
-      labels: {
-        style: { colors: '#94a3b8', fontSize: '11px', fontFamily: 'monospace' },
-        formatter: (v) => `${Math.round(v / 1000)}k`,
-      },
-    },
-    grid: {
-      borderColor: 'rgba(255, 255, 255, 0.07)',
-      strokeDashArray: 3,
-    },
-    legend: {
-      position: 'top',
-      horizontalAlign: 'right',
-      labels: { colors: '#cbd5e1' },
-      fontSize: '12px',
-    },
-    tooltip: {
-      theme: 'dark',
-      y: { formatter: (v) => `${v.toLocaleString()} tokens` },
-    },
-  }
-
-  const tokensTimelineSeries = [
-    { name: 'Input Tokens', data: data.timeSeries.inputTokens },
-    { name: 'Output Tokens', data: data.timeSeries.outputTokens },
+  const tokensOptions = chartOptions('bar', categories, {
+    colors: [COLOR_INPUT, COLOR_OUTPUT],
+    chart: { stacked: true },
+    unit: ' token',
+  })
+  const tokensSeries = [
+    { name: 'Input tokens', data: series.inputTokens },
+    { name: 'Output tokens', data: series.outputTokens },
   ]
 
-  // Chart 3: Requests Share per Model (Donut)
-  const modelsDonutOptions: ApexCharts.ApexOptions = {
-    chart: {
-      type: 'donut',
-      background: 'transparent',
-      fontFamily: 'inherit',
-    },
+  const donutModels = data.models.filter((m) => m.totals.requests > 0)
+  const modelsDonutOptions: ApexOptions = {
+    chart: { type: 'donut', background: 'transparent', fontFamily: 'inherit' },
     theme: { mode: 'dark' },
-    colors: ['#f59e0b', '#06b6d4', '#8b5cf6', '#10b981', '#ec4899', '#3b82f6'],
-    labels: data.models.map((m) => m.name),
+    colors: SERIES_COLORS,
+    labels: donutModels.map((m) => `${m.model} · ${m.providerName}`),
     dataLabels: { enabled: false },
-    legend: {
-      position: 'bottom',
-      labels: { colors: '#cbd5e1' },
-      fontSize: '11px',
-    },
+    legend: { position: 'bottom', labels: { colors: '#cbd5e1' }, fontSize: '11px' },
     plotOptions: {
       pie: {
         donut: {
@@ -204,71 +117,32 @@ export function AiTokensDashboardClient({ initialData }: AiTokensDashboardClient
             show: true,
             total: {
               show: true,
-              label: 'Total Panggilan',
+              label: 'Total panggilan',
               color: '#94a3b8',
               fontSize: '11px',
               fontFamily: 'monospace',
-              formatter: () => data.overview.totalRequests.toLocaleString(),
+              formatter: () => overview.requests.toLocaleString('id-ID'),
             },
-            value: {
-              color: '#f8fafc',
-              fontSize: '18px',
-              fontWeight: 700,
-              fontFamily: 'monospace',
-            },
+            value: { color: '#f8fafc', fontSize: '18px', fontWeight: 700, fontFamily: 'monospace' },
           },
         },
       },
     },
     stroke: { width: 0 },
-    tooltip: {
-      theme: 'dark',
-      y: { formatter: (v) => `${v.toLocaleString()} req` },
-    },
+    tooltip: { theme: 'dark', y: { formatter: (v) => `${v.toLocaleString('id-ID')} req` } },
+    noData: { text: 'Belum ada panggilan', style: { color: '#64748b', fontSize: '12px' } },
   }
 
-  const modelsDonutSeries = data.models.map((m) => m.requests)
-
-  // Chart 4: Latensi Respon (Spline)
-  const latencyOptions: ApexCharts.ApexOptions = {
-    chart: {
-      type: 'line',
-      toolbar: { show: false },
-      background: 'transparent',
-      fontFamily: 'inherit',
-    },
-    theme: { mode: 'dark' },
-    colors: ['#06b6d4'],
-    stroke: { curve: 'smooth', width: 2 },
-    dataLabels: { enabled: false },
-    xaxis: {
-      categories: data.timeSeries.categories,
-      labels: {
-        style: { colors: '#94a3b8', fontSize: '11px', fontFamily: 'monospace' },
-      },
-      axisBorder: { color: 'rgba(255,255,255,0.1)' },
-    },
-    yaxis: {
-      labels: {
-        style: { colors: '#94a3b8', fontSize: '11px', fontFamily: 'monospace' },
-        formatter: (v) => `${v}ms`,
-      },
-    },
-    grid: {
-      borderColor: 'rgba(255, 255, 255, 0.07)',
-      strokeDashArray: 3,
-    },
-    tooltip: {
-      theme: 'dark',
-      y: { formatter: (v) => `${v} ms` },
-    },
-  }
-
-  const latencySeries = [{ name: 'Latensi Rata-rata', data: data.timeSeries.latency }]
+  const latencyOptions = chartOptions('line', categories, {
+    colors: [COLOR_LATENCY],
+    unit: ' ms',
+    yFormatter: (v) => `${Math.round(v)}ms`,
+  })
+  const latencySeries = [{ name: 'Latensi rata-rata', data: series.latencyMs }]
 
   return (
     <div className="admin-page-content ai-tokens-dashboard">
-      {/* 1. HERO HEADER */}
+      {/* 1. HERO */}
       <div className="admin-page-hero">
         <span className="admin-hero-glow" aria-hidden="true" />
 
@@ -283,280 +157,303 @@ export function AiTokensDashboardClient({ initialData }: AiTokensDashboardClient
           </h1>
 
           <p className="admin-page-standfirst">
-            Pemantauan langsung perputaran {data.overview.totalKeysCount} kunci API terpasang (Gemini, Groq, OpenRouter),
-            indikator batas kuota 429 TooManyRequests, konsumsi token input/output, dan analisis visual ApexCharts interaktif.
+            Pemakaian nyata {overview.totalKeysCount} kunci API dari {data.providers.length} penyedia: permintaan,
+            galat 429 TooManyRequests, token input/output, dan latensi. Klik kartu penyedia atau baris kunci untuk
+            membuka grafik rinciannya.
           </p>
 
-          {/* Time Range Selector */}
           <div className="ai-tokens-range-tabs mono">
+            {(Object.keys(RANGE_LABELS) as TimeRange[]).map((r) => (
+              <button
+                key={r}
+                type="button"
+                className={`range-tab ${timeRange === r ? 'active' : ''}`}
+                onClick={() => refreshData(r)}
+                disabled={loading}
+              >
+                {r === '24h' ? '24 Jam' : r === '7d' ? '7 Hari' : '30 Hari'}
+              </button>
+            ))}
             <button
               type="button"
-              className={`range-tab ${timeRange === '24h' ? 'active' : ''}`}
-              onClick={() => refreshData('24h')}
+              className="range-tab"
+              onClick={() => refreshData(timeRange)}
               disabled={loading}
+              title="Muat ulang data"
             >
-              24 Jam Terakhir
-            </button>
-            <button
-              type="button"
-              className={`range-tab ${timeRange === '7d' ? 'active' : ''}`}
-              onClick={() => refreshData('7d')}
-              disabled={loading}
-            >
-              7 Hari
-            </button>
-            <button
-              type="button"
-              className={`range-tab ${timeRange === '30d' ? 'active' : ''}`}
-              onClick={() => refreshData('30d')}
-              disabled={loading}
-            >
-              30 Hari
+              {loading ? 'Memuat…' : 'Muat ulang'}
             </button>
           </div>
         </div>
 
-        {/* Status System Chips */}
         <div className="admin-hero-chips mono">
           <div className="admin-hero-chips-head">
             <IconLock size={11} />
             <span>KOLAM KUNCI TERPASANG</span>
           </div>
-
           <div className="admin-hero-chip">
             <span className="chip-indicator ok" />
-            <span className="admin-hero-chip-name">Kunci Siap</span>
-            <span className="admin-hero-chip-value ok">{data.overview.readyKeysCount} Kunci</span>
+            <span className="admin-hero-chip-name">Kunci siap</span>
+            <span className="admin-hero-chip-value ok">{overview.readyKeysCount} kunci</span>
           </div>
-
           <div className="admin-hero-chip">
-            <span className={`chip-indicator ${data.overview.coolingKeysCount > 0 ? 'warn' : 'ok'}`} />
-            <span className="admin-hero-chip-name">Sedang Cooldown</span>
-            <span className={`admin-hero-chip-value ${data.overview.coolingKeysCount > 0 ? 'warn' : 'ok'}`}>
-              {data.overview.coolingKeysCount} Kunci
+            <span className={`chip-indicator ${overview.coolingKeysCount > 0 ? 'warn' : 'ok'}`} />
+            <span className="admin-hero-chip-name">Sedang cooldown</span>
+            <span className={`admin-hero-chip-value ${overview.coolingKeysCount > 0 ? 'warn' : 'ok'}`}>
+              {overview.coolingKeysCount} kunci
             </span>
           </div>
-
           <div className="admin-hero-chip">
-            <span className="chip-indicator ok" />
-            <span className="admin-hero-chip-name">Penyedia Aktif</span>
-            <span className="admin-hero-chip-value ok">{data.providers.length} Vendor</span>
+            <span className={`chip-indicator ${data.storage === 'redis' ? 'ok' : 'warn'}`} />
+            <span className="admin-hero-chip-name">Penyimpanan</span>
+            <span className={`admin-hero-chip-value ${data.storage === 'redis' ? 'ok' : 'warn'}`}>
+              {data.storage === 'redis' ? 'Redis' : 'Memori'}
+            </span>
           </div>
         </div>
       </div>
 
-      {/* 2. OVERVIEW KPI CARDS (Persis sesuai permintaan pengguna) */}
+      {data.storage === 'memory' && (
+        <div className="key-cooldown-alert">
+          <IconAlert size={16} />
+          <div>
+            <strong>Redis belum dikonfigurasi</strong>
+            <p>
+              Angka di halaman ini hanya berasal dari memori proses server yang sedang melayani, dan hilang saat server
+              dimulai ulang. Isi UPSTASH_REDIS_REST_URL dan UPSTASH_REDIS_REST_TOKEN supaya riwayat 7 dan 30 hari
+              tersimpan.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* 2. KPI */}
       <div className="ai-tokens-kpi-grid">
-        {/* KPI 1: Total API Requests */}
         <div className="ai-kpi-card">
           <div className="ai-kpi-head">
             <span className="ai-kpi-label mono">TOTAL API REQUESTS</span>
-            <span className="ai-kpi-tag ok mono">All API Keys</span>
+            <span className="ai-kpi-tag ok mono">Semua kunci</span>
           </div>
-          <div className="ai-kpi-value mono">{data.overview.totalRequests.toLocaleString()}</div>
+          <div className="ai-kpi-value mono">{fmt(overview.requests)}</div>
           <div className="ai-kpi-foot">
-            <span className="ai-kpi-detail">
-              Default Gemini: <strong>{data.providers.find((p) => p.id === 'gemini')?.requests.toLocaleString() ?? '0'}</strong>
-            </span>
-            <span className="ai-kpi-sublink">38 Kunci Bergilir</span>
+            <span className="ai-kpi-detail">{rangeLabel}</span>
+            <span className="ai-kpi-sublink">{overview.totalKeysCount} kunci bergilir</span>
           </div>
         </div>
 
-        {/* KPI 2: Success Rate */}
         <div className="ai-kpi-card">
           <div className="ai-kpi-head">
             <span className="ai-kpi-label mono">SUCCESS RATE</span>
-            <span
-              className="ai-kpi-tag mono"
-              style={{
-                background: data.overview.successRate >= 95 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
-                color: data.overview.successRate >= 95 ? '#10b981' : '#f59e0b',
-              }}
-            >
-              {data.overview.successRate}%
+            <span className="ai-kpi-tag mono" style={{ color: rateColor(overview.successRate) }}>
+              {fmt(overview.successRate, '%')}
             </span>
           </div>
-          <div className="ai-kpi-value mono" style={{ color: '#10b981' }}>
-            {data.overview.totalSuccess.toLocaleString()}
+          <div className="ai-kpi-value mono" style={{ color: COLOR_SUCCESS }}>
+            {fmt(overview.success)}
           </div>
           <div className="ai-kpi-foot">
             <div className="ai-kpi-bar-wrap">
               <div
                 className="ai-kpi-bar-fill"
-                style={{ width: `${Math.min(100, data.overview.successRate)}%`, background: '#10b981' }}
+                style={{ width: `${Math.min(100, overview.successRate ?? 0)}%`, background: COLOR_SUCCESS }}
               />
             </div>
-            <span className="ai-kpi-detail">Berhasil dieksekusi model</span>
+            <span className="ai-kpi-detail">panggilan berhasil</span>
           </div>
         </div>
 
-        {/* KPI 3: Total API Errors (429 TooManyRequests) */}
         <div className="ai-kpi-card">
           <div className="ai-kpi-head">
             <span className="ai-kpi-label mono">TOTAL API ERRORS</span>
             <span className="ai-kpi-tag warn mono">429 TooManyRequests</span>
           </div>
-          <div className="ai-kpi-value mono" style={{ color: data.overview.total429Errors > 0 ? '#ef4444' : '#94a3b8' }}>
-            {data.overview.totalErrors.toLocaleString()}
+          <div
+            className="ai-kpi-value mono"
+            style={{ color: overview.rateLimited + overview.otherErrors > 0 ? COLOR_429 : '#94a3b8' }}
+          >
+            {fmt(overview.rateLimited + overview.otherErrors)}
           </div>
           <div className="ai-kpi-foot">
             <span className="ai-kpi-detail">
-              Terkena 429: <strong style={{ color: '#ef4444' }}>{data.overview.total429Errors}x</strong> (Diistirahatkan)
+              429: <strong style={{ color: COLOR_429 }}>{fmt(overview.rateLimited)}</strong> · lain:{' '}
+              <strong>{fmt(overview.otherErrors)}</strong>
             </span>
-            <span className="ai-kpi-sublink">Failover Aman</span>
           </div>
         </div>
 
-        {/* KPI 4: Input Tokens */}
         <div className="ai-kpi-card">
           <div className="ai-kpi-head">
             <span className="ai-kpi-label mono">INPUT TOKENS</span>
-            <span className="ai-kpi-tag mono" style={{ color: '#8b5cf6', background: 'rgba(139, 92, 246, 0.15)' }}>
-              Prompt Masuk
+            <span className="ai-kpi-tag mono" style={{ color: COLOR_INPUT }}>
+              Prompt masuk
             </span>
           </div>
-          <div className="ai-kpi-value mono" style={{ color: '#8b5cf6' }}>
-            {data.overview.totalInputTokens.toLocaleString()}
+          <div className="ai-kpi-value mono" style={{ color: COLOR_INPUT }}>
+            {fmt(overview.inputTokens)}
           </div>
           <div className="ai-kpi-foot">
             <span className="ai-kpi-detail">
-              Gemini 2.5 Flash:{' '}
-              <strong>
-                {data.models.find((m) => m.id === 'gemini-2.5-flash')?.inputTokens.toLocaleString() ?? '0'}
-              </strong>
+              {topModel && topModel.totals.requests > 0 ? (
+                <>
+                  {topModel.model}: <strong>{fmt(topModel.totals.inputTokens)}</strong>
+                </>
+              ) : (
+                'Belum ada pemakaian'
+              )}
             </span>
           </div>
         </div>
 
-        {/* KPI 5: Output Tokens */}
         <div className="ai-kpi-card">
           <div className="ai-kpi-head">
             <span className="ai-kpi-label mono">OUTPUT TOKENS</span>
-            <span className="ai-kpi-tag mono" style={{ color: '#f59e0b', background: 'rgba(245, 158, 11, 0.15)' }}>
-              Hasil Generasi
+            <span className="ai-kpi-tag mono" style={{ color: COLOR_OUTPUT }}>
+              Hasil generasi
             </span>
           </div>
-          <div className="ai-kpi-value mono" style={{ color: '#f59e0b' }}>
-            {data.overview.totalOutputTokens.toLocaleString()}
+          <div className="ai-kpi-value mono" style={{ color: COLOR_OUTPUT }}>
+            {fmt(overview.outputTokens)}
           </div>
           <div className="ai-kpi-foot">
             <span className="ai-kpi-detail">
-              Rata-rata: <strong>~{Math.round(data.overview.totalOutputTokens / Math.max(1, data.overview.totalRequests))} tok/req</strong>
+              Rata-rata:{' '}
+              <strong>
+                {overview.success > 0 ? `${Math.round(overview.outputTokens / overview.success)} tok/req` : '—'}
+              </strong>
             </span>
           </div>
         </div>
       </div>
 
-      {/* 3. APEXCHARTS MAIN SECTION (2 Grid Kolom) */}
+      {/* 3. KARTU PENYEDIA → POPUP */}
+      <div className="ai-provider-grid">
+        {data.providers.map((p, i) => (
+          <button
+            key={p.id}
+            type="button"
+            className="ai-provider-card"
+            onClick={() => setModal({ providerId: p.id })}
+            title={`Buka grafik pemakaian ${p.name}`}
+          >
+            <div className="ai-provider-card-head">
+              <span className="ai-provider-name">{p.name}</span>
+              <span className={`ai-provider-keys mono ${p.coolingKeys > 0 ? 'warn' : ''}`}>
+                {p.availableKeys}/{p.totalKeys} siap
+              </span>
+            </div>
+            <span className="ai-provider-model mono">{p.model}</span>
+            <div className="ai-provider-spark">
+              <ApexChartWrapper
+                options={sparklineOptions(SERIES_COLORS[i % SERIES_COLORS.length])}
+                series={[{ name: 'Requests', data: p.series.requests }]}
+                type="area"
+                height={44}
+              />
+            </div>
+            <div className="ai-provider-stats mono">
+              <span>
+                <em>REQ</em>
+                {compact(p.totals.requests)}
+              </span>
+              <span style={{ color: rateColor(p.totals.successRate) }}>
+                <em>SUKSES</em>
+                {fmt(p.totals.successRate, '%')}
+              </span>
+              <span style={{ color: p.totals.rateLimited > 0 ? COLOR_429 : undefined }}>
+                <em>429</em>
+                {compact(p.totals.rateLimited)}
+              </span>
+              <span>
+                <em>TOKEN</em>
+                {compact(p.totals.inputTokens + p.totals.outputTokens)}
+              </span>
+            </div>
+            <span className="ai-provider-cta mono">
+              <IconPulse size={11} /> Lihat grafik
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {/* 4. GRAFIK UTAMA */}
       <div className="ai-charts-grid">
-        {/* Chart 1: Total API Requests (Sukses vs 429) */}
         <div className="ai-chart-card">
           <div className="ai-chart-card-head">
             <div>
               <h3 className="ai-chart-title mono">VOLUME PERMINTAAN &amp; DETEKSI 429</h3>
-              <p className="ai-chart-subtitle">
-                Grafik garis area tren pemanggilan API sukses vs batas kuota per jam (ApexCharts Area Spline)
-              </p>
+              <p className="ai-chart-subtitle">Panggilan sukses vs kena batas kuota, seluruh penyedia</p>
             </div>
-            <div className="ai-chart-badge ok mono">Live Telemetry</div>
+            <div className="ai-chart-badge ok mono">{rangeLabel}</div>
           </div>
           <div className="ai-chart-card-body">
-            <ApexChartWrapper
-              options={requestsTimelineOptions}
-              series={requestsTimelineSeries}
-              type="area"
-              height={300}
-            />
+            <ApexChartWrapper options={requestsOptions} series={requestsSeries} type="area" height={300} />
           </div>
         </div>
 
-        {/* Chart 2: Input & Output Tokens per Model */}
         <div className="ai-chart-card">
           <div className="ai-chart-card-head">
             <div>
               <h3 className="ai-chart-title mono">KONSUMSI TOKEN (INPUT VS OUTPUT)</h3>
-              <p className="ai-chart-subtitle">
-                Volume token masuk (prompt pasar) dan token keluar (analisis komite) per segmen waktu
-              </p>
+              <p className="ai-chart-subtitle">Token prompt masuk dan token hasil generasi per segmen waktu</p>
             </div>
-            <div className="ai-chart-badge mono" style={{ color: '#8b5cf6', borderColor: 'rgba(139, 92, 246, 0.3)' }}>
-              Token Analysis
-            </div>
+            <div className="ai-chart-badge mono">{compact(overview.totalTokens)} token</div>
           </div>
           <div className="ai-chart-card-body">
-            <ApexChartWrapper
-              options={tokensTimelineOptions}
-              series={tokensTimelineSeries}
-              type="bar"
-              height={300}
-            />
+            <ApexChartWrapper options={tokensOptions} series={tokensSeries} type="bar" height={300} />
           </div>
         </div>
 
-        {/* Chart 3: Proporsi Penggunaan per Model (Donut) */}
         <div className="ai-chart-card">
           <div className="ai-chart-card-head">
             <div>
               <h3 className="ai-chart-title mono">DISTRIBUSI MODEL AI</h3>
-              <p className="ai-chart-subtitle">
-                Porsi pembagian beban antara Gemini 2.5 Flash, Llama 3.3, DeepSeek, dan OpenRouter
-              </p>
+              <p className="ai-chart-subtitle">Porsi permintaan per model dan penyedia</p>
             </div>
-            <div className="ai-chart-badge mono">Model Share</div>
+            <div className="ai-chart-badge mono">{donutModels.length} model aktif</div>
           </div>
           <div className="ai-chart-card-body">
             <ApexChartWrapper
               options={modelsDonutOptions}
-              series={modelsDonutSeries}
+              series={donutModels.map((m) => m.totals.requests)}
               type="donut"
               height={300}
             />
           </div>
         </div>
 
-        {/* Chart 4: Latensi Respon Model (ms) */}
         <div className="ai-chart-card">
           <div className="ai-chart-card-head">
             <div>
-              <h3 className="ai-chart-title mono">LATENSI RESUMEN &amp; INFERENSI</h3>
-              <p className="ai-chart-subtitle">
-                Kecepatan respons penyedia dalam milidetik (Groq ~300ms, Gemini ~600ms)
-              </p>
+              <h3 className="ai-chart-title mono">LATENSI RESPONS</h3>
+              <p className="ai-chart-subtitle">Rata-rata waktu respons panggilan sukses, dalam milidetik</p>
             </div>
-            <div className="ai-chart-badge mono" style={{ color: '#06b6d4', borderColor: 'rgba(6, 182, 212, 0.3)' }}>
-              {data.overview.avgLatencyMs}ms Avg
-            </div>
+            <div className="ai-chart-badge mono">{fmt(overview.avgLatencyMs, ' ms')} rata-rata</div>
           </div>
           <div className="ai-chart-card-body">
-            <ApexChartWrapper
-              options={latencyOptions}
-              series={latencySeries}
-              type="line"
-              height={300}
-            />
+            <ApexChartWrapper options={latencyOptions} series={latencySeries} type="line" height={300} />
           </div>
         </div>
       </div>
 
-      {/* 4. TABEL KOLAM KUNCI & POPUP CHART TRIGGER */}
+      {/* 5. TABEL KUNCI */}
       <div className="ai-keys-section">
         <div className="ai-keys-header">
           <div>
-            <h2 className="ai-keys-title mono">KOLAM KUNCI API TERPASANG ({filteredKeys.length} KUNCI)</h2>
+            <h2 className="ai-keys-title mono">KOLAM KUNCI API ({filteredKeys.length} KUNCI)</h2>
             <p className="ai-keys-subtitle">
-              Klik tombol <strong>"Lihat Grafik (Popup)"</strong> pada baris kunci mana pun untuk memunculkan modal analisis detail ApexCharts.
+              {hasActivity
+                ? 'Klik "Lihat grafik" pada kunci mana pun untuk membuka popup analisisnya.'
+                : `Belum ada panggilan tercatat dalam ${rangeLabel.toLowerCase()}.`}
             </p>
           </div>
 
-          {/* Filter Bar */}
           <div className="ai-keys-filters">
-            {/* Search Input */}
             <div className="ai-keys-search-wrap">
               <IconSearch size={14} />
               <input
                 type="text"
                 className="ai-keys-search-input mono"
-                placeholder="Cari kunci, fingerprint, provider..."
+                placeholder="Cari kunci, sidik, penyedia..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -572,14 +469,13 @@ export function AiTokensDashboardClient({ initialData }: AiTokensDashboardClient
               )}
             </div>
 
-            {/* Provider Filter Tabs */}
             <div className="ai-keys-provider-tabs mono">
               <button
                 type="button"
                 className={`prov-tab ${providerFilter === 'all' ? 'active' : ''}`}
                 onClick={() => setProviderFilter('all')}
               >
-                Semua ({data.overview.totalKeysCount})
+                Semua ({data.keys.length})
               </button>
               {data.providers.map((p) => (
                 <button
@@ -588,25 +484,24 @@ export function AiTokensDashboardClient({ initialData }: AiTokensDashboardClient
                   className={`prov-tab ${providerFilter === p.id ? 'active' : ''}`}
                   onClick={() => setProviderFilter(p.id)}
                 >
-                  {p.name} ({p.totalKeys})
+                  {p.name} ({data.keys.filter((k) => k.providerId === p.id).length})
                 </button>
               ))}
             </div>
           </div>
         </div>
 
-        {/* Tabel Kunci */}
         <div className="ai-keys-table-wrap">
           <table className="ai-keys-table">
             <thead>
               <tr className="mono">
                 <th>KUNCI / ENV</th>
-                <th>PROVIDER</th>
+                <th>PENYEDIA</th>
                 <th>MODEL</th>
                 <th>STATUS</th>
                 <th>REQUESTS</th>
                 <th>SUCCESS %</th>
-                <th>429 TOO MANY</th>
+                <th>429</th>
                 <th>TOTAL TOKENS</th>
                 <th style={{ textAlign: 'right' }}>AKSI</th>
               </tr>
@@ -621,25 +516,18 @@ export function AiTokensDashboardClient({ initialData }: AiTokensDashboardClient
               ) : (
                 filteredKeys.map((k) => (
                   <tr key={k.id} className={k.status === 'cooldown' ? 'row-cooldown' : ''}>
-                    {/* Nama Kunci & Fingerprint */}
                     <td>
                       <div className="key-name-cell mono">
                         <span className="key-env">{k.envName}</span>
                         <span className="key-fp">[{k.fingerprint}]</span>
                       </div>
                     </td>
-
-                    {/* Provider */}
                     <td>
                       <span className="key-prov-badge mono">{k.providerName}</span>
                     </td>
-
-                    {/* Model */}
                     <td>
                       <span className="key-model-badge mono">{k.model}</span>
                     </td>
-
-                    {/* Status */}
                     <td>
                       {k.status === 'ready' ? (
                         <span className="key-status-pill ok mono">
@@ -647,55 +535,39 @@ export function AiTokensDashboardClient({ initialData }: AiTokensDashboardClient
                         </span>
                       ) : (
                         <span className="key-status-pill warn mono">
-                          <span className="dot" /> Cooldown ({k.cooldownRemainingSec ?? 60}s)
+                          <span className="dot" /> {k.status === 'cooldown' ? 'Cooldown' : 'Dicabut'}
                         </span>
                       )}
                     </td>
-
-                    {/* Requests */}
-                    <td className="mono">{k.totalRequests.toLocaleString()}</td>
-
-                    {/* Success Rate */}
+                    <td className="mono">{fmt(k.totals.requests)}</td>
+                    <td>
+                      <span className="mono" style={{ color: rateColor(k.totals.successRate), fontWeight: 600 }}>
+                        {fmt(k.totals.successRate, '%')}
+                      </span>
+                    </td>
                     <td>
                       <span
                         className="mono"
                         style={{
-                          color: k.successRate >= 95 ? '#10b981' : k.successRate >= 80 ? '#f59e0b' : '#ef4444',
-                          fontWeight: 600,
+                          color: k.totals.rateLimited > 0 ? COLOR_429 : 'var(--ink-faint)',
+                          fontWeight: k.totals.rateLimited > 0 ? 700 : 400,
                         }}
                       >
-                        {k.successRate}%
+                        {fmt(k.totals.rateLimited)}
                       </span>
                     </td>
-
-                    {/* 429 Errors */}
-                    <td>
-                      <span
-                        className="mono"
-                        style={{
-                          color: k.error429Count > 0 ? '#ef4444' : 'var(--ink-faint)',
-                          fontWeight: k.error429Count > 0 ? 700 : 400,
-                        }}
-                      >
-                        {k.error429Count > 0 ? `${k.error429Count}x` : '0'}
-                      </span>
+                    <td className="mono" style={{ color: COLOR_OUTPUT }}>
+                      {fmt(k.totals.inputTokens + k.totals.outputTokens)}
                     </td>
-
-                    {/* Total Tokens */}
-                    <td className="mono" style={{ color: '#f59e0b' }}>
-                      {(k.inputTokens + k.outputTokens).toLocaleString()}
-                    </td>
-
-                    {/* Action Button: Buka Popup Chart Apex */}
                     <td style={{ textAlign: 'right' }}>
                       <button
                         type="button"
                         className="btn-key-chart mono"
-                        onClick={() => setSelectedKeyForModal(k)}
-                        title={`Buka grafik analisis ApexCharts untuk ${k.envName}`}
+                        onClick={() => setModal({ providerId: k.providerId, keyId: k.id })}
+                        title={`Buka grafik analisis untuk ${k.envName}`}
                       >
                         <IconPulse size={12} />
-                        <span>Lihat Grafik (Popup)</span>
+                        <span>Lihat grafik</span>
                       </button>
                     </td>
                   </tr>
@@ -706,11 +578,14 @@ export function AiTokensDashboardClient({ initialData }: AiTokensDashboardClient
         </div>
       </div>
 
-      {/* 5. POPUP MODAL APEXCHARTS */}
-      {selectedKeyForModal && (
-        <KeyDetailModal
-          keyItem={selectedKeyForModal}
-          onClose={() => setSelectedKeyForModal(null)}
+      {modal && (
+        <UsageDetailModal
+          key={`${modal.providerId}-${modal.keyId ?? 'all'}`}
+          data={data}
+          providerId={modal.providerId}
+          initialKeyId={modal.keyId}
+          rangeLabel={rangeLabel}
+          onClose={() => setModal(null)}
         />
       )}
     </div>

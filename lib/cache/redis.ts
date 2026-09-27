@@ -73,6 +73,22 @@ export const cache = {
     return value;
   },
 
+  /**
+   * Run several commands in one round trip. Returns null when Redis is not
+   * configured or the call fails, so callers can fall back instead of throwing.
+   */
+  async pipeline(build: (p: ReturnType<Redis['pipeline']>) => void): Promise<unknown[] | null> {
+    if (!redis) return null;
+    try {
+      const p = redis.pipeline();
+      build(p);
+      return await p.exec();
+    } catch (err) {
+      console.error('[Redis] PIPELINE error:', err);
+      return null;
+    }
+  },
+
   /** Check if Redis is available */
   isAvailable(): boolean {
     return redis !== null;

@@ -12,6 +12,7 @@ import {
   IconEye,
   IconEyeOff,
 } from '@/components/icons'
+import { GoogleSignInButton } from '@/components/google-sign-in-button'
 
 /**
  * useSearchParams() memaksa halaman ini keluar dari prarender statis, dan Next
@@ -127,6 +128,17 @@ function UserLoginForm() {
             <p className="auth-lead">
               Grafik harga langsung, putusan 4 agen AI, dan katalog 400+ instrumen analisis kuantitatif.
             </p>
+          </div>
+
+          {/* Masuk Cepat dengan Google */}
+          <GoogleSignInButton
+            label="Masuk dengan Akun Google"
+            nextPath={nextPath}
+            onError={(msg) => setError(msg)}
+          />
+
+          <div className="auth-divider">
+            <span>atau dengan surel</span>
           </div>
 
           <div className="auth-field">

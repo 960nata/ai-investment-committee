@@ -2,12 +2,22 @@
  * Telemetri & Analisis AI Token / Kunci API
  *
  * Mencatat setiap panggilan ke kolam kunci LLM (Gemini, Groq, OpenRouter, dll):
- * jumlah permintaan, token input, token output, latensi, dan status galat (khususnya 429 TooManyRequests).
- * Data diagregasikan untuk visualisasi grafik ApexCharts interaktif.
+ * jumlah permintaan, token input, token output, latensi, dan status galat
+ * (khususnya 429 TooManyRequests), lalu menyajikannya per kunci, per penyedia,
+ * dan per model untuk dashboard admin.
+ *
+ * Penyimpanannya satu hash Redis per ember waktu (per jam dan per hari, zona
+ * WIB), dengan field `penyedia|sidik|model|metrik`. HINCRBY dipakai alih-alih
+ * baca-lalu-tulis: dua invocation serverless yang berjalan bersamaan akan saling
+ * menimpa hitungan kalau caranya get → set. Satu dashboard 24 jam cukup membaca
+ * 24 hash, berapa pun jumlah kuncinya.
+ *
+ * Tidak ada angka rekaan di sini. Kunci yang belum pernah dipakai tampil nol.
  */
 
 import { cache } from '@/lib/cache/redis'
-import { collectKeys, poolStatus, type PooledKey } from './keyring'
+import { LLM_ADAPTERS } from './adapters'
+import { collectKeys, poolStatus } from './keyring'
 
 export interface LlmCallEvent {
   providerId: string
@@ -23,55 +33,125 @@ export interface LlmCallEvent {
   timestamp?: number
 }
 
-// Buffer in-memory rolling untuk telemetri lokal/serverless
-const MEMORY_EVENTS_LIMIT = 500
-const memoryEvents: LlmCallEvent[] = []
+export type TimeRange = '24h' | '7d' | '30d'
+export const TIME_RANGES: readonly TimeRange[] = ['24h', '7d', '30d']
+
+type Granularity = 'hour' | 'day'
+type Metric = 'req' | 'ok' | 'r429' | 'err' | 'tin' | 'tout' | 'lat'
+
+const KEY_PREFIX = 'telemetry:ai:v2'
+const LAST_USED_KEY = `${KEY_PREFIX}:last`
+/** Ember jam cukup hidup sedikit di atas rentang terpanjang yang memakainya (24 jam). */
+const HOUR_TTL_SECONDS = 60 * 60 * 50
+const DAY_TTL_SECONDS = 60 * 60 * 24 * 32
+const WIB_OFFSET_MS = 7 * 60 * 60 * 1000
+const MONTHS_ID = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
 
 /**
- * Catat satu kejadian pemanggilan LLM.
+ * Cadangan saat Redis tidak dikonfigurasi. Memori proses tidak dibagi antar
+ * invocation serverless, jadi di produksi tanpa Redis angka dashboard hanya
+ * mencerminkan instance yang kebetulan melayani halaman ini.
+ */
+const MEMORY_EVENTS_LIMIT = 5000
+const memoryEvents: LlmCallEvent[] = []
+
+function isRateLimited(evt: LlmCallEvent): boolean {
+  return evt.status === 429 || evt.errorKind === 'rate_limited'
+}
+
+function eventMetrics(evt: LlmCallEvent): Partial<Record<Metric, number>> {
+  const m: Partial<Record<Metric, number>> = { req: 1 }
+  if (evt.success) {
+    m.ok = 1
+    m.lat = Math.max(0, Math.round(evt.latencyMs))
+  } else if (isRateLimited(evt)) {
+    m.r429 = 1
+  } else {
+    m.err = 1
+  }
+  if (evt.inputTokens > 0) m.tin = evt.inputTokens
+  if (evt.outputTokens > 0) m.tout = evt.outputTokens
+  return m
+}
+
+/** Pengenal ember dalam waktu WIB: `YYYYMMDDHH` untuk jam, `YYYYMMDD` untuk hari. */
+function bucketId(ts: number, granularity: Granularity): string {
+  const iso = new Date(ts + WIB_OFFSET_MS).toISOString()
+  return granularity === 'hour'
+    ? iso.slice(0, 13).replace(/[-T]/g, '')
+    : iso.slice(0, 10).replace(/-/g, '')
+}
+
+function bucketKey(granularity: Granularity, id: string): string {
+  return `${KEY_PREFIX}:${granularity === 'hour' ? 'h' : 'd'}:${id}`
+}
+
+function field(providerId: string, fp: string, model: string, metric: Metric): string {
+  return `${providerId}|${fp}|${model}|${metric}`
+}
+
+/**
+ * Catat satu kejadian pemanggilan LLM. Tidak pernah melempar: telemetri yang
+ * gagal tidak boleh menggagalkan jawaban model.
  */
 export async function recordLlmCall(event: LlmCallEvent): Promise<void> {
-  const evt: LlmCallEvent = {
-    ...event,
-    timestamp: event.timestamp || Date.now(),
+  const evt: LlmCallEvent = { ...event, timestamp: event.timestamp || Date.now() }
+  const ts = evt.timestamp!
+
+  if (!cache.isAvailable()) {
+    memoryEvents.push(evt)
+    if (memoryEvents.length > MEMORY_EVENTS_LIMIT) memoryEvents.shift()
+    return
   }
 
-  // Simpan di rolling memory buffer
-  memoryEvents.unshift(evt)
-  if (memoryEvents.length > MEMORY_EVENTS_LIMIT) {
-    memoryEvents.pop()
-  }
-
-  // Jika Redis tersedia, simpan juga counter harian
-  if (cache.isAvailable()) {
-    try {
-      const today = new Date().toISOString().slice(0, 10)
-      const providerKey = `telemetry:ai:${today}:${evt.providerId}`
-      const curReq = ((await cache.get<number>(`${providerKey}:req_total`)) || 0) + 1
-      await cache.set(`${providerKey}:req_total`, curReq, 60 * 60 * 48)
-
-      if (evt.success) {
-        const curSucc = ((await cache.get<number>(`${providerKey}:req_success`)) || 0) + 1
-        await cache.set(`${providerKey}:req_success`, curSucc, 60 * 60 * 48)
-      } else if (evt.status === 429 || evt.errorKind === 'rate_limited') {
-        const cur429 = ((await cache.get<number>(`${providerKey}:err_429`)) || 0) + 1
-        await cache.set(`${providerKey}:err_429`, cur429, 60 * 60 * 48)
-      } else {
-        const curOther = ((await cache.get<number>(`${providerKey}:err_other`)) || 0) + 1
-        await cache.set(`${providerKey}:err_other`, curOther, 60 * 60 * 48)
+  const metrics = Object.entries(eventMetrics(evt)) as [Metric, number][]
+  await cache.pipeline((p) => {
+    for (const [granularity, ttl] of [
+      ['hour', HOUR_TTL_SECONDS],
+      ['day', DAY_TTL_SECONDS],
+    ] as const) {
+      const key = bucketKey(granularity, bucketId(ts, granularity))
+      for (const [metric, n] of metrics) {
+        p.hincrby(key, field(evt.providerId, evt.keyFingerprint, evt.model, metric), n)
       }
-      if (evt.inputTokens > 0) {
-        const curIn = ((await cache.get<number>(`${providerKey}:tokens_in`)) || 0) + evt.inputTokens
-        await cache.set(`${providerKey}:tokens_in`, curIn, 60 * 60 * 48)
-      }
-      if (evt.outputTokens > 0) {
-        const curOut = ((await cache.get<number>(`${providerKey}:tokens_out`)) || 0) + evt.outputTokens
-        await cache.set(`${providerKey}:tokens_out`, curOut, 60 * 60 * 48)
-      }
-    } catch {
-      // Abaikan kegagalan cache statistik agar tidak menghambat alur kerja model
+      p.expire(key, ttl)
     }
-  }
+    p.hset(LAST_USED_KEY, { [`${evt.providerId}|${evt.keyFingerprint}`]: ts })
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Agregasi untuk dashboard
+// ---------------------------------------------------------------------------
+
+export interface UsageSeries {
+  requests: number[]
+  success: number[]
+  rateLimited: number[]
+  otherErrors: number[]
+  inputTokens: number[]
+  outputTokens: number[]
+  /** Rata-rata latensi panggilan sukses per ember; null saat tidak ada yang sukses. */
+  latencyMs: (number | null)[]
+  /** Persen sukses per ember; null saat tidak ada permintaan. */
+  successRate: (number | null)[]
+}
+
+export interface UsageTotals {
+  requests: number
+  success: number
+  rateLimited: number
+  otherErrors: number
+  inputTokens: number
+  outputTokens: number
+  avgLatencyMs: number | null
+  successRate: number | null
+}
+
+export interface ModelUsage {
+  model: string
+  totals: UsageTotals
+  series: UsageSeries
 }
 
 export interface KeyAnalyticsItem {
@@ -79,360 +159,365 @@ export interface KeyAnalyticsItem {
   envName: string
   providerId: string
   providerName: string
+  /** Model yang saat ini dipasang di adaptor. Riwayat per model ada di `byModel`. */
   model: string
   index: number
   fingerprint: string
-  status: 'ready' | 'cooldown'
-  cooldownRemainingSec?: number
-  totalRequests: number
-  successfulRequests: number
-  error429Count: number
-  otherErrorsCount: number
-  successRate: number
-  inputTokens: number
-  outputTokens: number
-  avgLatencyMs: number
+  /** `retired`: kunci pernah tercatat tapi sudah tidak ada di env. */
+  status: 'ready' | 'cooldown' | 'retired'
   lastUsedAt?: string
-  hourlyTrend: { time: string; success: number; errors: number; tokens: number }[]
+  totals: UsageTotals
+  series: UsageSeries
+  byModel: ModelUsage[]
 }
 
-export interface ModelAnalyticsItem {
+export interface ModelAnalyticsItem extends ModelUsage {
+  id: string
+  providerId: string
+  providerName: string
+}
+
+export interface ProviderAnalyticsItem {
   id: string
   name: string
-  providerId: string
-  requests: number
-  inputTokens: number
-  outputTokens: number
-  errorCount: number
-  error429Count: number
-  successRate: number
-  avgLatencyMs: number
+  model: string
+  envPrefix: string
+  totalKeys: number
+  availableKeys: number
+  coolingKeys: number
+  totals: UsageTotals
+  series: UsageSeries
 }
 
 export interface AiTokensDashboardData {
-  overview: {
-    totalRequests: number
-    totalSuccess: number
-    totalErrors: number
-    total429Errors: number
-    successRate: number
-    totalInputTokens: number
-    totalOutputTokens: number
+  range: TimeRange
+  granularity: Granularity
+  /** `memory` berarti Redis belum dikonfigurasi dan angkanya hanya milik instance ini. */
+  storage: 'redis' | 'memory'
+  generatedAt: string
+  categories: string[]
+  timestamps: string[]
+  overview: UsageTotals & {
     totalTokens: number
-    avgLatencyMs: number
     totalKeysCount: number
     readyKeysCount: number
     coolingKeysCount: number
   }
+  series: UsageSeries
+  providers: ProviderAnalyticsItem[]
   models: ModelAnalyticsItem[]
-  providers: {
-    id: string
-    name: string
-    model: string
-    envPrefix: string
-    totalKeys: number
-    availableKeys: number
-    coolingKeys: string[]
-    requests: number
-    errors: number
-  }[]
   keys: KeyAnalyticsItem[]
-  timeSeries: {
-    timestamps: string[]
-    categories: string[]
-    requestsSuccess: number[]
-    requests429: number[]
-    requestsOtherErrors: number[]
-    inputTokens: number[]
-    outputTokens: number[]
-    latency: number[]
-    perModelRequests: Record<string, number[]>
-    perModelTokens: Record<string, number[]>
+}
+
+/** Deret mentah: latensi disimpan sebagai jumlah, baru dirata-rata di akhir. */
+interface RawSeries {
+  req: number[]
+  ok: number[]
+  r429: number[]
+  err: number[]
+  tin: number[]
+  tout: number[]
+  lat: number[]
+}
+
+function emptyRaw(n: number): RawSeries {
+  const z = () => new Array<number>(n).fill(0)
+  return { req: z(), ok: z(), r429: z(), err: z(), tin: z(), tout: z(), lat: z() }
+}
+
+function addRaw(target: RawSeries, source: RawSeries): void {
+  for (const m of Object.keys(target) as Metric[]) {
+    for (let i = 0; i < target[m].length; i++) target[m][i] += source[m][i]
   }
 }
 
-const KNOWN_PROVIDERS = [
-  { id: 'gemini', name: 'Google Gemini', model: 'gemini-2.5-flash', envPrefix: 'GEMINI_API_KEY' },
-  { id: 'groq', name: 'Groq Cloud', model: 'llama-3.3-70b-versatile', envPrefix: 'GROQ_API_KEY' },
-  { id: 'openrouter', name: 'OpenRouter', model: 'deepseek/deepseek-chat', envPrefix: 'OPENROUTER_API_KEY' },
-  { id: 'deepseek', name: 'DeepSeek', model: 'deepseek-chat', envPrefix: 'DEEPSEEK_API_KEY' },
-  { id: 'mistral', name: 'Mistral AI', model: 'mistral-small-latest', envPrefix: 'MISTRAL_API_KEY' },
-  { id: 'nvidia', name: 'NVIDIA NIM', model: 'meta/llama-3.3-70b-instruct', envPrefix: 'NVIDIA_API_KEY' },
-]
+function sum(xs: number[]): number {
+  return xs.reduce((a, b) => a + b, 0)
+}
 
-/**
- * Generate simulasi agregat berbasis seed determistik untuk riwayat kunci yang aktif di env.
- * Data aktual dari memoryEvents dan Redis akan menimpa/menggabung seed ini.
- */
-function generateKeySeed(providerId: string, index: number, totalInPool: number) {
-  // Hash sederhana berbasis provider dan index
-  const factor = (providerId.length * 17 + index * 31) % 100
-  const isPrimary = index === 0 || index === 1
-  const baseReq = isPrimary ? 340 + factor * 4 : Math.max(12, Math.round(180 - (index / totalInPool) * 120 + factor))
-  const err429 = factor > 82 ? Math.round(baseReq * 0.04) : factor > 60 ? Math.round(baseReq * 0.015) : 0
-  const otherErr = factor % 13 === 0 ? 1 : 0
-  const success = Math.max(0, baseReq - err429 - otherErr)
-  const inTokens = Math.round(baseReq * (1200 + factor * 15))
-  const outTokens = Math.round(baseReq * (380 + factor * 8))
-  const latency = Math.round(350 + (factor % 25) * 20)
+function rate(part: number, whole: number): number | null {
+  return whole > 0 ? Math.round((part / whole) * 1000) / 10 : null
+}
 
+function finalise(raw: RawSeries): { totals: UsageTotals; series: UsageSeries } {
+  const ok = sum(raw.ok)
+  const req = sum(raw.req)
   return {
-    baseReq,
-    success,
-    err429,
-    otherErr,
-    inTokens,
-    outTokens,
-    latency,
+    totals: {
+      requests: req,
+      success: ok,
+      rateLimited: sum(raw.r429),
+      otherErrors: sum(raw.err),
+      inputTokens: sum(raw.tin),
+      outputTokens: sum(raw.tout),
+      avgLatencyMs: ok > 0 ? Math.round(sum(raw.lat) / ok) : null,
+      successRate: rate(ok, req),
+    },
+    series: {
+      requests: raw.req,
+      success: raw.ok,
+      rateLimited: raw.r429,
+      otherErrors: raw.err,
+      inputTokens: raw.tin,
+      outputTokens: raw.tout,
+      latencyMs: raw.lat.map((l, i) => (raw.ok[i] > 0 ? Math.round(l / raw.ok[i]) : null)),
+      successRate: raw.req.map((r, i) => rate(raw.ok[i], r)),
+    },
   }
+}
+
+interface Bucket {
+  id: string
+  label: string
+  timestamp: string
+}
+
+function rangeBuckets(range: TimeRange, now: number): { granularity: Granularity; buckets: Bucket[] } {
+  const granularity: Granularity = range === '24h' ? 'hour' : 'day'
+  const count = range === '24h' ? 24 : range === '7d' ? 7 : 30
+  const step = granularity === 'hour' ? 60 * 60 * 1000 : 24 * 60 * 60 * 1000
+  const buckets: Bucket[] = []
+
+  for (let i = count - 1; i >= 0; i--) {
+    const id = bucketId(now - i * step, granularity)
+    const y = Number(id.slice(0, 4))
+    const mo = Number(id.slice(4, 6))
+    const d = Number(id.slice(6, 8))
+    const h = granularity === 'hour' ? Number(id.slice(8, 10)) : 0
+    buckets.push({
+      id,
+      label: granularity === 'hour' ? `${id.slice(8, 10)}:00` : `${d} ${MONTHS_ID[mo - 1]}`,
+      timestamp: new Date(Date.UTC(y, mo - 1, d, h) - WIB_OFFSET_MS).toISOString(),
+    })
+  }
+
+  return { granularity, buckets }
+}
+
+/** Isi tiap ember sebagai peta field → angka, dari Redis atau dari memori. */
+async function loadBuckets(
+  granularity: Granularity,
+  buckets: Bucket[],
+): Promise<{ cells: Record<string, number>[]; lastUsed: Record<string, number> }> {
+  if (cache.isAvailable()) {
+    const results = await cache.pipeline((p) => {
+      for (const b of buckets) p.hgetall(bucketKey(granularity, b.id))
+      p.hgetall(LAST_USED_KEY)
+    })
+    const toNumbers = (raw: unknown): Record<string, number> => {
+      const out: Record<string, number> = {}
+      if (raw && typeof raw === 'object') {
+        for (const [k, v] of Object.entries(raw)) {
+          const n = Number(v)
+          if (Number.isFinite(n)) out[k] = n
+        }
+      }
+      return out
+    }
+    const rows = results ?? []
+    return {
+      cells: buckets.map((_, i) => toNumbers(rows[i])),
+      lastUsed: toNumbers(rows[buckets.length]),
+    }
+  }
+
+  const index = new Map(buckets.map((b, i) => [b.id, i]))
+  const cells = buckets.map(() => ({}) as Record<string, number>)
+  const lastUsed: Record<string, number> = {}
+
+  for (const evt of memoryEvents) {
+    const ts = evt.timestamp ?? 0
+    const keyId = `${evt.providerId}|${evt.keyFingerprint}`
+    lastUsed[keyId] = Math.max(lastUsed[keyId] ?? 0, ts)
+
+    const i = index.get(bucketId(ts, granularity))
+    if (i === undefined) continue
+    for (const [metric, n] of Object.entries(eventMetrics(evt)) as [Metric, number][]) {
+      const f = field(evt.providerId, evt.keyFingerprint, evt.model, metric)
+      cells[i][f] = (cells[i][f] ?? 0) + n
+    }
+  }
+
+  return { cells, lastUsed }
 }
 
 /**
  * Ambil seluruh data analitik AI Token & API Keys untuk dashboard dan popup chart.
  */
-export async function getAiTokensDashboardData(
-  timeRange: '24h' | '7d' | '30d' = '24h',
-  filterProvider?: string,
-  filterModel?: string,
-): Promise<AiTokensDashboardData> {
-  const providerStatsList: AiTokensDashboardData['providers'] = []
-  const allKeysList: KeyAnalyticsItem[] = []
-  const modelStatsMap: Record<string, ModelAnalyticsItem> = {}
+export async function getAiTokensDashboardData(range: TimeRange = '24h'): Promise<AiTokensDashboardData> {
+  const { granularity, buckets } = rangeBuckets(range, Date.now())
+  const n = buckets.length
+  const { cells, lastUsed } = await loadBuckets(granularity, buckets)
 
+  // 1. Pecah field menjadi deret per kunci×model.
+  //    keyModels: "penyedia|sidik" → model → deret
+  const keyModels = new Map<string, Map<string, RawSeries>>()
+
+  cells.forEach((cell, i) => {
+    for (const [f, value] of Object.entries(cell)) {
+      const parts = f.split('|')
+      if (parts.length < 4) continue
+      const metric = parts[parts.length - 1] as Metric
+      const providerId = parts[0]
+      const fp = parts[1]
+      const model = parts.slice(2, -1).join('|')
+
+      const keyId = `${providerId}|${fp}`
+      let models = keyModels.get(keyId)
+      if (!models) keyModels.set(keyId, (models = new Map()))
+      let raw = models.get(model)
+      if (!raw) models.set(model, (raw = emptyRaw(n)))
+      if (metric in raw) raw[metric][i] += value
+    }
+  })
+
+  const adapterById = new Map(LLM_ADAPTERS.map((a) => [a.id, a]))
+  const providerName = (id: string) => adapterById.get(id)?.name ?? id
+
+  const keys: KeyAnalyticsItem[] = []
+  const providers: ProviderAnalyticsItem[] = []
+  const providerRaw = new Map<string, RawSeries>()
+  const modelRaw = new Map<string, { providerId: string; model: string; raw: RawSeries }>()
+
+  const buildKey = (
+    providerId: string,
+    fp: string,
+    base: Pick<KeyAnalyticsItem, 'envName' | 'index' | 'model' | 'status'>,
+  ): KeyAnalyticsItem => {
+    const models = keyModels.get(`${providerId}|${fp}`) ?? new Map<string, RawSeries>()
+    const total = emptyRaw(n)
+    const byModel: ModelUsage[] = []
+
+    for (const [model, raw] of models) {
+      addRaw(total, raw)
+      byModel.push({ model, ...finalise(raw) })
+
+      const mKey = `${providerId}|${model}`
+      let agg = modelRaw.get(mKey)
+      if (!agg) modelRaw.set(mKey, (agg = { providerId, model, raw: emptyRaw(n) }))
+      addRaw(agg.raw, raw)
+    }
+
+    let pRaw = providerRaw.get(providerId)
+    if (!pRaw) providerRaw.set(providerId, (pRaw = emptyRaw(n)))
+    addRaw(pRaw, total)
+
+    const last = lastUsed[`${providerId}|${fp}`]
+    return {
+      id: `${providerId}-${fp}`,
+      providerId,
+      providerName: providerName(providerId),
+      fingerprint: fp,
+      ...base,
+      lastUsedAt: last ? new Date(last).toISOString() : undefined,
+      ...finalise(total),
+      byModel: byModel.sort((a, b) => b.totals.requests - a.totals.requests),
+    }
+  }
+
+  // 2. Kunci yang terpasang di env, per penyedia.
   let totalKeysCount = 0
   let readyKeysCount = 0
   let coolingKeysCount = 0
+  const seenKeys = new Set<string>()
 
-  // 1. Kumpulkan kunci dari seluruh provider
-  for (const prov of KNOWN_PROVIDERS) {
-    const pool = collectKeys(prov.envPrefix)
+  for (const adapter of LLM_ADAPTERS) {
+    const pool = collectKeys(adapter.envPrefix)
     if (pool.length === 0) continue
 
-    const status = await poolStatus(prov.id, pool)
+    const status = await poolStatus(adapter.id, pool)
     totalKeysCount += pool.length
     readyKeysCount += status.available
     coolingKeysCount += status.cooling.length
 
-    let provReqs = 0
-    let provErrors = 0
-
-    // Siapkan data per kunci
     for (const k of pool) {
-      const isCooling = status.cooling.some((c) => c.includes(k.fingerprint))
-      const seed = generateKeySeed(prov.id, k.index, pool.length)
-
-      // Cek apakah ada record aktual di memoryEvents
-      const realEvents = memoryEvents.filter(
-        (e) => e.providerId === prov.id && e.keyFingerprint === k.fingerprint,
+      seenKeys.add(`${adapter.id}|${k.fingerprint}`)
+      const cooling = status.cooling.some((c) => c.endsWith(` ${k.fingerprint}`))
+      keys.push(
+        buildKey(adapter.id, k.fingerprint, {
+          envName: k.envName,
+          index: k.index,
+          model: adapter.model,
+          status: cooling ? 'cooldown' : 'ready',
+        }),
       )
-      const realReqs = realEvents.length
-      const realSuccess = realEvents.filter((e) => e.success).length
-      const real429 = realEvents.filter((e) => !e.success && (e.status === 429 || e.errorKind === 'rate_limited')).length
-      const realOtherErr = realEvents.filter((e) => !e.success && e.status !== 429 && e.errorKind !== 'rate_limited').length
-      const realInTokens = realEvents.reduce((acc, e) => acc + (e.inputTokens || 0), 0)
-      const realOutTokens = realEvents.reduce((acc, e) => acc + (e.outputTokens || 0), 0)
-
-      const totalReq = seed.baseReq + realReqs
-      const totalSucc = seed.success + realSuccess
-      const total429 = seed.err429 + real429
-      const totalOther = seed.otherErr + realOtherErr
-      const totalIn = seed.inTokens + realInTokens
-      const totalOut = seed.outTokens + realOutTokens
-      const succRate = totalReq > 0 ? Math.round((totalSucc / totalReq) * 1000) / 10 : 100
-
-      provReqs += totalReq
-      provErrors += total429 + totalOther
-
-      // Bangun riwayat tren per jam untuk popup modal chart
-      const hourlyTrend: KeyAnalyticsItem['hourlyTrend'] = []
-      const hoursCount = timeRange === '24h' ? 12 : timeRange === '7d' ? 7 : 14
-      for (let h = hoursCount - 1; h >= 0; h--) {
-        const timeLabel = timeRange === '24h' ? `${(24 - h * 2) % 24}:00` : `H-${h}`
-        const hFactor = ((k.index + h * 7) % 19) / 19
-        const hReq = Math.max(1, Math.round((totalReq / hoursCount) * (0.6 + hFactor * 0.8)))
-        const hErr = h === 2 && isCooling ? Math.round(hReq * 0.25) : 0
-        const hSucc = Math.max(0, hReq - hErr)
-        const hTokens = Math.round(hReq * 1450)
-        hourlyTrend.push({
-          time: timeLabel,
-          success: hSucc,
-          errors: hErr,
-          tokens: hTokens,
-        })
-      }
-
-      allKeysList.push({
-        id: `${prov.id}-${k.index}`,
-        envName: k.envName,
-        providerId: prov.id,
-        providerName: prov.name,
-        model: prov.model,
-        index: k.index,
-        fingerprint: k.fingerprint,
-        status: isCooling ? 'cooldown' : 'ready',
-        cooldownRemainingSec: isCooling ? 45 : undefined,
-        totalRequests: totalReq,
-        successfulRequests: totalSucc,
-        error429Count: total429,
-        otherErrorsCount: totalOther,
-        successRate: succRate,
-        inputTokens: totalIn,
-        outputTokens: totalOut,
-        avgLatencyMs: seed.latency,
-        lastUsedAt: new Date(Date.now() - (k.index * 140000 + 45000)).toISOString(),
-        hourlyTrend,
-      })
     }
 
-    providerStatsList.push({
-      id: prov.id,
-      name: prov.name,
-      model: prov.model,
-      envPrefix: prov.envPrefix,
+    providers.push({
+      id: adapter.id,
+      name: adapter.name,
+      model: adapter.model,
+      envPrefix: adapter.envPrefix,
       totalKeys: pool.length,
       availableKeys: status.available,
-      coolingKeys: status.cooling,
-      requests: provReqs,
-      errors: provErrors,
+      coolingKeys: status.cooling.length,
+      ...finalise(emptyRaw(n)), // diisi ulang setelah kunci pensiunan ikut dihitung
     })
-
-    // Model aggregations
-    if (!modelStatsMap[prov.model]) {
-      modelStatsMap[prov.model] = {
-        id: prov.model,
-        name: prov.model,
-        providerId: prov.id,
-        requests: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        errorCount: 0,
-        error429Count: 0,
-        successRate: 100,
-        avgLatencyMs: 0,
-      }
-    }
-
-    const mod = modelStatsMap[prov.model]
-    const pKeys = allKeysList.filter((k) => k.providerId === prov.id)
-    mod.requests += pKeys.reduce((a, b) => a + b.totalRequests, 0)
-    mod.inputTokens += pKeys.reduce((a, b) => a + b.inputTokens, 0)
-    mod.outputTokens += pKeys.reduce((a, b) => a + b.outputTokens, 0)
-    mod.error429Count += pKeys.reduce((a, b) => a + b.error429Count, 0)
-    mod.errorCount += pKeys.reduce((a, b) => a + b.error429Count + b.otherErrorsCount, 0)
-    const modSucc = pKeys.reduce((a, b) => a + b.successfulRequests, 0)
-    mod.successRate = mod.requests > 0 ? Math.round((modSucc / mod.requests) * 1000) / 10 : 100
-    mod.avgLatencyMs = Math.round(pKeys.reduce((a, b) => a + b.avgLatencyMs, 0) / Math.max(1, pKeys.length))
   }
 
-  // 2. Overview total agregat
-  const grandTotalReq = allKeysList.reduce((a, b) => a + b.totalRequests, 0)
-  const grandTotalSucc = allKeysList.reduce((a, b) => a + b.successfulRequests, 0)
-  const grandTotal429 = allKeysList.reduce((a, b) => a + b.error429Count, 0)
-  const grandTotalOther = allKeysList.reduce((a, b) => a + b.otherErrorsCount, 0)
-  const grandTotalIn = allKeysList.reduce((a, b) => a + b.inputTokens, 0)
-  const grandTotalOut = allKeysList.reduce((a, b) => a + b.outputTokens, 0)
-  const overallSuccessRate = grandTotalReq > 0 ? Math.round((grandTotalSucc / grandTotalReq) * 1000) / 10 : 100
-  const overallAvgLatency = Math.round(
-    allKeysList.reduce((a, b) => a + b.avgLatencyMs, 0) / Math.max(1, allKeysList.length),
-  )
-
-  // 3. Time Series Data untuk Chart Utama (24 jam / 7 hari / 30 hari)
-  const pointsCount = timeRange === '24h' ? 24 : timeRange === '7d' ? 14 : 30
-  const categories: string[] = []
-  const timestamps: string[] = []
-  const requestsSuccess: number[] = []
-  const requests429: number[] = []
-  const requestsOtherErrors: number[] = []
-  const inputTokens: number[] = []
-  const outputTokens: number[] = []
-  const latency: number[] = []
-
-  const perModelRequests: Record<string, number[]> = {}
-  const perModelTokens: Record<string, number[]> = {}
-
-  for (const mId of Object.keys(modelStatsMap)) {
-    perModelRequests[mId] = []
-    perModelTokens[mId] = []
-  }
-
-  const now = Date.now()
-  const intervalMs = timeRange === '24h' ? 60 * 60 * 1000 : 24 * 60 * 60 * 1000 / (pointsCount / 7)
-
-  for (let i = pointsCount - 1; i >= 0; i--) {
-    const ptDate = new Date(now - i * intervalMs)
-    const label =
-      timeRange === '24h'
-        ? ptDate.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
-        : ptDate.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })
-
-    categories.push(label)
-    timestamps.push(ptDate.toISOString())
-
-    // Simulasi kurva aktivitas natural harian
-    const hour = ptDate.getHours()
-    const activityFactor = 0.4 + 0.6 * Math.sin(((hour - 6) / 24) * Math.PI * 2) + Math.random() * 0.15
-    const ptReqBase = Math.round((grandTotalReq / pointsCount) * Math.max(0.2, activityFactor))
-    const pt429 = Math.random() < 0.3 ? Math.round(ptReqBase * (0.02 + Math.random() * 0.05)) : 0
-    const ptOther = Math.random() < 0.1 ? 1 : 0
-    const ptSucc = Math.max(0, ptReqBase - pt429 - ptOther)
-
-    const ptIn = Math.round(ptReqBase * 1420)
-    const ptOut = Math.round(ptReqBase * 410)
-    const ptLat = Math.round(380 + Math.random() * 120 + (pt429 > 0 ? 150 : 0))
-
-    requestsSuccess.push(ptSucc)
-    requests429.push(pt429)
-    requestsOtherErrors.push(ptOther)
-    inputTokens.push(ptIn)
-    outputTokens.push(ptOut)
-    latency.push(ptLat)
-
-    // Per model distribution
-    for (const [mId, mStat] of Object.entries(modelStatsMap)) {
-      const share = mStat.requests / Math.max(1, grandTotalReq)
-      perModelRequests[mId].push(Math.round(ptReqBase * share))
-      perModelTokens[mId].push(Math.round((ptIn + ptOut) * share))
+  // 3. Kunci yang tercatat tapi sudah dicabut dari env. Pemakaiannya nyata,
+  //    jadi tetap dihitung, hanya ditandai pensiun.
+  for (const keyId of keyModels.keys()) {
+    if (seenKeys.has(keyId)) continue
+    const [providerId, fp] = keyId.split('|')
+    const adapter = adapterById.get(providerId)
+    keys.push(
+      buildKey(providerId, fp, {
+        envName: adapter ? `${adapter.envPrefix} (dicabut)` : `${providerId} (dicabut)`,
+        index: -1,
+        model: adapter?.model ?? '—',
+        status: 'retired',
+      }),
+    )
+    if (!providers.some((p) => p.id === providerId)) {
+      providers.push({
+        id: providerId,
+        name: providerName(providerId),
+        model: adapter?.model ?? '—',
+        envPrefix: adapter?.envPrefix ?? '—',
+        totalKeys: 0,
+        availableKeys: 0,
+        coolingKeys: 0,
+        ...finalise(emptyRaw(n)),
+      })
     }
   }
 
-  // Filter keys jika ada filterProvider
-  let filteredKeys = allKeysList
-  if (filterProvider && filterProvider !== 'all') {
-    filteredKeys = filteredKeys.filter((k) => k.providerId === filterProvider)
+  for (const p of providers) {
+    Object.assign(p, finalise(providerRaw.get(p.id) ?? emptyRaw(n)))
   }
-  if (filterModel && filterModel !== 'all') {
-    filteredKeys = filteredKeys.filter((k) => k.model === filterModel)
-  }
+
+  const overallRaw = emptyRaw(n)
+  for (const raw of providerRaw.values()) addRaw(overallRaw, raw)
+  const overall = finalise(overallRaw)
+
+  const models: ModelAnalyticsItem[] = [...modelRaw.values()]
+    .map(({ providerId, model, raw }) => ({
+      id: `${providerId}|${model}`,
+      providerId,
+      providerName: providerName(providerId),
+      model,
+      ...finalise(raw),
+    }))
+    .sort((a, b) => b.totals.requests - a.totals.requests)
 
   return {
+    range,
+    granularity,
+    storage: cache.isAvailable() ? 'redis' : 'memory',
+    generatedAt: new Date().toISOString(),
+    categories: buckets.map((b) => b.label),
+    timestamps: buckets.map((b) => b.timestamp),
     overview: {
-      totalRequests: grandTotalReq,
-      totalSuccess: grandTotalSucc,
-      totalErrors: grandTotal429 + grandTotalOther,
-      total429Errors: grandTotal429,
-      successRate: overallSuccessRate,
-      totalInputTokens: grandTotalIn,
-      totalOutputTokens: grandTotalOut,
-      totalTokens: grandTotalIn + grandTotalOut,
-      avgLatencyMs: overallAvgLatency,
+      ...overall.totals,
+      totalTokens: overall.totals.inputTokens + overall.totals.outputTokens,
       totalKeysCount,
       readyKeysCount,
       coolingKeysCount,
     },
-    models: Object.values(modelStatsMap),
-    providers: providerStatsList,
-    keys: filteredKeys,
-    timeSeries: {
-      timestamps,
-      categories,
-      requestsSuccess,
-      requests429,
-      requestsOtherErrors,
-      inputTokens,
-      outputTokens,
-      latency,
-      perModelRequests,
-      perModelTokens,
-    },
+    series: overall.series,
+    providers,
+    models,
+    keys,
   }
 }
