@@ -53,6 +53,12 @@ async function binanceFetch(path: string): Promise<Response> {
         label: 'Binance Intraday',
         timeoutMs: 6_000,
       })
+      // 451/403 (blokir wilayah, mis. region AS di Vercel) harus pindah ke cermin,
+      // bukan dikembalikan sebagai jawaban kosong.
+      if (!res.ok) {
+        lastError = new Error(`${host} HTTP ${res.status}`)
+        continue
+      }
       activeBinanceHost = host
       return res
     } catch (err) {
@@ -152,7 +158,10 @@ export async function GET(request: Request) {
     ? await fetchBinanceIntraday(symbol)
     : await fetchYahooIntraday(symbol)
 
-  CACHE.set(symbol, { candles, expiresAt: now + CACHE_TTL_MS })
+  // Jangan cache hasil kosong — galat sesaat tak boleh mengunci grafik 30 detik
+  if (candles.length > 0) {
+    CACHE.set(symbol, { candles, expiresAt: now + CACHE_TTL_MS })
+  }
 
   return NextResponse.json({ candles })
 }

@@ -55,6 +55,7 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
   // lebih dulu, tetapi pemeriksaan di sini yang menjamin halaman ini tidak
   // pernah merender data untuk orang tanpa sesi.
   const session = await requireUser('/ringkasan')
+  const isAdmin = session.role === 'admin'
   // Tautan dari menu dan pita harga membawa aset atau kelas aset yang diminta.
   // Tanpa dibaca di sini, setiap tautan menu mendarat di halaman yang sama dan
   // menunya berhenti berarti apa-apa.
@@ -64,7 +65,7 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
   let error: string | null = null
 
   try {
-    data = await load({ symbol, tab })
+    data = await load({ symbol, tab, includeAnalytics: isAdmin })
   } catch (err) {
     error = err instanceof Error ? err.message : String(err)
   }
@@ -169,11 +170,13 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
 
       {error && <DatabaseNotice detail={error} />}
 
-      {/* Telemetri Google Analytics 4 & Peta Sebaran Lokasi Pengunjung (Leaflet) */}
-      <UserAnalyticsDashboard
-        measurementId={getMeasurementId()}
-        initialSummary={data?.visitSummary}
-      />
+      {/* Telemetri Google Analytics 4 & Peta Sebaran Lokasi Pengunjung (Leaflet) - Khusus Administrator */}
+      {isAdmin && (
+        <UserAnalyticsDashboard
+          measurementId={getMeasurementId()}
+          initialSummary={data?.visitSummary}
+        />
+      )}
 
       {data && (
         <InstrumentExplorer
@@ -234,13 +237,21 @@ function Readout({
   )
 }
 
-async function load({ symbol, tab }: { symbol?: string; tab?: string } = {}) {
+async function load({
+  symbol,
+  tab,
+  includeAnalytics = false,
+}: {
+  symbol?: string
+  tab?: string
+  includeAnalytics?: boolean
+} = {}) {
   const [stats, health, instruments, scores, visitSummary] = await Promise.all([
     getDashboardStats(),
     listAdapterHealth(),
     listInstrumentQuotes(),
     listLatestScores(MODEL_VERSION),
-    getVisitSummary('30d').catch(() => null),
+    includeAnalytics ? getVisitSummary('30d').catch(() => null) : Promise.resolve(null),
   ])
 
   // Skor dikelompokkan per instrumen dan diurutkan pendek, menengah, panjang —

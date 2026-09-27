@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import type { AgentVerdict, MarketCode } from '@/lib/db/schema'
-import { SkeletonBoardroom, Track, Tag, Lamp } from './ui'
+import { SkeletonBoardroom, Tag, Lamp } from './ui'
 import type { State } from './ui'
 import {
   IconAlert,
@@ -18,12 +18,10 @@ import {
   IconChat,
   IconTrendDown,
   IconTrendUp,
-  IconLayers,
-  IconBolt,
   IconPlay,
   IconRefresh,
 } from './icons'
-import { verdictLabel, verdictTone } from '@/lib/format/verdict'
+import { verdictLabel, verdictTone, VERDICT_MEANING, type VerdictValue } from '@/lib/format/verdict'
 
 interface Turn {
   agent: string
@@ -52,8 +50,6 @@ interface Props {
   currency?: string
   onClose?: () => void
 }
-
-type ViewMode = 'timeline' | 'arena' | 'summary'
 
 const ROLES_INFO: Record<
   string,
@@ -100,7 +96,6 @@ export function CommitteeBoardroom({ symbol, market, name, onClose }: Props) {
   const [stepIndex, setStepIndex] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
-  const [viewMode, setViewMode] = useState<ViewMode>('timeline')
   const [prevSymbol, setPrevSymbol] = useState(symbol)
 
   if (prevSymbol !== symbol) {
@@ -245,54 +240,27 @@ export function CommitteeBoardroom({ symbol, market, name, onClose }: Props) {
   const confidence = session?.confidence ?? 0
 
   const confidenceTier = useMemo(() => {
-    if (confidence >= 75) return 'Konfirmasi Multi-Metrik Kuat'
-    if (confidence >= 50) return 'Bukti Kuantitatif Cukup'
-    if (confidence >= 30) return 'Divergensi Sinyal / Sampel Sedang'
-    return 'Bukti Lemah · Kurang Sampel Kuantitatif'
+    if (confidence >= 75) return 'Bukti kuat'
+    if (confidence >= 50) return 'Bukti cukup'
+    if (confidence >= 30) return 'Sinyal bercampur'
+    return 'Bukti lemah'
   }, [confidence])
 
   const confidenceState: State =
     confidence >= 60 ? 'ok' : confidence >= 35 ? 'degraded' : 'halted'
-
-  const tensionInfo = useMemo(() => {
-    if (verdict === 'beli') {
-      return {
-        label: 'Bukti Positif',
-        status: 'Bukti Positif · Tesis Lolos Uji Risiko',
-        ratio: 0.8,
-        state: 'ok' as State,
-      }
-    }
-    if (verdict === 'jual') {
-      return {
-        label: 'Bukti Negatif',
-        status: 'Bukti Negatif · Kerapuhan Lebih Besar',
-        ratio: 0.2,
-        state: 'halted' as State,
-      }
-    }
-    if (verdict === 'abstain') {
-      return {
-        label: 'Tidak Dinilai',
-        status: 'Tidak Dinilai · Keberatan Risiko Tak Terjawab',
-        ratio: 0.35,
-        state: 'degraded' as State,
-      }
-    }
-    return {
-      label: 'Berimbang',
-      status: 'Bukti Berimbang · Menunggu Konfirmasi Volume',
-      ratio: 0.5,
-      state: 'unknown' as State,
-    }
-  }, [verdict])
 
   const verdictToneValue = verdictTone(verdict)
 
   const turnAnalis = turns.find((t) => t.agent === 'analis')
   const turnStrateg = turns.find((t) => t.agent === 'strateg')
   const turnRisiko = turns.find((t) => t.agent === 'risiko')
-  const turnKetua = turns.find((t) => t.agent === 'ketua')
+
+  const rationale = cleanRationale((parsedKetua?.rationale as string | undefined) ?? session?.rationale ?? null)
+  const invalidation = (parsedKetua?.invalidation as string | undefined) || undefined
+  const bullThesis = turnStrateg ? strategThesis(turnStrateg.content) : undefined
+  const bearRisk =
+    (parsedKetua?.key_risk as string | undefined) || (turnRisiko ? risikoWorstCase(turnRisiko.content) : undefined)
+  const keyFacts = useMemo(() => (turnAnalis ? analisFacts(turnAnalis.content).slice(0, 4) : []), [turnAnalis])
 
   return (
     <section className="boardroom-panel panel" style={{ marginTop: 'var(--space-4)' }}>
@@ -418,294 +386,196 @@ export function CommitteeBoardroom({ symbol, market, name, onClose }: Props) {
       {/* Putusan & Debat 4 Agen */}
       {!deliberating && session && (
         <div className="boardroom-body">
-          {/* 3 KARTU READOUT UTAMA (Format Resmi Dashboard) */}
-          <div className="readouts" style={{ marginTop: 0 }}>
-            {/* Kartu 1: Putusan Akhir */}
-            <div className="readout">
-              <div className="readout-head">
-                <IconScales size={14} />
-                <span className="readout-label">PUTUSAN RESMI KOMITE</span>
-              </div>
-              <div className="readout-value" style={{ marginTop: 'var(--space-2)' }}>
-                <Tag tone={verdictToneValue}>{verdictLabel(verdict).toUpperCase()}</Tag>
-              </div>
-              <p className="readout-note">Palu putusan resmi Ketua Komite (CIO)</p>
+          {/* 1. Putusan: satu kartu besar, satu jawaban */}
+          <div className={`verdict-hero tone-${verdictToneValue}`}>
+            <div className="verdict-hero-main">
+              <span className="verdict-hero-eyebrow">
+                <IconScales size={13} /> Putusan Komite
+              </span>
+              <div className="verdict-hero-label">{verdictLabel(verdict)}</div>
+              <p className="verdict-hero-meaning">{verdictMeaning(verdict)}</p>
             </div>
-
-            {/* Kartu 2: Keyakinan Bukti */}
-            <div className="readout">
-              <div className="readout-head">
-                <IconShield size={14} />
-                <span className="readout-label">KEYAKINAN BUKTI</span>
-              </div>
-              <div className="readout-value">{confidence}%</div>
-              <div style={{ marginTop: 'var(--space-3)' }}>
-                <Track
-                  value={confidence / 100}
-                  state={confidenceState}
-                  ticks={16}
-                  label="Keyakinan Bukti"
-                />
-              </div>
-              <p className="readout-note">{confidenceTier}</p>
-            </div>
-
-            {/* Kartu 3: Tensi Debat */}
-            <div className="readout">
-              <div className="readout-head">
-                <IconTarget size={14} />
-                <span className="readout-label">TENSI DEBAT (BULL VS BEAR)</span>
-              </div>
-              <div className="readout-value" style={{ fontSize: '18px' }}>
-                {tensionInfo.label}
-              </div>
-              <div style={{ marginTop: 'var(--space-3)' }}>
-                <Track
-                  value={tensionInfo.ratio}
-                  state={tensionInfo.state}
-                  ticks={16}
-                  label="Tensi Debat"
-                />
-              </div>
-              <p className="readout-note">{tensionInfo.status}</p>
-            </div>
+            <ConfidenceRing value={confidence} state={confidenceState} caption={confidenceTier} />
           </div>
 
-          {/* Dekrit Konsensus Alasan Putusan */}
-          <div className="boardroom-decree-panel">
-            <div className="decree-head">
-              <IconCourt size={14} />
-              <span>KONSENSUS &amp; ALASAN PUTUSAN KOMITE:</span>
-            </div>
-            <p className="decree-body">{session.rationale}</p>
-          </div>
+          {rationale && <p className="verdict-rationale">{rationale}</p>}
 
-          {/* Dua Pilar Safeguards: Risiko Kunci & Syarat Pembatalan (Teks & Judul Terpisah Jelas) */}
-          {(parsedKetua?.key_risk || parsedKetua?.invalidation) && (
-            <div className="boardroom-safeguards-row">
-              {parsedKetua?.key_risk && (
-                <div className="safeguard-box risk">
-                  <div className="safeguard-head">
-                    <IconAlert size={14} />
-                    <span>RISIKO UTAMA YANG TIDAK TERJAWAB</span>
-                  </div>
-                  <p className="safeguard-text">{parsedKetua.key_risk}</p>
-                </div>
-              )}
-              {parsedKetua?.invalidation && (
-                <div className="safeguard-box invalidation">
-                  <div className="safeguard-head">
-                    <IconShield size={14} />
-                    <span>SYARAT PEMBATALAN / CUT-LOSS</span>
-                  </div>
-                  <p className="safeguard-text">{parsedKetua.invalidation}</p>
-                </div>
-              )}
+          {/* 2. Bull vs Bear: inti masing-masing sisi */}
+          {(bullThesis || bearRisk) && (
+            <div className="verdict-sides">
+              <div className="verdict-side bull">
+                <span className="verdict-side-head">
+                  <IconTrendUp size={13} /> Peluang · Strateg
+                </span>
+                <p>{bullThesis ?? 'Strateg tidak mengajukan tesis.'}</p>
+              </div>
+              <div className="verdict-side bear">
+                <span className="verdict-side-head">
+                  <IconTrendDown size={13} /> Risiko · Pengawas Risiko
+                </span>
+                <p>{bearRisk ?? 'Pengawas risiko tidak mencatat keberatan.'}</p>
+              </div>
             </div>
           )}
 
-          {/* Tab Navigasi Standar (.tabs & .tab) */}
-          <div className="tabs" style={{ marginTop: 'var(--space-3)' }}>
-            <button
-              type="button"
-              className="tab"
-              aria-selected={viewMode === 'timeline'}
-              onClick={() => setViewMode('timeline')}
-            >
-              <IconRows size={13} /> Alur Sidang (4 Babak)
-            </button>
-            <button
-              type="button"
-              className="tab"
-              aria-selected={viewMode === 'arena'}
-              onClick={() => setViewMode('arena')}
-            >
-              <IconBolt size={13} /> Arena Debat: Bull vs Bear
-            </button>
-            <button
-              type="button"
-              className="tab"
-              aria-selected={viewMode === 'summary'}
-              onClick={() => setViewMode('summary')}
-            >
-              <IconLayers size={13} /> Ringkasan Eksekutif
-            </button>
-          </div>
+          {/* 3. Kapan putusan ini gugur */}
+          {invalidation && (
+            <div className="verdict-watch">
+              <IconClock size={13} />
+              <span>
+                <strong>Putusan ditinjau ulang bila:</strong> {invalidation}
+              </span>
+            </div>
+          )}
 
-          {/* --- TAMPILAN 1: Alur Sidang Kronologis (4 Babak) --- */}
-          {viewMode === 'timeline' && (
-            <div className="turns-list">
-              {turns.map((turn, idx) => {
-                const role = ROLES_INFO[turn.agent] ?? {
-                  title: turn.agent,
-                  badge: 'ANGGOTA',
-                  badgeTone: 'neutral' as const,
-                  icon: <IconChat size={16} />,
-                }
+          {/* 4. Angka pijakan dari analis */}
+          {keyFacts.length > 0 && (
+            <div className="verdict-facts">
+              {keyFacts.map((f) => (
+                <div key={f.label} className="verdict-fact">
+                  <span className="verdict-fact-label">{f.label}</span>
+                  <span className={`verdict-fact-val ${f.tone}`}>{f.value}</span>
+                </div>
+              ))}
+            </div>
+          )}
 
-                return (
-                  <div key={idx} className="agent-card">
-                    <div className="agent-card-head">
-                      <span className="agent-avatar">{role.icon}</span>
-                      <div className="agent-meta">
-                        <span className="agent-title">{role.title}</span>
-                        <Tag tone={role.badgeTone}>{role.badge}</Tag>
+          {/* 5. Transkrip lengkap, dilipat supaya tidak menenggelamkan putusan */}
+          {turns.length > 0 && (
+            <details className="verdict-transcript">
+              <summary>
+                <IconRows size={13} /> Lihat jalannya sidang ({turns.length} babak)
+              </summary>
+              <div className="turns-list">
+                {turns.map((turn, idx) => {
+                  const role = ROLES_INFO[turn.agent] ?? {
+                    title: turn.agent,
+                    badge: 'ANGGOTA',
+                    badgeTone: 'neutral' as const,
+                    icon: <IconChat size={16} />,
+                  }
+
+                  return (
+                    <div key={idx} className="agent-card">
+                      <div className="agent-card-head">
+                        <span className="agent-avatar">{role.icon}</span>
+                        <div className="agent-meta">
+                          <span className="agent-title">
+                            {idx + 1}. {role.title}
+                          </span>
+                          <Tag tone={role.badgeTone}>{role.badge}</Tag>
+                        </div>
+                        {turn.latencyMs ? (
+                          <span className="turn-latency">{(turn.latencyMs / 1000).toFixed(1)}s</span>
+                        ) : null}
                       </div>
-                      {turn.latencyMs && (
-                        <span className="turn-latency">{(turn.latencyMs / 1000).toFixed(1)}s respons</span>
-                      )}
-                    </div>
 
-                    <div className="agent-card-content">
-                      {turn.agent === 'analis' && <AnalisRenderer raw={turn.content} />}
-                      {turn.agent === 'strateg' && <StrategRenderer raw={turn.content} />}
-                      {turn.agent === 'risiko' && <RisikoRenderer raw={turn.content} />}
-                      {turn.agent === 'ketua' && <KetuaRenderer raw={turn.content} session={session} />}
-                      {!['analis', 'strateg', 'risiko', 'ketua'].includes(turn.agent) && (
-                        <FallbackRenderer raw={turn.content} />
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-
-          {/* --- TAMPILAN 2: Arena Debat Bull vs Bear (Side by Side) --- */}
-          {viewMode === 'arena' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-              {/* Snapshot Analis Kuantitatif di Atas */}
-              {turnAnalis && (
-                <div className="agent-card">
-                  <div className="agent-card-head">
-                    <span className="agent-avatar">
-                      <IconRows size={16} />
-                    </span>
-                    <div className="agent-meta">
-                      <span className="agent-title">
-                        Fakta Kuantitatif Terverifikasi (Pijakan Debat)
-                      </span>
-                      <Tag tone="neutral">AUDIT FAKTA</Tag>
-                    </div>
-                  </div>
-                  <div className="agent-card-content">
-                    <AnalisRenderer raw={turnAnalis.content} />
-                  </div>
-                </div>
-              )}
-
-              {/* 2 Kolom: Strateg (BULL) vs Pengawas Risiko (BEAR) - Seimbang & Simetris */}
-              <div className="boardroom-split-arena">
-                {/* Kolom Kiri: Strateg Portofolio */}
-                <div className="arena-column">
-                  <div className="arena-col-header bull">
-                    <span className="arena-col-title">
-                      <IconTrendUp size={14} /> SUDUT BULLISH · STRATEG PORTOFOLIO
-                    </span>
-                    <span className="arena-col-subtitle">TESIS PERTUMBUHAN</span>
-                  </div>
-                  {turnStrateg ? (
-                    <div className="agent-card arena-card">
                       <div className="agent-card-content">
-                        <StrategRenderer raw={turnStrateg.content} />
+                        {turn.agent === 'analis' && <AnalisRenderer raw={turn.content} />}
+                        {turn.agent === 'strateg' && <StrategRenderer raw={turn.content} />}
+                        {turn.agent === 'risiko' && <RisikoRenderer raw={turn.content} />}
+                        {turn.agent === 'ketua' && <KetuaRenderer raw={turn.content} session={session} />}
+                        {!['analis', 'strateg', 'risiko', 'ketua'].includes(turn.agent) && (
+                          <FallbackRenderer raw={turn.content} />
+                        )}
                       </div>
                     </div>
-                  ) : (
-                    <div className="panel" style={{ padding: 16, color: 'var(--ink-mute)' }}>
-                      Tesis strateg belum tersedia.
-                    </div>
-                  )}
-                </div>
-
-                {/* Kolom Kanan: Pengawas Risiko */}
-                <div className="arena-column">
-                  <div className="arena-col-header bear">
-                    <span className="arena-col-title">
-                      <IconTrendDown size={14} /> SUDUT BEARISH · PENGAWAS RISIKO
-                    </span>
-                    <span className="arena-col-subtitle">STRESS TEST &amp; SKENARIO RUGI</span>
-                  </div>
-                  {turnRisiko ? (
-                    <div className="agent-card arena-card">
-                      <div className="agent-card-content">
-                        <RisikoRenderer raw={turnRisiko.content} />
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="panel" style={{ padding: 16, color: 'var(--ink-mute)' }}>
-                      Analisis risiko belum tersedia.
-                    </div>
-                  )}
-                </div>
+                  )
+                })}
               </div>
-
-              {/* Putusan Akhir Ketua Komite di Bawah */}
-              {turnKetua && (
-                <div className="agent-card">
-                  <div className="agent-card-head">
-                    <span className="agent-avatar">
-                      <IconScales size={16} />
-                    </span>
-                    <div className="agent-meta">
-                      <span className="agent-title">
-                        Palu Sidang &amp; Putusan Konsensus Akhir
-                      </span>
-                      <Tag tone="warn">PUTUSAN RESMI</Tag>
-                    </div>
-                  </div>
-                  <div className="agent-card-content">
-                    <KetuaRenderer raw={turnKetua.content} session={session} />
-                  </div>
-                </div>
-              )}
-            </div>
+            </details>
           )}
 
-          {/* --- TAMPILAN 3: Ringkasan Eksekutif --- */}
-          {viewMode === 'summary' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-              {turnKetua ? (
-                <div className="agent-card">
-                  <div className="agent-card-head">
-                    <span className="agent-avatar">
-                      <IconScales size={16} />
-                    </span>
-                    <div className="agent-meta">
-                      <span className="agent-title">
-                        Keputusan Eksekutif Komite Investasi
-                      </span>
-                      <Tag tone="warn">DECREE CIO</Tag>
-                    </div>
-                  </div>
-                  <div className="agent-card-content">
-                    <KetuaRenderer raw={turnKetua.content} session={session} />
-                  </div>
-                </div>
-              ) : null}
-
-              {turnStrateg && turnRisiko && (
-                <div className="proof-pillars-grid">
-                  <div className="thesis-proof-item">
-                    <div className="proof-heading">Inti Peluang (Bull)</div>
-                    <p className="proof-description">
-                      {extractKey(turnStrateg.content, 'tesis') || 'Tesis pemulihan tren aset.'}
-                    </p>
-                  </div>
-                  <div className="risk-attack-item">
-                    <div className="attack-heading">Risiko Utama (Bear)</div>
-                    <p className="attack-description">
-                      {extractKey(turnRisiko.content, 'skenario rugi') ||
-                        extractKey(turnRisiko.content, 'kelemahan utama') ||
-                        'Potensi koreksi teknikal mendalam.'}
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+          <p className="verdict-disclaimer">
+            Hasil telaah 4 agen AI atas data kuantitatif. Bukan rekomendasi membeli atau menjual efek apa pun.
+          </p>
         </div>
       )}
     </section>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// RINGKASAN PUTUSAN
+// ---------------------------------------------------------------------------
+
+function verdictMeaning(value: string | null | undefined): string {
+  const v = (value ?? '').toLowerCase()
+  return VERDICT_MEANING[(v in VERDICT_MEANING ? v : 'abstain') as VerdictValue]
+}
+
+/**
+ * Alasan yang tersimpan di sesi sudah ditempeli "Risiko utama: …" dan
+ * "Pembatalan: …" (lihat lib/agents/committee.ts). Keduanya punya tempat
+ * sendiri di layar, jadi di sini dipotong supaya tidak terbaca dua kali.
+ */
+function cleanRationale(text: string | null | undefined): string | undefined {
+  if (!text) return undefined
+  const cut = text.search(/\s(Risiko utama|Pembatalan|Main risk|Invalidation):/i)
+  return (cut > 0 ? text.slice(0, cut) : text).trim() || undefined
+}
+
+function strategThesis(raw: string): string | undefined {
+  return findVal(parseLabeledSections(raw), ['tesis investasi utama', 'tesis investasi', 'tesis utama', 'tesis'])
+}
+
+function risikoWorstCase(raw: string): string | undefined {
+  const map = parseLabeledSections(raw)
+  return (
+    findVal(map, ['skenario kerugian maksimal', 'skenario rugi', 'skenario terburuk', 'worst case']) ??
+    findVal(map, ['kelemahan utama', 'kelemahan'])
+  )
+}
+
+type FactTone = 'positive' | 'negative' | 'neutral'
+
+/** Angka pijakan dari giliran analis, hanya yang benar-benar ia tulis. */
+function analisFacts(raw: string): { label: string; value: string; tone: FactTone }[] {
+  const map: Record<string, string> = {}
+  for (const line of raw.split('\n')) {
+    const i = line.indexOf(':')
+    if (i > 0) map[line.slice(0, i).toLowerCase().trim()] = line.slice(i + 1).trim()
+  }
+  const signed = (v: string): FactTone => (isPos(v) ? 'positive' : 'negative')
+  const defs: { label: string; keys: string[]; tone: (v: string) => FactTone }[] = [
+    { label: 'Return 90 hari', keys: ['imbal hasil 90 hari', 'return 90d', '90 hari'], tone: signed },
+    { label: 'Return 1 tahun', keys: ['imbal hasil 365 hari', 'return 365d', '365 hari', '1 tahun'], tone: signed },
+    { label: 'Drawdown maks', keys: ['penurunan terdalam', 'max drawdown', 'drawdown'], tone: () => 'negative' },
+    { label: 'Volatilitas', keys: ['volatilitas disetahunkan', 'volatilitas'], tone: () => 'neutral' },
+    { label: 'Rasio volume', keys: ['rasio volume', 'volume 20v100'], tone: () => 'neutral' },
+  ]
+  const facts: { label: string; value: string; tone: FactTone }[] = []
+  for (const d of defs) {
+    const value = findVal(map, d.keys)
+    if (value) facts.push({ label: d.label, value, tone: d.tone(value) })
+  }
+  return facts
+}
+
+const RING_RADIUS = 30
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS
+
+function ConfidenceRing({ value, state, caption }: { value: number; state: State; caption: string }) {
+  const clamped = Math.max(0, Math.min(100, value))
+  return (
+    <div className={`confidence-ring state-${state}`} role="img" aria-label={`Keyakinan bukti ${clamped}%, ${caption}`}>
+      <svg viewBox="0 0 72 72" width="84" height="84" aria-hidden="true">
+        <circle className="ring-track" cx="36" cy="36" r={RING_RADIUS} />
+        <circle
+          className="ring-fill"
+          cx="36"
+          cy="36"
+          r={RING_RADIUS}
+          strokeDasharray={RING_CIRCUMFERENCE}
+          strokeDashoffset={RING_CIRCUMFERENCE * (1 - clamped / 100)}
+        />
+      </svg>
+      <div className="confidence-ring-text">
+        <strong>{clamped}%</strong>
+        <span>keyakinan</span>
+      </div>
+      <span className="confidence-ring-caption">{caption}</span>
+    </div>
   )
 }
 
@@ -819,39 +689,12 @@ function StrategRenderer({ raw }: { raw: string }) {
   const horizon = findVal(map, ['horizon waktu', 'horizon'])
   const notes = findVal(map, ['catatan', 'note', 'keterangan'])
 
-  // Kumpulkan bukti-bukti dari map
-  const proofs: { label: string; text: string }[] = []
-  for (const [k, v] of Object.entries(map)) {
-    if (k.startsWith('bukti') && v) {
-      proofs.push({ label: k.toUpperCase(), text: v })
-    }
-  }
-
-  // Tepat 4 kartu untuk membentuk grid 2x2 simetris dengan Pengawas Risiko
   const points: { label: string; text: string }[] = []
-
-  // Slot 1, 2, 3
-  if (proofs.length >= 1) points.push(proofs[0])
-  else points.push({ label: 'BUKTI 1', text: 'Konfirmasi tren pergerakan harga jangka menengah.' })
-
-  if (proofs.length >= 2) points.push(proofs[1])
-  else points.push({ label: 'BUKTI 2', text: 'Posisi harga relatif terhadap rata-rata pergerakan (SMA).' })
-
-  if (proofs.length >= 3) points.push(proofs[2])
-  else points.push({ label: 'BUKTI 3', text: 'Dukungan partisipasi volume transaksi pada pergerakan aset.' })
-
-  // Slot 4: Alokasi Posisi & Horizon Waktu (atau Bukti ke-4 bila ada)
-  if (proofs.length >= 4) {
-    points.push(proofs[3])
-  } else {
-    const paramParts: string[] = []
-    if (posSize) paramParts.push(`Posisi: ${posSize}`)
-    if (horizon) paramParts.push(`Horizon: ${horizon}`)
-    points.push({
-      label: 'ALOKASI POSISI & HORIZON',
-      text: paramParts.length > 0 ? paramParts.join(' · ') : 'Ukuran posisi terukur sesuai volatilitas aset dan toleransi risiko.',
-    })
+  for (const [k, v] of Object.entries(map)) {
+    if (k.startsWith('bukti') && v) points.push({ label: k.toUpperCase(), text: v })
   }
+  const params = [posSize && `Posisi: ${posSize}`, horizon && `Horizon: ${horizon}`].filter(Boolean).join(' · ')
+  if (params) points.push({ label: 'POSISI & HORIZON', text: params })
 
   return (
     <div className="arena-symmetric-layout">
@@ -861,40 +704,38 @@ function StrategRenderer({ raw }: { raw: string }) {
           <IconTarget size={13} />
           <span>TESIS INVESTASI UTAMA</span>
         </div>
-        <p className="arena-focus-text">
-          {thesis || 'Tesis pertumbuhan dan pemulihan tren aset terkonfirmasi secara bertahap.'}
-        </p>
+        <p className="arena-focus-text">{thesis ?? raw}</p>
       </div>
 
-      {/* Tier 2: 4 Kartu Poin Bukti (2x2 Grid) */}
-      <div className="arena-points-grid">
-        {points.map((p, idx) => (
-          <div key={idx} className="arena-point-card bull">
-            <div className="point-heading">
-              <IconTarget size={11} />
-              <span>{p.label}</span>
+      {points.length > 0 && (
+        <div className="arena-points-grid">
+          {points.map((p, idx) => (
+            <div key={idx} className="arena-point-card bull">
+              <div className="point-heading">
+                <IconTarget size={11} />
+                <span>{p.label}</span>
+              </div>
+              <p className="point-description">{p.text}</p>
             </div>
-            <p className="point-description">{p.text}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Tier 3: Batas Pembatalan (Cut-Loss) */}
-      <div className="arena-gate-card bull">
-        <div className="arena-gate-head">
-          <IconShield size={13} />
-          <span>BATAS PEMBATALAN (CUT-LOSS)</span>
+          ))}
         </div>
-        <p className="arena-gate-body">
-          {cutloss || 'Penutupan di bawah level teknikal utama atau pelemahan harian melampaui batas toleransi risiko.'}
-        </p>
-        {notes && (
-          <div className="arena-gate-note">
-            <IconAlert size={11} />
-            <span>Catatan: {notes}</span>
+      )}
+
+      {(cutloss || notes) && (
+        <div className="arena-gate-card bull">
+          <div className="arena-gate-head">
+            <IconShield size={13} />
+            <span>BATAS PEMBATALAN (CUT-LOSS)</span>
           </div>
-        )}
-      </div>
+          {cutloss && <p className="arena-gate-body">{cutloss}</p>}
+          {notes && (
+            <div className="arena-gate-note">
+              <IconAlert size={11} />
+              <span>Catatan: {notes}</span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -922,33 +763,12 @@ function RisikoRenderer({ raw }: { raw: string }) {
     'proteksi modal',
   ])
 
-  // Tepat 4 kartu serangan untuk membentuk grid 2x2 simetris dengan Strateg Portofolio
-  const attacks: { label: string; text: string }[] = [
-    {
-      label: 'KELEMAHAN UTAMA',
-      text:
-        primaryWeakness ||
-        'Tesis mengabaikan tren jangka panjang dan potensi koreksi struktural yang belum teruji.',
-    },
-    {
-      label: 'DATA YANG DIABAIKAN',
-      text:
-        ignoredData ||
-        'Jarak harga terhadap puncak historis dan batas volatilitas ekstrem belum dihitung cermat.',
-    },
-    {
-      label: 'VALIDASI ARGUMEN LEMAH',
-      text:
-        weakValidation ||
-        'Deviasi harga saat ini masih berada dalam batas volatilitas normal aset, bukan sinyal konfirmasi.',
-    },
-    {
-      label: 'RISIKO LIKUIDITAS',
-      text:
-        liquidityRisk ||
-        'Penurunan partisipasi volume mengindikasikan likuiditas rapuh yang rentan slippage tajam.',
-    },
-  ]
+  const attacks = [
+    { label: 'KELEMAHAN UTAMA', text: primaryWeakness },
+    { label: 'DATA YANG DIABAIKAN', text: ignoredData },
+    { label: 'VALIDASI ARGUMEN LEMAH', text: weakValidation },
+    { label: 'RISIKO LIKUIDITAS', text: liquidityRisk },
+  ].filter((a): a is { label: string; text: string } => Boolean(a.text))
 
   return (
     <div className="arena-symmetric-layout">
@@ -958,34 +778,32 @@ function RisikoRenderer({ raw }: { raw: string }) {
           <IconAlert size={13} />
           <span>SKENARIO KERUGIAN MAKSIMAL (WORST CASE)</span>
         </div>
-        <p className="arena-focus-text">
-          {worstCase || 'Penurunan tajam menguji moving average utama yang memicu drawdown modal signifikan.'}
-        </p>
+        <p className="arena-focus-text">{worstCase ?? raw}</p>
       </div>
 
-      {/* Tier 2: 4 Kartu Serangan Risiko (2x2 Grid) */}
-      <div className="arena-points-grid">
-        {attacks.map((att, idx) => (
-          <div key={idx} className="arena-point-card bear">
-            <div className="point-heading">
-              <IconAlert size={11} />
-              <span>{att.label}</span>
+      {attacks.length > 0 && (
+        <div className="arena-points-grid">
+          {attacks.map((att, idx) => (
+            <div key={idx} className="arena-point-card bear">
+              <div className="point-heading">
+                <IconAlert size={11} />
+                <span>{att.label}</span>
+              </div>
+              <p className="point-description">{att.text}</p>
             </div>
-            <p className="point-description">{att.text}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Tier 3: Kondisi Wajib Proteksi Modal */}
-      <div className="arena-gate-card bear">
-        <div className="arena-gate-head">
-          <IconCheck size={13} />
-          <span>KONDISI WAJIB PROTEKSI MODAL</span>
+          ))}
         </div>
-        <p className="arena-gate-body">
-          {mandatoryCond || 'Tesis hanya layak dieksekusi bila konfirmasi volume dan batas cut-loss dipatuhi ketat.'}
-        </p>
-      </div>
+      )}
+
+      {mandatoryCond && (
+        <div className="arena-gate-card bear">
+          <div className="arena-gate-head">
+            <IconCheck size={13} />
+            <span>KONDISI WAJIB PROTEKSI MODAL</span>
+          </div>
+          <p className="arena-gate-body">{mandatoryCond}</p>
+        </div>
+      )}
     </div>
   )
 }
@@ -1000,10 +818,7 @@ function KetuaRenderer({ raw, session }: { raw: string; session: SessionData }) 
   }
 
   const verdict = (parsed?.verdict as string | undefined) ?? session.verdict ?? 'abstain'
-  const rationale = (parsed?.rationale as string | undefined) ?? session.rationale ?? raw
-  const keyRisk = (parsed?.key_risk as string | undefined) ?? extractKey(raw, 'risiko utama')
-  const invalidation = (parsed?.invalidation as string | undefined) ?? extractKey(raw, 'syarat pembatalan')
-
+  const rationale = (parsed?.rationale as string | undefined) ?? cleanRationale(session.rationale) ?? raw
   const tone = verdictTone(verdict)
 
   return (
@@ -1022,28 +837,6 @@ function KetuaRenderer({ raw, session }: { raw: string; session: SessionData }) 
         {rationale}
       </div>
 
-      {(keyRisk || invalidation) && (
-        <div className="boardroom-safeguards-row" style={{ marginTop: 0 }}>
-          {keyRisk && (
-            <div className="safeguard-box risk">
-              <div className="safeguard-head">
-                <IconAlert size={12} />
-                <span>RISIKO KUNCI YANG TIDAK TERJAWAB</span>
-              </div>
-              <p className="safeguard-text">{keyRisk}</p>
-            </div>
-          )}
-          {invalidation && (
-            <div className="safeguard-box invalidation">
-              <div className="safeguard-head">
-                <IconShield size={12} />
-                <span>SYARAT PEMBATALAN / TINDAK LANJUT</span>
-              </div>
-              <p className="safeguard-text">{invalidation}</p>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   )
 }
@@ -1157,17 +950,6 @@ function findVal(map: Record<string, string>, keys: string[]): string | undefine
   }
   for (const [mk, mv] of Object.entries(map)) {
     if (keys.some((k) => mk.includes(k))) return mv
-  }
-  return undefined
-}
-
-function extractKey(raw: string, keyName: string): string | undefined {
-  const lines = raw.split('\n')
-  for (const line of lines) {
-    const parts = line.split(':')
-    if (parts.length > 1 && parts[0].toLowerCase().includes(keyName.toLowerCase())) {
-      return parts.slice(1).join(':').trim()
-    }
   }
   return undefined
 }

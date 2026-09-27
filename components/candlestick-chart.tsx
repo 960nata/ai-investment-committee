@@ -396,6 +396,8 @@ export function IntradayChart({
     if (!chartRef.current || !candleSeriesRef.current || data.length === 0) return
 
     const sorted = [...data].sort((a, b) => a.time - b.time)
+    // Riwayat penuh baru tiba setelah lilin tunggal dari stream — sesuaikan ulang zoom
+    const needsFit = sortedRef.current.length < 2 && sorted.length > 1
     sortedRef.current = sorted
     lastCandleRef.current = { ...sorted[sorted.length - 1] }
 
@@ -417,6 +419,7 @@ export function IntradayChart({
         })),
       )
     }
+    if (needsFit) chartRef.current.timeScale().fitContent()
   }, [data])
 
   // Update lilin 5m terakhir dan garis harga secara realtime

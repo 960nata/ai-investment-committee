@@ -143,9 +143,16 @@ export function InstrumentExplorer({
         const res = await fetch(`/api/quotes/intraday?symbol=${encodeURIComponent(sym)}`, {
           signal: AbortSignal.timeout(10_000),
         })
-        if (!res.ok) return
-        const body = await res.json()
-        if (active && body.candles?.length) setIntradayCandles(body.candles)
+        const body = res.ok ? await res.json() : null
+        if (active && body?.candles?.length) {
+          setIntradayCandles(body.candles)
+          return
+        }
+        // Server gagal menjangkau Binance (mis. region diblokir) — ambil langsung dari browser
+        if (isCryptoSymbol(sym)) {
+          const direct = await fetchBinanceKlinesDirect(sym)
+          if (active && direct.length) setIntradayCandles(direct)
+        }
       } catch {
         // Diam-diam abaikan — grafik harian tetap tersedia
       } finally {
@@ -154,6 +161,7 @@ export function InstrumentExplorer({
     }
 
     const initialTimer = setTimeout(() => {
+      setIntradayCandles([]) // jangan campur lilin simbol sebelumnya
       runFetch(true)
     }, 0)
 
@@ -165,6 +173,47 @@ export function InstrumentExplorer({
       active = false
       clearTimeout(initialTimer)
       clearInterval(interval)
+    }
+  }, [isIntraday, selected?.symbol])
+
+  // Stream kline 5m Binance: lilin terakhir diperbarui tiap detik dan lilin baru
+  // langsung muncul saat periode 5 menit berganti, tanpa menunggu polling 15 detik.
+  useEffect(() => {
+    if (!isIntraday || !selected || !isCryptoSymbol(selected.symbol)) return
+    let active = true
+    let ws: WebSocket | null = null
+
+    try {
+      ws = new WebSocket(`wss://stream.binance.com:9443/ws/${selected.symbol.toLowerCase()}@kline_5m`)
+      ws.onmessage = (event) => {
+        if (!active) return
+        try {
+          const k = JSON.parse(event.data)?.k
+          if (!k) return
+          const candle: IntradayCandle = {
+            time: Math.floor(k.t / 1000),
+            open: parseFloat(k.o),
+            high: parseFloat(k.h),
+            low: parseFloat(k.l),
+            close: parseFloat(k.c),
+            volume: parseFloat(k.v),
+          }
+          setIntradayCandles((prev) => {
+            const last = prev[prev.length - 1]
+            if (!last) return [candle]
+            if (last.time === candle.time) return [...prev.slice(0, -1), candle]
+            if (candle.time > last.time) return [...prev.slice(-287), candle]
+            return prev
+          })
+        } catch {}
+      }
+    } catch {}
+
+    return () => {
+      active = false
+      try {
+        ws?.close()
+      } catch {}
     }
   }, [isIntraday, selected?.symbol])
 
@@ -825,4 +874,30 @@ function yearsAgo(n: number): string {
   const d = new Date()
   d.setUTCFullYear(d.getUTCFullYear() - n)
   return d.toISOString().slice(0, 10)
+}
+
+function isCryptoSymbol(symbol: string) {
+  return symbol.endsWith('USDT')
+}
+
+/** Cadangan sisi-browser: cermin publik Binance mengizinkan CORS. */
+async function fetchBinanceKlinesDirect(symbol: string): Promise<IntradayCandle[]> {
+  try {
+    const res = await fetch(
+      `https://data-api.binance.vision/api/v3/klines?symbol=${encodeURIComponent(symbol)}&interval=5m&limit=288`,
+      { signal: AbortSignal.timeout(8_000) },
+    )
+    if (!res.ok) return []
+    const klines = (await res.json()) as Array<[number, string, string, string, string, string]>
+    return klines.map((k) => ({
+      time: Math.floor(k[0] / 1000),
+      open: parseFloat(k[1]),
+      high: parseFloat(k[2]),
+      low: parseFloat(k[3]),
+      close: parseFloat(k[4]),
+      volume: parseFloat(k[5]),
+    }))
+  } catch {
+    return []
+  }
 }

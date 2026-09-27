@@ -2186,11 +2186,281 @@ body.rail-lock {
 }
 
 /* ── Body & Putusan ── */
+/* Putusan ringkas: satu kartu besar, dua sisi debat, transkrip dilipat */
+.verdict-hero {
+  --tone: var(--ink-soft);
+  --tone-dim: rgba(167, 176, 171, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--tone);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(110deg, var(--tone-dim), transparent 65%), var(--surface-1);
+}
+
+.verdict-hero.tone-ok { --tone: var(--measured); --tone-dim: var(--measured-dim); }
+.verdict-hero.tone-down { --tone: var(--halted); --tone-dim: var(--halted-dim); }
+.verdict-hero.tone-warn { --tone: var(--signal); --tone-dim: var(--signal-dim); }
+
+.verdict-hero-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.verdict-hero-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: var(--t-micro);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+.verdict-hero-label {
+  font-family: var(--mono);
+  font-size: var(--t-display);
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--tone);
+}
+
+.verdict-hero-meaning {
+  margin: 0;
+  font-size: var(--t-body);
+  color: var(--ink-soft);
+}
+
+.confidence-ring {
+  position: relative;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  --ring: var(--measured);
+}
+
+.confidence-ring.state-degraded { --ring: var(--signal); }
+.confidence-ring.state-halted { --ring: var(--halted); }
+
+.confidence-ring svg { transform: rotate(-90deg); }
+
+.confidence-ring .ring-track {
+  fill: none;
+  stroke: var(--surface-3);
+  stroke-width: 6;
+}
+
+.confidence-ring .ring-fill {
+  fill: none;
+  stroke: var(--ring);
+  stroke-width: 6;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.confidence-ring-text {
+  position: absolute;
+  top: 0;
+  width: 84px;
+  height: 84px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+}
+
+.confidence-ring-text strong {
+  font-size: 18px;
+  color: var(--ink);
+}
+
+.confidence-ring-text span {
+  font-size: 9px;
+  color: var(--ink-mute);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.confidence-ring-caption {
+  font-family: var(--mono);
+  font-size: var(--t-micro);
+  color: var(--ring);
+}
+
+.verdict-rationale {
+  margin: 0;
+  font-size: var(--t-lead);
+  line-height: 1.6;
+  color: var(--ink);
+  max-width: 72ch;
+}
+
+.verdict-sides {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.verdict-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: var(--surface-1);
+}
+
+.verdict-side.bull { border-top: 2px solid var(--measured); }
+.verdict-side.bear { border-top: 2px solid var(--halted); }
+
+.verdict-side-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: var(--t-micro);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.verdict-side.bull .verdict-side-head { color: var(--measured); }
+.verdict-side.bear .verdict-side-head { color: var(--halted); }
+
+.verdict-side p {
+  margin: 0;
+  font-size: var(--t-body);
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+
+.verdict-watch {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--signal-dim);
+  color: var(--ink-soft);
+  font-size: var(--t-body);
+  line-height: 1.5;
+}
+
+.verdict-watch svg {
+  flex: none;
+  margin-top: 3px;
+  color: var(--signal);
+}
+
+.verdict-watch strong { color: var(--ink); font-weight: 600; }
+
+.verdict-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: var(--space-2);
+}
+
+.verdict-fact {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-0);
+}
+
+.verdict-fact-label {
+  font-family: var(--mono);
+  font-size: var(--t-micro);
+  color: var(--ink-mute);
+}
+
+.verdict-fact-val {
+  font-family: var(--mono);
+  font-size: var(--t-lead);
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.verdict-fact-val.positive { color: var(--measured); }
+.verdict-fact-val.negative { color: var(--halted); }
+
+.verdict-transcript {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-0);
+}
+
+.verdict-transcript > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: var(--space-3) var(--space-4);
+  font-family: var(--mono);
+  font-size: var(--t-small);
+  color: var(--ink-soft);
+  cursor: pointer;
+  list-style: none;
+}
+
+.verdict-transcript > summary::-webkit-details-marker { display: none; }
+
+.verdict-transcript > summary::after {
+  content: '▾';
+  margin-left: auto;
+  transition: transform 0.2s ease;
+}
+
+.verdict-transcript[open] > summary::after { transform: rotate(180deg); }
+
+.verdict-transcript > summary:hover { color: var(--ink); }
+
+.verdict-transcript > summary:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: -2px;
+}
+
+.verdict-transcript > .turns-list {
+  padding: 0 var(--space-3) var(--space-3);
+}
+
+.verdict-disclaimer {
+  margin: 0;
+  font-size: var(--t-micro);
+  color: var(--ink-faint);
+}
+
+@media (max-width: 640px) {
+  .verdict-hero {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: var(--space-4);
+  }
+
+  .verdict-hero-label { font-size: 24px; }
+
+  .verdict-sides { grid-template-columns: 1fr; }
+}
+
 .boardroom-body {
   padding: var(--space-5);
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: var(--space-4);
+}
+
+@media (max-width: 640px) {
+  .boardroom-body { padding: var(--space-4); }
 }
 
 /* ── Panel Dekrit Konsensus — Premium Glassmorphism ── */
