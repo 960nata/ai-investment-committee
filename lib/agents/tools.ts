@@ -21,8 +21,13 @@ import { MIN_CANDLES, buildFacts, type MarketFacts, type PricePoint } from './fa
 
 export * from './facts'
 
-/** Hari kalender riwayat yang ditarik untuk tiap analisis. */
-const LOOKBACK_DAYS = 400
+/**
+ * Hari kalender riwayat yang ditarik untuk tiap analisis — lima tahun plus
+ * sedikit ruang supaya imbal hasil 5 tahun masih punya candle pembanding.
+ * Database menyimpan riwayat sejak 2015; jendela 400 hari membuat komite
+ * menilai tren "jangka panjang" dari satu tahun saja.
+ */
+const LOOKBACK_DAYS = 5 * 365 + 10
 
 export class InsufficientDataError extends Error {
   constructor(symbol: string, detail: string) {
@@ -65,6 +70,9 @@ export async function gatherFacts(
     date: r.date,
     close: Number(r.close),
     volume: Number(r.volume),
+    open: Number(r.open),
+    high: Number(r.high),
+    low: Number(r.low),
   }))
 
   return buildFacts(instrument, series, now)

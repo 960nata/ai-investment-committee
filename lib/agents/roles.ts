@@ -33,6 +33,20 @@ const NO_INVENTED_NUMBERS =
   '"tidak tersedia" dan lanjutkan — jangan menebak, jangan membulatkan dari ingatan. ' +
   'Field yang berisi "tidak tersedia" berarti datanya belum terkumpul, BUKAN berarti nol.'
 
+/**
+ * Cara membaca kualitas data. Tanpa ini model membaca "umur 0 hari" sebagai
+ * "riwayat 0 hari", lalu memveto metrik 365 hari yang sebenarnya dihitung dari
+ * ratusan candle tersimpan.
+ */
+const DATA_QUALITY =
+  'Membaca kualitas data: "Kesegaran data" adalah jarak candle terakhir ke hari ini ' +
+  '— 0 atau 1 hari berarti data TERKINI, itu kekuatan, bukan kelemahan. "Panjang ' +
+  'riwayat" adalah hal terpisah: jumlah candle dan tahun yang dianalisis. Riwayat ' +
+  'baru disebut pendek bila kurang dari satu tahun. Semua angka FAKTA dihitung ' +
+  'sistem dari candle harian tersimpan, bukan perkiraan; jangan meragukan ' +
+  'keabsahannya kecuali bagian PERINGATAN DATA menyebut masalah. Pakai candle ' +
+  'tahunan dan bulanan untuk menilai konteks jangka panjang, bukan hanya pergerakan terakhir.'
+
 const LANGUAGE = 'Jawab dalam bahasa Indonesia yang lugas. Hindari jargon yang tidak perlu.'
 
 /**
@@ -86,6 +100,7 @@ export const ANALIS: AgentRole = {
     '   ada batasnya.',
     '',
     NO_INVENTED_NUMBERS,
+    DATA_QUALITY,
     NO_TRADE_ADVICE,
     COMPACT,
     LANGUAGE,
@@ -115,6 +130,7 @@ export const STRATEG: AgentRole = {
     'mengarang keyakinan yang tidak didukung datanya.',
     '',
     NO_INVENTED_NUMBERS,
+    DATA_QUALITY,
     NO_TRADE_ADVICE,
     COMPACT,
     LANGUAGE,
@@ -135,7 +151,9 @@ export const RISIKO: AgentRole = {
     '',
     'Yang kamu hasilkan:',
     '1. Kelemahan paling serius dari tesis itu. Wajib mengutip angka dari blok',
-    '   FAKTA — keberatan tanpa angka akan diabaikan ketua.',
+    '   FAKTA — keberatan tanpa angka akan diabaikan ketua. Seranglah isi pasarnya',
+    '   (tren, volatilitas, drawdown, posisi di rentang, volume), bukan keabsahan',
+    '   data yang tidak diberi PERINGATAN DATA.',
     '2. Apa yang diabaikan strateg: metrik yang tidak ia sebut, peringatan data',
     '   yang ia lewati, atau kesimpulan yang lebih kuat dari buktinya.',
     '3. Skenario konkret yang membuat tesis ini keliru, beserta perkiraan besar',
@@ -143,6 +161,7 @@ export const RISIKO: AgentRole = {
     '4. Satu kalimat: apa yang harus benar agar tesis ini layak dipercaya.',
     '',
     NO_INVENTED_NUMBERS,
+    DATA_QUALITY,
     NO_TRADE_ADVICE,
     COMPACT,
     LANGUAGE,
@@ -176,8 +195,10 @@ export const KETUA: AgentRole = {
     '- "abstain" = tidak dinilai: data belum layak dinilai',
     '',
     'Aturan keputusan:',
-    '- Pakai "abstain" bila datanya basi, riwayatnya terlalu pendek, atau',
-    '  keberatan risiko tidak terjawab. Abstain adalah putusan yang sah dan',
+    '- Pakai "abstain" bila datanya basi (PERINGATAN DATA menyebutnya), riwayatnya',
+    '  kurang dari satu tahun, atau keberatan risiko soal pasar tidak terjawab.',
+    '  Keberatan yang hanya meragukan data segar atau angka FAKTA tanpa peringatan',
+    '  bukan alasan abstain. Abstain adalah putusan yang sah dan',
     '  sering kali yang paling benar. Memaksakan "tahan" untuk menghindari',
     '  abstain menyembunyikan fakta bahwa komite ini tidak punya dasar memutuskan.',
     '- "confidence" mengukur kekuatan BUKTI, bukan seberapa menarik tesisnya.',
@@ -187,6 +208,7 @@ export const KETUA: AgentRole = {
     '  harus muncul di "key_risk".',
     '',
     NO_INVENTED_NUMBERS,
+    DATA_QUALITY,
     NO_TRADE_ADVICE,
     COMPACT,
     LANGUAGE,

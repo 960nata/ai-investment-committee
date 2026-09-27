@@ -34,6 +34,24 @@ export interface PricePoint {
   date: string
   close: number
   volume: number
+  /** OHLC opsional: tanpa ini ringkasan candle memakai harga penutupan. */
+  open?: number
+  high?: number
+  low?: number
+}
+
+/** Satu candle hasil agregasi (bulanan atau tahunan) untuk dibaca model. */
+export interface PeriodCandle {
+  /** `YYYY-MM` untuk bulanan, `YYYY` untuk tahunan. */
+  period: string
+  open: number
+  high: number
+  low: number
+  close: number
+  /** Perubahan terhadap penutupan periode sebelumnya; null untuk periode pertama. */
+  changePct: number | null
+  /** Periode yang belum selesai atau baru sebagian terekam. */
+  partial: boolean
 }
 
 export interface MarketFacts {
@@ -43,20 +61,47 @@ export interface MarketFacts {
   currency: string
   /** Tanggal candle terakhir yang tersimpan, bukan tanggal hari ini. */
   asOf: string
-  /** Umur data dalam hari. Tesis di atas data basi harus ditolak, bukan dipakai. */
+  /**
+   * Kesegaran: hari kalender sejak candle terakhir. 0 berarti data hari ini —
+   * BUKAN panjang riwayat. Tesis di atas data basi harus ditolak, bukan dipakai.
+   */
   staleDays: number
+  /** Candle yang dianalisis (dibatasi jendela tarikan, bukan seluruh isi database). */
   candleCount: number
+  /** Tanggal candle tertua yang dianalisis. */
+  historyStart: string
+  /** Panjang riwayat yang dianalisis, dalam tahun kalender. */
+  historyYears: number
   lastClose: number
-  returns: Record<'d1' | 'd7' | 'd30' | 'd90' | 'd365', number | null>
-  /** Simpangan baku imbal hasil harian, disetahunkan. */
+  /**
+   * Imbal hasil menurut hari KALENDER, bukan jumlah candle: 365 candle saham
+   * adalah hampir satu setengah tahun, 365 candle crypto tepat satu tahun.
+   */
+  returns: Record<'d1' | 'd7' | 'd30' | 'd90' | 'd365' | 'y2' | 'y3' | 'y5', number | null>
+  /** Simpangan baku imbal hasil harian, disetahunkan, jendela 1 tahun terakhir. */
   annualisedVolatility: number | null
+  /** Volatilitas yang sama di seluruh riwayat yang dianalisis. */
+  volatilityFullHistory: number | null
+  /** Penurunan terdalam dalam 1 tahun terakhir. */
   maxDrawdown: number | null
+  /** Penurunan terdalam di seluruh riwayat yang dianalisis. */
+  maxDrawdownFullHistory: number | null
+  /** Rentang 52 minggu dan posisi harga di dalamnya (0 = di titik terendah, 100 = tertinggi). */
+  range52w: { high: number; low: number; positionPct: number } | null
+  /** Puncak tertinggi di riwayat yang dianalisis dan jarak harga sekarang darinya. */
+  historyHigh: { value: number; date: string; pctFromHigh: number } | null
   sma: Record<'s20' | 's50' | 's200', number | null>
+  /** Kemiringan SMA200 selama 20 candle terakhir, dalam persen. */
+  sma200SlopePct: number | null
   /** Posisi harga terhadap rata-rata bergeraknya, dalam persen. */
   priceVsSma50Pct: number | null
   trend: 'naik' | 'turun' | 'menyamping' | 'tidak cukup data'
   /** Rasio volume 20 hari terakhir terhadap 100 hari sebelumnya. */
   volumeRatio20v100: number | null
+  /** Dua belas candle bulanan terakhir. */
+  monthly: PeriodCandle[]
+  /** Candle tahunan sepanjang riwayat yang dianalisis. */
+  yearly: PeriodCandle[]
   warnings: string[]
 }
 
@@ -84,12 +129,15 @@ export function buildFacts(
   const sma20 = mean(closes.slice(-20))
   const sma50 = mean(closes.slice(-50))
   const sma200 = closes.length >= 200 ? mean(closes.slice(-200)) : null
+  const sma200Before = closes.length >= 220 ? mean(closes.slice(-220, -20)) : null
 
   if (sma200 === null) {
     warnings.push(`Riwayat ${closes.length} hari, belum cukup untuk SMA200.`)
   }
 
-  const dailyReturns = pctChanges(closes)
+  const lastYear = windowSince(series, last.date, 365)
+  const lastYearCloses = lastYear.map((p) => p.close)
+  const first = series[0]
 
   return {
     symbol: instrument.symbol,
@@ -99,20 +147,35 @@ export function buildFacts(
     asOf: last.date,
     staleDays,
     candleCount: series.length,
+    historyStart: first.date,
+    historyYears: round(daysBetween(first.date, last.date) / 365.25, 1),
     lastClose: last.close,
     returns: {
-      d1: trailingReturn(closes, 1),
-      d7: trailingReturn(closes, 7),
-      d30: trailingReturn(closes, 30),
-      d90: trailingReturn(closes, 90),
-      d365: trailingReturn(closes, 365),
+      d1: calendarReturn(series, 1),
+      d7: calendarReturn(series, 7),
+      d30: calendarReturn(series, 30),
+      d90: calendarReturn(series, 90),
+      d365: calendarReturn(series, 365),
+      y2: calendarReturn(series, 730),
+      y3: calendarReturn(series, 1095),
+      y5: calendarReturn(series, 1826),
     },
-    annualisedVolatility: annualisedVolatility(dailyReturns, instrument.market),
-    maxDrawdown: maxDrawdown(closes),
+    annualisedVolatility: annualisedVolatility(pctChanges(lastYearCloses), instrument.market),
+    volatilityFullHistory: annualisedVolatility(pctChanges(closes), instrument.market),
+    maxDrawdown: maxDrawdown(lastYearCloses),
+    maxDrawdownFullHistory: maxDrawdown(closes),
+    range52w: range(lastYear, last.close),
+    historyHigh: historyHigh(series, last.close),
     sma: { s20: sma20, s50: sma50, s200: sma200 },
+    sma200SlopePct:
+      sma200 === null || sma200Before === null || sma200Before <= 0
+        ? null
+        : round((sma200 / sma200Before - 1) * 100, 2),
     priceVsSma50Pct: sma50 === null ? null : round((last.close / sma50 - 1) * 100, 2),
     trend: classifyTrend(last.close, sma20, sma50, sma200),
     volumeRatio20v100: volumeRatio(series),
+    monthly: aggregate(series, 7).slice(-12),
+    yearly: aggregate(series, 4),
     warnings,
   }
 }
@@ -126,15 +189,124 @@ function mean(values: number[]): number | null {
   return round(values.reduce((a, b) => a + b, 0) / values.length, 6)
 }
 
+function daysBetween(from: string, to: string): number {
+  return (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000
+}
+
+function shiftDate(date: string, days: number): string {
+  const d = new Date(`${date}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
+/** Candle dalam `days` hari kalender terakhir, dihitung mundur dari `lastDate`. */
+function windowSince(series: PricePoint[], lastDate: string, days: number): PricePoint[] {
+  const cutoff = shiftDate(lastDate, -days)
+  return series.filter((p) => p.date >= cutoff)
+}
+
 /**
- * Imbal hasil selama `days` hari data terakhir.
- * Mengembalikan null bila riwayatnya belum sepanjang itu — bukan nol.
+ * Imbal hasil selama `days` hari kalender terakhir, dibandingkan dengan candle
+ * terakhir pada atau sebelum tanggal itu. Mengembalikan null bila riwayatnya
+ * belum sepanjang itu — bukan nol.
  */
-function trailingReturn(closes: number[], days: number): number | null {
-  if (closes.length <= days) return null
-  const past = closes[closes.length - 1 - days]
-  if (past <= 0) return null
-  return round((closes[closes.length - 1] / past - 1) * 100, 2)
+function calendarReturn(series: PricePoint[], days: number): number | null {
+  const last = series[series.length - 1]
+  const target = shiftDate(last.date, -days)
+
+  let past: PricePoint | undefined
+  for (const point of series) {
+    if (point.date > target) break
+    past = point
+  }
+
+  if (!past || past.close <= 0) return null
+  return round((last.close / past.close - 1) * 100, 2)
+}
+
+function range(
+  window: PricePoint[],
+  lastClose: number,
+): MarketFacts['range52w'] {
+  if (window.length < MIN_CANDLES) return null
+
+  const high = Math.max(...window.map((p) => p.high ?? p.close))
+  const low = Math.min(...window.map((p) => p.low ?? p.close))
+  const span = high - low
+
+  return {
+    high: round(high, 6),
+    low: round(low, 6),
+    positionPct: span > 0 ? round(((lastClose - low) / span) * 100, 1) : 50,
+  }
+}
+
+function historyHigh(series: PricePoint[], lastClose: number): MarketFacts['historyHigh'] {
+  let best = series[0]
+  for (const point of series) {
+    if ((point.high ?? point.close) > (best.high ?? best.close)) best = point
+  }
+
+  const value = best.high ?? best.close
+  if (value <= 0) return null
+
+  return {
+    value: round(value, 6),
+    date: best.date,
+    pctFromHigh: round((lastClose / value - 1) * 100, 2),
+  }
+}
+
+/**
+ * Gabungkan candle harian per awalan tanggal: 7 karakter untuk bulanan
+ * (`YYYY-MM`), 4 untuk tahunan (`YYYY`). Periode pertama ditandai parsial
+ * karena riwayatnya bisa dimulai di tengah periode, dan periode terakhir
+ * ditandai parsial karena masih berjalan.
+ */
+function aggregate(series: PricePoint[], keyLength: 4 | 7): PeriodCandle[] {
+  const out: PeriodCandle[] = []
+
+  for (const point of series) {
+    const period = point.date.slice(0, keyLength)
+    const current = out[out.length - 1]
+
+    if (current?.period === period) {
+      current.high = Math.max(current.high, point.high ?? point.close)
+      current.low = Math.min(current.low, point.low ?? point.close)
+      current.close = point.close
+    } else {
+      out.push({
+        period,
+        open: point.open ?? point.close,
+        high: point.high ?? point.close,
+        low: point.low ?? point.close,
+        close: point.close,
+        changePct: null,
+        partial: false,
+      })
+    }
+  }
+
+  for (let i = 0; i < out.length; i++) {
+    const c = out[i]
+    const prev = out[i - 1]
+    c.changePct = prev && prev.close > 0 ? round((c.close / prev.close - 1) * 100, 2) : null
+    c.open = round(c.open, 6)
+    c.high = round(c.high, 6)
+    c.low = round(c.low, 6)
+    c.close = round(c.close, 6)
+  }
+
+  if (out.length > 0) {
+    // Periode pertama baru dianggap utuh bila candle pertamanya jatuh di awal periode.
+    const firstDay = series[0].date
+    const startsAtBeginning =
+      keyLength === 7 ? firstDay.slice(8) <= '03' : firstDay.slice(5) <= '01-05'
+    if (!startsAtBeginning) out[0].partial = true
+    out[out.length - 1].partial = true
+  }
+
+  return out
 }
 
 function pctChanges(closes: number[]): number[] {
@@ -220,27 +392,62 @@ export function factsToPrompt(facts: MarketFacts): string {
   const fmt = (value: number | null, suffix = '%') =>
     value === null ? 'tidak tersedia' : `${value}${suffix}`
 
+  const staleLimit = STALE_LIMIT_DAYS[facts.market]
+  const freshness =
+    facts.staleDays <= staleLimit
+      ? 'SEGAR — data terkini, bukan kelemahan'
+      : `BASI — melewati ambang ${staleLimit} hari`
+
   const lines = [
     `Instrumen: ${facts.symbol} (${facts.name}) — pasar ${facts.market}, mata uang ${facts.currency}`,
-    `Data per: ${facts.asOf} (umur ${facts.staleDays} hari, ${facts.candleCount} candle tersimpan)`,
+    `Kesegaran data  : candle terakhir ${facts.asOf}, ${facts.staleDays} hari lalu (${freshness})`,
+    `Panjang riwayat : ${facts.candleCount} candle harian sejak ${facts.historyStart} (≈${facts.historyYears} tahun), semua dari database harga`,
     `Harga penutupan terakhir: ${facts.lastClose}`,
     ``,
     `Imbal hasil 1 hari   : ${fmt(facts.returns.d1)}`,
     `Imbal hasil 7 hari   : ${fmt(facts.returns.d7)}`,
     `Imbal hasil 30 hari  : ${fmt(facts.returns.d30)}`,
     `Imbal hasil 90 hari  : ${fmt(facts.returns.d90)}`,
-    `Imbal hasil 365 hari : ${fmt(facts.returns.d365)}`,
+    `Imbal hasil 1 tahun  : ${fmt(facts.returns.d365)}`,
+    `Imbal hasil 2 tahun  : ${fmt(facts.returns.y2)}`,
+    `Imbal hasil 3 tahun  : ${fmt(facts.returns.y3)}`,
+    `Imbal hasil 5 tahun  : ${fmt(facts.returns.y5)}`,
     ``,
-    `Volatilitas disetahunkan : ${fmt(facts.annualisedVolatility)}`,
-    `Penurunan terdalam       : ${fmt(facts.maxDrawdown)}`,
+    `Volatilitas disetahunkan (1 thn)     : ${fmt(facts.annualisedVolatility)}`,
+    `Volatilitas disetahunkan (riwayat)   : ${fmt(facts.volatilityFullHistory)}`,
+    `Penurunan terdalam (1 thn)           : ${fmt(facts.maxDrawdown)}`,
+    `Penurunan terdalam (seluruh riwayat) : ${fmt(facts.maxDrawdownFullHistory)}`,
+    facts.range52w
+      ? `Rentang 52 minggu        : ${facts.range52w.low} – ${facts.range52w.high} (harga di posisi ${facts.range52w.positionPct}% dari bawah)`
+      : `Rentang 52 minggu        : tidak tersedia`,
+    facts.historyHigh
+      ? `Puncak riwayat           : ${facts.historyHigh.value} pada ${facts.historyHigh.date} (harga sekarang ${facts.historyHigh.pctFromHigh}% dari puncak)`
+      : `Puncak riwayat           : tidak tersedia`,
     `SMA20 / SMA50 / SMA200   : ${facts.sma.s20 ?? 'n/a'} / ${facts.sma.s50 ?? 'n/a'} / ${facts.sma.s200 ?? 'n/a'}`,
+    `Kemiringan SMA200 (20 candle): ${fmt(facts.sma200SlopePct)}`,
     `Harga vs SMA50           : ${fmt(facts.priceVsSma50Pct)}`,
     `Arah tren                : ${facts.trend}`,
     `Rasio volume 20v100      : ${fmt(facts.volumeRatio20v100, 'x')}`,
   ]
 
+  const candleTable = (title: string, rows: PeriodCandle[]) => {
+    if (rows.length === 0) return
+    lines.push(``, `${title} (periode: buka / tertinggi / terendah / tutup, perubahan):`)
+    for (const c of rows) {
+      const note = c.partial ? ' [belum lengkap]' : ''
+      lines.push(
+        `${c.period}: ${c.open} / ${c.high} / ${c.low} / ${c.close}, ${fmt(c.changePct)}${note}`,
+      )
+    }
+  }
+
+  candleTable('CANDLE TAHUNAN', facts.yearly)
+  candleTable('CANDLE BULANAN 12 TERAKHIR', facts.monthly)
+
   if (facts.warnings.length > 0) {
     lines.push(``, `PERINGATAN DATA:`, ...facts.warnings.map((w) => `- ${w}`))
+  } else {
+    lines.push(``, `PERINGATAN DATA: tidak ada — seluruh angka di atas layak dipakai.`)
   }
 
   return lines.join('\n')

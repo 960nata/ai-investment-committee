@@ -114,6 +114,40 @@ console.log('\nbuildFacts — riwayat pendek dan data basi')
   })
 }
 
+console.log('\nbuildFacts — riwayat panjang 3 tahun')
+{
+  const now = new Date('2026-09-19T00:00:00Z')
+  const facts = buildFacts(instrument, risingSeries(1100, now), now)
+
+  check('imbal hasil 1 tahun dihitung per kalender (1.001^365)', () => {
+    assert.equal(facts.returns.d365, 44.03)
+  })
+
+  check('imbal hasil 2 tahun terisi, 5 tahun null', () => {
+    assert.notEqual(facts.returns.y2, null)
+    assert.equal(facts.returns.y5, null)
+  })
+
+  check('panjang riwayat ≈3 tahun', () => assert.equal(facts.historyYears, 3))
+
+  check('12 candle bulanan, bulan berjalan ditandai belum lengkap', () => {
+    assert.equal(facts.monthly.length, 12)
+    assert.equal(facts.monthly[11].period, '2026-09')
+    assert.equal(facts.monthly[11].partial, true)
+  })
+
+  check('candle tahunan mencakup seluruh riwayat', () => {
+    assert.equal(facts.yearly[0].period, '2023')
+    assert.equal(facts.yearly[0].partial, true)
+    assert.equal(facts.yearly[facts.yearly.length - 1].period, '2026')
+  })
+
+  check('harga di puncak riwayat dan di ujung atas rentang 52 minggu', () => {
+    assert.equal(facts.historyHigh?.pctFromHigh, 0)
+    assert.equal(facts.range52w?.positionPct, 100)
+  })
+}
+
 console.log('\nparseVerdict')
 {
   const valid = '{"verdict":"tahan","confidence":45,"rationale":"Bukti tipis."}'
