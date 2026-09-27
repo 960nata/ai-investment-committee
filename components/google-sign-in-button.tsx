@@ -141,6 +141,16 @@ export function GoogleSignInButton({
         return
       }
 
+      if (
+        errCode === 'auth/unauthorized-domain' ||
+        errMsg.includes('unauthorized-domain')
+      ) {
+        reportError(
+          'Domain web ini belum didaftarkan di Firebase. Buka Firebase Console > Authentication > Settings > Authorized domains > Tambahkan domain web Anda.',
+        )
+        return
+      }
+
       reportError(errMsg || 'Gagal masuk dengan Google. Coba lagi.')
     }
   }
