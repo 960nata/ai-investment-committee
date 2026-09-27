@@ -48,7 +48,7 @@ export { parseVerdict, type CommitteeVerdict }
  * peran berubah: putusan lama hanya dipakai ulang bila versinya sama, jadi
  * perbaikan prompt langsung berlaku tanpa menunggu candle baru.
  */
-export const COMMITTEE_VERSION = '2026-09-27.1'
+export const COMMITTEE_VERSION = '2026-09-27.2'
 
 
 export interface CommitteeResult {
