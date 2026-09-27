@@ -39,9 +39,13 @@ interface UserAnalyticsDashboardProps {
   initialSummary?: VisitSummary | null
 }
 
-const TILE_URL = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+/** Ubin peta ArcGIS World Dark Gray (Bebas API Key & Tanpa Watermark). */
+const TILE_URL =
+  'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}'
+const TILE_REF_URL =
+  'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}'
 const TILE_ATTRIBUTION =
-  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+  '&copy; <a href="https://www.esri.com/">Esri</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
 const MARKER_COLOR = '#10b981' // Emerald pulse untuk user visitor
 
 // Titik fallback representatif saat dijalankan di localhost / belum ada header koordinat
@@ -112,8 +116,12 @@ export function UserAnalyticsDashboard({
 
         L.tileLayer(TILE_URL, {
           attribution: TILE_ATTRIBUTION,
-          subdomains: 'abcd',
-          maxZoom: 12,
+          maxZoom: 14,
+        }).addTo(map)
+
+        L.tileLayer(TILE_REF_URL, {
+          maxZoom: 14,
+          opacity: 0.8,
         }).addTo(map)
 
         if (points.length > 0) {
@@ -182,7 +190,7 @@ export function UserAnalyticsDashboard({
             <span style={{ color: '#10b981' }}>TELEMETRI GOOGLE ANALYTICS &amp; PETA PENGUNJUNG</span>
           </div>
           <h2 className="user-analytics-headline">
-            Analitik Komite &amp; <span className="admin-headline-accent">Lokasi Pengguna</span>
+            Analitik AI Investdesk &amp; <span className="admin-headline-accent">Lokasi Pengguna</span>
           </h2>
           <p className="user-analytics-subtitle">
             Integrasi langsung tag pengukuran Google Analytics 4 dan pemetaan geolokasi pengunjung
@@ -300,7 +308,7 @@ export function UserAnalyticsDashboard({
             className="visitor-map"
             style={{ height: '360px', width: '100%', background: 'var(--surface-0)' }}
             role="img"
-            aria-label="Peta sebaran pengunjung Komite"
+            aria-label="Peta sebaran pengunjung AI Investdesk"
           />
 
           {mapStatus !== 'ready' && (
@@ -321,7 +329,7 @@ export function UserAnalyticsDashboard({
               <strong>{points.length}</strong> pusat kota terpetakan
             </span>
             <span style={{ marginLeft: 'auto', color: '#10b981' }}>
-              ● CartoDB Dark Edition &middot; Leaflet v1.9.4
+              ● Dark Canvas Edition &middot; Leaflet v1.9.4
             </span>
           </div>
         </div>

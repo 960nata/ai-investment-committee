@@ -5,7 +5,7 @@ import { getAppUsers, updateUserRole, deleteAppUser, upsertAppUser } from '@/lib
 export const dynamic = 'force-dynamic'
 
 /**
- * Ambil daftar seluruh user Komite.
+ * Ambil daftar seluruh user AI Investdesk.
  */
 export async function GET(req: NextRequest) {
   const isAuthed = (await verifyAdminSession()) || isRequestAdminAuthenticated(req)
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
 
     const created = await upsertAppUser({
       email: email.trim().toLowerCase(),
-      name: name?.trim() || 'Analis Komite',
+      name: name?.trim() || 'Analis AI Investdesk',
       role: role === 'admin' ? 'admin' : 'user',
       isActive: true,
     })

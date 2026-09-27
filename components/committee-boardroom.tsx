@@ -3,11 +3,9 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import type { AgentVerdict, MarketCode } from '@/lib/db/schema'
 import { SkeletonBoardroom, Tag, Lamp } from './ui'
-import type { State } from './ui'
 import {
   IconAlert,
   IconCheck,
-  IconClock,
   IconClose,
   IconCopy,
   IconCourt,
@@ -16,12 +14,12 @@ import {
   IconShield,
   IconTarget,
   IconChat,
-  IconTrendDown,
-  IconTrendUp,
   IconPlay,
   IconRefresh,
 } from './icons'
-import { verdictLabel, verdictTone, VERDICT_MEANING, type VerdictValue } from '@/lib/format/verdict'
+import { verdictLabel, verdictTone } from '@/lib/format/verdict'
+import { CommitteeSessionStage, type StageFact } from './committee-session-stage'
+import type { AgentId } from './landing-protocol'
 
 interface Turn {
   agent: string
@@ -239,18 +237,6 @@ export function CommitteeBoardroom({ symbol, market, name, onClose }: Props) {
   const verdict = session?.verdict
   const confidence = session?.confidence ?? 0
 
-  const confidenceTier = useMemo(() => {
-    if (confidence >= 75) return 'Bukti kuat'
-    if (confidence >= 50) return 'Bukti cukup'
-    if (confidence >= 30) return 'Sinyal bercampur'
-    return 'Bukti lemah'
-  }, [confidence])
-
-  const confidenceState: State =
-    confidence >= 60 ? 'ok' : confidence >= 35 ? 'degraded' : 'halted'
-
-  const verdictToneValue = verdictTone(verdict)
-
   const turnAnalis = turns.find((t) => t.agent === 'analis')
   const turnStrateg = turns.find((t) => t.agent === 'strateg')
   const turnRisiko = turns.find((t) => t.agent === 'risiko')
@@ -260,7 +246,15 @@ export function CommitteeBoardroom({ symbol, market, name, onClose }: Props) {
   const bullThesis = turnStrateg ? strategThesis(turnStrateg.content) : undefined
   const bearRisk =
     (parsedKetua?.key_risk as string | undefined) || (turnRisiko ? risikoWorstCase(turnRisiko.content) : undefined)
-  const keyFacts = useMemo(() => (turnAnalis ? analisFacts(turnAnalis.content).slice(0, 4) : []), [turnAnalis])
+  const keyFacts = useMemo(() => (turnAnalis ? analisFacts(turnAnalis.content) : []), [turnAnalis])
+  const analisLine = turnAnalis
+    ? keyFacts.length > 0
+      ? keyFacts.map((f) => `${f.label} ${f.value}`).join(' · ') + '.'
+      : firstSentences(turnAnalis.content)
+    : undefined
+  const latencyByAgent = Object.fromEntries(
+    turns.filter((t) => t.latencyMs).map((t) => [t.agent, t.latencyMs as number]),
+  ) as Partial<Record<AgentId, number>>
 
   return (
     <section className="boardroom-panel panel" style={{ marginTop: 'var(--space-4)' }}>
@@ -386,65 +380,25 @@ export function CommitteeBoardroom({ symbol, market, name, onClose }: Props) {
       {/* Putusan & Debat 4 Agen */}
       {!deliberating && session && (
         <div className="boardroom-body">
-          {/* 1. Putusan: satu kartu besar, satu jawaban */}
-          <div className={`verdict-hero tone-${verdictToneValue}`}>
-            <div className="verdict-hero-main">
-              <span className="verdict-hero-eyebrow">
-                <IconScales size={13} /> Putusan Komite
-              </span>
-              <div className="verdict-hero-label">{verdictLabel(verdict)}</div>
-              <p className="verdict-hero-meaning">{verdictMeaning(verdict)}</p>
-            </div>
-            <ConfidenceRing value={confidence} state={confidenceState} caption={confidenceTier} />
-          </div>
+          <CommitteeSessionStage
+            symbol={symbol}
+            facts={keyFacts}
+            analis={analisLine}
+            strateg={bullThesis}
+            risiko={bearRisk}
+            verdict={verdict ?? null}
+            confidence={confidence}
+            rationale={rationale}
+            invalidation={invalidation}
+            latencyMs={latencyByAgent}
+            playKey={session.id}
+          />
 
-          {rationale && <p className="verdict-rationale">{rationale}</p>}
-
-          {/* 2. Bull vs Bear: inti masing-masing sisi */}
-          {(bullThesis || bearRisk) && (
-            <div className="verdict-sides">
-              <div className="verdict-side bull">
-                <span className="verdict-side-head">
-                  <IconTrendUp size={13} /> Peluang · Strateg
-                </span>
-                <p>{bullThesis ?? 'Strateg tidak mengajukan tesis.'}</p>
-              </div>
-              <div className="verdict-side bear">
-                <span className="verdict-side-head">
-                  <IconTrendDown size={13} /> Risiko · Pengawas Risiko
-                </span>
-                <p>{bearRisk ?? 'Pengawas risiko tidak mencatat keberatan.'}</p>
-              </div>
-            </div>
-          )}
-
-          {/* 3. Kapan putusan ini gugur */}
-          {invalidation && (
-            <div className="verdict-watch">
-              <IconClock size={13} />
-              <span>
-                <strong>Putusan ditinjau ulang bila:</strong> {invalidation}
-              </span>
-            </div>
-          )}
-
-          {/* 4. Angka pijakan dari analis */}
-          {keyFacts.length > 0 && (
-            <div className="verdict-facts">
-              {keyFacts.map((f) => (
-                <div key={f.label} className="verdict-fact">
-                  <span className="verdict-fact-label">{f.label}</span>
-                  <span className={`verdict-fact-val ${f.tone}`}>{f.value}</span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* 5. Transkrip lengkap, dilipat supaya tidak menenggelamkan putusan */}
+          {/* Jawaban lengkap tiap agen, dilipat supaya tidak menenggelamkan sidang */}
           {turns.length > 0 && (
             <details className="verdict-transcript">
               <summary>
-                <IconRows size={13} /> Lihat jalannya sidang ({turns.length} babak)
+                <IconRows size={13} /> Baca jawaban lengkap tiap agen
               </summary>
               <div className="turns-list">
                 {turns.map((turn, idx) => {
@@ -499,11 +453,6 @@ export function CommitteeBoardroom({ symbol, market, name, onClose }: Props) {
 // RINGKASAN PUTUSAN
 // ---------------------------------------------------------------------------
 
-function verdictMeaning(value: string | null | undefined): string {
-  const v = (value ?? '').toLowerCase()
-  return VERDICT_MEANING[(v in VERDICT_MEANING ? v : 'abstain') as VerdictValue]
-}
-
 /**
  * Alasan yang tersimpan di sesi sudah ditempeli "Risiko utama: …" dan
  * "Pembatalan: …" (lihat lib/agents/committee.ts). Keduanya punya tempat
@@ -527,7 +476,15 @@ function risikoWorstCase(raw: string): string | undefined {
   )
 }
 
-type FactTone = 'positive' | 'negative' | 'neutral'
+type FactTone = StageFact['tone']
+
+/** Dua kalimat pertama, untuk agen yang tidak menulis dalam format berlabel. */
+function firstSentences(raw: string): string {
+  const flat = raw.replace(/\s+/g, ' ').trim()
+  const m = flat.match(/^(.+?[.!?])\s+(.+?[.!?])(\s|$)/)
+  const text = m ? `${m[1]} ${m[2]}` : flat
+  return text.length > 280 ? `${text.slice(0, 277)}…` : text
+}
 
 /** Angka pijakan dari giliran analis, hanya yang benar-benar ia tulis. */
 function analisFacts(raw: string): { label: string; value: string; tone: FactTone }[] {
@@ -550,33 +507,6 @@ function analisFacts(raw: string): { label: string; value: string; tone: FactTon
     if (value) facts.push({ label: d.label, value, tone: d.tone(value) })
   }
   return facts
-}
-
-const RING_RADIUS = 30
-const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS
-
-function ConfidenceRing({ value, state, caption }: { value: number; state: State; caption: string }) {
-  const clamped = Math.max(0, Math.min(100, value))
-  return (
-    <div className={`confidence-ring state-${state}`} role="img" aria-label={`Keyakinan bukti ${clamped}%, ${caption}`}>
-      <svg viewBox="0 0 72 72" width="84" height="84" aria-hidden="true">
-        <circle className="ring-track" cx="36" cy="36" r={RING_RADIUS} />
-        <circle
-          className="ring-fill"
-          cx="36"
-          cy="36"
-          r={RING_RADIUS}
-          strokeDasharray={RING_CIRCUMFERENCE}
-          strokeDashoffset={RING_CIRCUMFERENCE * (1 - clamped / 100)}
-        />
-      </svg>
-      <div className="confidence-ring-text">
-        <strong>{clamped}%</strong>
-        <span>keyakinan</span>
-      </div>
-      <span className="confidence-ring-caption">{caption}</span>
-    </div>
-  )
 }
 
 // ---------------------------------------------------------------------------

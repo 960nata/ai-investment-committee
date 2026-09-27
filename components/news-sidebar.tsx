@@ -134,7 +134,7 @@ export function NewsSidebar({
         <div className="ad-sponsor-body">
           <div className="ad-sponsor-badge-mark">MITRA RESMI</div>
           <h4 className="ad-sponsor-title">
-            Terminal Riset Kuantitatif &amp; AI Komite Institusional
+            Terminal Riset Kuantitatif AI Investdesk
           </h4>
           <p className="ad-sponsor-desc">
             Jangkau analis, pengelola dana, dan investor modal institusi.

@@ -10,6 +10,7 @@ import {
   localePath,
   type Locale,
 } from '@/lib/i18n/locales'
+import { SITE_NAME } from '@/lib/brand'
 
 /*
  * Halaman panduan pengguna — kerangka server untuk dek slide.
@@ -33,7 +34,7 @@ export function guideMetadata(locale: Locale): Metadata {
       title: g.metaTitle,
       description: g.metaDescription,
       url: localePath(locale, PATH),
-      siteName: 'Komite',
+      siteName: SITE_NAME,
       locale: LOCALE_INFO[locale].ogLocale,
       alternateLocale: LOCALES.filter((l) => l !== locale).map((l) => LOCALE_INFO[l].ogLocale),
       type: 'website',
@@ -53,7 +54,7 @@ export function GuidePage({ locale }: { locale: Locale }) {
               fill="#fa862a"
             />
           </svg>
-          Komite
+          AI Investdesk
         </Link>
         <LanguageSwitch current={locale} path={PATH} available={LOCALES} label={g.deckLabel} />
       </header>

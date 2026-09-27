@@ -5,6 +5,7 @@ import { GoogleAnalytics } from "@next/third-parties/google";
 import { getMeasurementId } from "@/lib/analytics/ga4";
 import { VisitBeacon } from "@/components/visit-beacon";
 import { SiteTranslator } from "@/components/site-translator";
+import { SITE_NAME } from "@/lib/brand";
 import "./globals.css";
 
 const fontSans = Plus_Jakarta_Sans({
@@ -17,7 +18,9 @@ export const metadata: Metadata = {
   // Alamat dasar untuk canonical, hreflang, dan Open Graph. Tanpa ini Next
   // menulis alamat relatif, dan Google menolak hreflang yang tidak absolut.
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"),
-  title: { default: "Komite — analisis probabilistik", template: "%s — Komite" },
+  title: { default: `${SITE_NAME} — analisis probabilistik`, template: `%s — ${SITE_NAME}` },
+  applicationName: SITE_NAME,
+  openGraph: { siteName: SITE_NAME },
   description:
     "Alat analisis data untuk saham IDX, saham AS, dan crypto. " +
     "Menampilkan peluang beserta dasarnya, bukan anjuran.",

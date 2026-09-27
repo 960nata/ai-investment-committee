@@ -64,7 +64,7 @@ import { VisitorMap } from '@/components/visitor-map'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Analitik Pengguna | Admin Komite',
+  title: 'Analitik Pengguna | Admin AI Investdesk',
   description:
     'Telemetri kunjungan dari Google Analytics 4: pengguna aktif, halaman teratas, perangkat, saluran akuisisi, dan sebaran kota.',
 }
@@ -402,7 +402,7 @@ function VisitorGeoSection({
     <div className="admin-table-card" suppressHydrationWarning>
       <div className="admin-table-card-head">
         <div>
-          <h2 className="admin-table-title">Dari mana pengunjung membuka Komite</h2>
+          <h2 className="admin-table-title">Dari mana pengunjung membuka AI Investdesk</h2>
           <p className="admin-table-subtitle mono">
             Dicatat sendiri oleh aplikasi, bukan dari GA4. Lokasi berasal dari geolokasi IP di tepi
             jaringan; alamat IP-nya sendiri tidak pernah disimpan &mdash; yang tersimpan hanya

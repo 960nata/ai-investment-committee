@@ -38,6 +38,7 @@ import { LandingFooter } from '@/components/landing-footer'
 import { PublicTerminalCta } from '@/components/public-news-portal'
 import { LanguageSwitch } from '@/components/language-switch'
 import { IconEye } from '@/components/icons'
+import { SITE_NAME } from '@/lib/brand'
 
 const baseUrl = () => process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 
@@ -64,7 +65,7 @@ export async function wartaArticleMetadata(slug: string, locale: Locale): Promis
       title: article.title,
       description: article.summary,
       url,
-      siteName: 'Komite',
+      siteName: SITE_NAME,
       locale: LOCALE_INFO[locale].ogLocale,
       alternateLocale: available.filter((l) => l !== locale).map((l) => LOCALE_INFO[l].ogLocale),
       images: imageUrl ? [{ url: imageUrl, alt: article.featuredImage?.alt ?? article.title }] : undefined,
@@ -120,7 +121,7 @@ export async function WartaArticle({ slug, locale }: { slug: string; locale: Loc
     datePublished: article.publishedAt.toISOString(),
     dateModified: article.publishedAt.toISOString(),
     author: [{ '@type': 'Organization', name: article.author, url: baseUrl() }],
-    publisher: { '@type': 'Organization', name: 'Komite', url: baseUrl() },
+    publisher: { '@type': 'Organization', name: SITE_NAME, url: baseUrl() },
     mainEntityOfPage: { '@type': 'WebPage', '@id': articleUrl },
     ...(locale !== SOURCE_LOCALE
       ? {

@@ -119,7 +119,7 @@ export function readSessionToken(token: string | undefined | null): UserSession 
     return {
       uid: payload.uid,
       email: payload.email,
-      name: typeof payload.name === 'string' ? payload.name : 'Analis Komite',
+      name: typeof payload.name === 'string' ? payload.name : 'Analis AI Investdesk',
       role: payload.role === 'admin' ? 'admin' : 'user',
       exp: payload.exp,
     }

@@ -25,6 +25,7 @@ import { Lamp, type State } from './ui'
 import { SECTIONS } from './rail'
 import { LanguageMenu } from './language-menu'
 import { useSidebar } from './sidebar-context'
+import { SITE_NAME } from '@/lib/brand'
 
 const TITLES = new Map(
   SECTIONS.flatMap((s) => s.links).map((l) => [l.href, l.label] as const),
@@ -50,7 +51,7 @@ export function Topbar({
 }) {
   const pathname = usePathname()
   const router = useRouter()
-  const title = TITLES.get(pathname) ?? 'Komite'
+  const title = TITLES.get(pathname) ?? SITE_NAME
   const { toggle } = useSidebar()
 
   async function handleLogout() {
@@ -79,7 +80,7 @@ export function Topbar({
         <span className="mark-glyph">
           <IconPulse size={14} />
         </span>
-        <span className="mark-name">Komite</span>
+        <span className="mark-name">{SITE_NAME}</span>
         <span className="mark-phase">f1</span>
       </Link>
 

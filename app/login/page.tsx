@@ -88,7 +88,7 @@ function UserLoginForm() {
             <IconPulse size={18} />
           </span>
           <span className="mark-name" style={{ fontSize: '20px' }}>
-            Komite
+            AI Investdesk
           </span>
         </Link>
         <p className="mono" style={{ fontSize: '11px', color: 'var(--ink-faint)', marginTop: '6px' }}>

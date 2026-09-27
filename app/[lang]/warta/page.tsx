@@ -61,7 +61,7 @@ export default async function LocalizedNewsIndex({ params }: Props) {
               fill="#fa862a"
             />
           </svg>
-          Komite
+          AI Investdesk
         </Link>
         <LanguageSwitch current={lang} path="/warta" available={LOCALES} label={ui.language} />
       </header>
@@ -70,7 +70,7 @@ export default async function LocalizedNewsIndex({ params }: Props) {
         <div className="lp-inner">
           <header className="lp-head">
             <div>
-              <p className="lp-label">Komite</p>
+              <p className="lp-label">AI Investdesk</p>
               <h1 className="lp-title">{ui.indexTitle}</h1>
             </div>
             <p className="lp-sub">{ui.indexLede}</p>

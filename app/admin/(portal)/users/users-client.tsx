@@ -163,7 +163,7 @@ export function UsersClient({ initialUsers }: { initialUsers: PublicAppUser[] })
         <div className="admin-card" style={{ marginBottom: 0, border: '1px solid var(--signal)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
             <span className="tag mono" style={{ color: 'var(--signal)', borderColor: 'rgba(224,161,60,0.3)' }}>
-              Hak Akses: Administrator Komite
+              Hak Akses: Administrator AI Investdesk
             </span>
           </div>
           <p style={{ fontSize: '13px', color: 'var(--ink-soft)', lineHeight: 1.5, margin: 0 }}>

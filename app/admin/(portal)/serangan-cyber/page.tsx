@@ -2,7 +2,7 @@
  * Pusat Kendali & Peta Serangan Cyber Global (Cyber Threat Radar & Map).
  *
  * Menampilkan:
- * 1. Peta Leaflet Interaktif lintasan serangan global ke server Komite (Jakarta node).
+ * 1. Peta Leaflet Interaktif lintasan serangan global ke server AI Investdesk (Jakarta node).
  * 2. 10 Tab Rentang Waktu yang diminta:
  *    - Realtime (Live Stream)
  *    - 1 Hari
@@ -41,7 +41,7 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 export const metadata: Metadata = {
-  title: 'Peta Serangan Cyber | Admin Komite',
+  title: 'Peta Serangan Cyber | Admin AI Investdesk',
   description:
     'Peta interaktif Leaflet radar serangan cyber global, mitigasi WAF, dan telemetri ancaman siber dengan 10 tab rentang waktu.',
 }

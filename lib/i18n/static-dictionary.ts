@@ -12,7 +12,7 @@ import type { Locale } from './locales'
 export const STATIC_DICTIONARY: Record<Exclude<Locale, 'id'>, Record<string, string>> = {
   en: {
     // Navigasi & Menu
-    'Komite': 'Komite',
+    'AI Investdesk': 'AI Investdesk',
     'Pasar': 'Markets',
     'Sidang AI': 'AI Board',
     'Berita': 'News',
@@ -65,7 +65,7 @@ export const STATIC_DICTIONARY: Record<Exclude<Locale, 'id'>, Record<string, str
     'Bukan ramalan harga klenik. Sistem analisis probabilistik independen yang mempertemukan analis kuantitatif, pakar strategi, dan pengawas risiko berveto untuk membedah saham IDX, kripto, dan komoditas secara matematis.':
       'Not mythical price forecasting. An independent probabilistic analysis system uniting quantitative analysts, portfolio strategists, and veto-empowered risk guardians to dissect IDX stocks, crypto, and commodities mathematically.',
     'Baca Metodologi': 'Read Methodology',
-    'Cara kerja Komite dalam 9 slide sederhana, tersedia 5 bahasa': 'How Komite works in 9 simple slides, available in 5 languages',
+    'Cara kerja AI Investdesk dalam 9 slide sederhana, tersedia 5 bahasa': 'How AI Investdesk works in 9 simple slides, available in 5 languages',
     'Empat tahap dari data mentah bursa sampai putusan tertulis': 'Four stages from raw exchange data to written ruling',
     'Peran, kewenangan, dan batas masing-masing agen dalam sidang': 'Roles, authority, and boundaries of each agent in session',
     'Arti bukti positif, berimbang, negatif, dan tidak dinilai': 'Meaning of positive, balanced, negative, and unrated evidence',
@@ -128,7 +128,7 @@ export const STATIC_DICTIONARY: Record<Exclude<Locale, 'id'>, Record<string, str
     'Selesai diterjemahkan': 'Translated to',
   },
   zh: {
-    'Komite': 'Komite',
+    'AI Investdesk': 'AI Investdesk',
     'Pasar': '市场行情',
     'Sidang AI': 'AI 审议委员会',
     'Berita': '财经情报',
@@ -170,7 +170,7 @@ export const STATIC_DICTIONARY: Record<Exclude<Locale, 'id'>, Record<string, str
     'Bukti negatif': '消极卖方证据',
   },
   ja: {
-    'Komite': 'Komite',
+    'AI Investdesk': 'AI Investdesk',
     'Pasar': '市場動向',
     'Sidang AI': 'AI 審議委員会',
     'Berita': '市況ニュース',
@@ -212,7 +212,7 @@ export const STATIC_DICTIONARY: Record<Exclude<Locale, 'id'>, Record<string, str
     'Bukti negatif': '弱気エビデンス',
   },
   ru: {
-    'Komite': 'Komite',
+    'AI Investdesk': 'AI Investdesk',
     'Pasar': 'Рынки',
     'Sidang AI': 'ИИ-совет',
     'Berita': 'Новости',

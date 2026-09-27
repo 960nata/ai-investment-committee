@@ -48,7 +48,7 @@ export default async function AdminOverviewPage() {
           </div>
 
           <h1 className="admin-page-headline">
-            Dashboard <span className="admin-headline-accent">Administrator</span> Komite
+            Dashboard <span className="admin-headline-accent">Administrator</span> AI Investdesk
           </h1>
 
           <p className="admin-page-standfirst">

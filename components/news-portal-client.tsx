@@ -43,10 +43,6 @@ export function NewsPortalClient({
     return matchCategory && matchQuery
   })
 
-  const heroArticle = filteredArticles[0] ?? null
-  const subFeaturedArticles = filteredArticles.slice(1, 4)
-  const remainingArticles = filteredArticles.slice(4)
-
   return (
     <div className="news-portal">
       {/* --- Header Bar --- */}
@@ -131,300 +127,15 @@ export function NewsPortalClient({
         </div>
       </section>
 
-      {/* --- Showcase Berita Utama 2-Grid (60% Kiri Hero Card / 40% Kanan 3 Sub-Berita) --- */}
-      {heroArticle && (
-        <section className="news-headline-showcase">
-          {/* Kolom Kiri: 60% Hero Card Persegi Panjang dengan Teks di Dalam Gambar */}
-          <Link
-            href={`/berita/${heroArticle.slug}`}
-            className="news-headline-hero"
-          >
-            {heroArticle.featuredImage?.url ? (
-              <img
-                src={heroArticle.featuredImage.url}
-                alt={heroArticle.featuredImage.alt ?? heroArticle.title}
-                className="news-headline-hero-bg"
-              />
-            ) : (
-              <div
-                style={{
-                  position: 'absolute',
-                  inset: 0,
-                  background: 'var(--bg-subtle)',
-                }}
-              />
-            )}
-            <div className="news-headline-hero-overlay" />
-
-            <div className="news-headline-hero-content">
-              {/* Bagian Atas: Badge Lencana Kategori & Skor Dampak */}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  fontSize: 'var(--t-micro)',
-                  fontFamily: 'var(--mono)',
-                  color: 'rgba(255, 255, 255, 0.9)',
-                }}
-              >
-                <span
-                  style={{
-                    background: 'rgba(0, 0, 0, 0.65)',
-                    border: '1px solid rgba(255, 255, 255, 0.25)',
-                    padding: '3px 8px',
-                    borderRadius: 'var(--radius-sm)',
-                    fontWeight: 700,
-                    letterSpacing: '0.04em',
-                    backdropFilter: 'blur(4px)',
-                  }}
-                >
-                  BERITA UTAMA · {heroArticle.category.toUpperCase()}
-                </span>
-                <span
-                  style={{
-                    background: 'rgba(0, 0, 0, 0.65)',
-                    border: '1px solid rgba(255, 255, 255, 0.25)',
-                    padding: '3px 8px',
-                    borderRadius: 'var(--radius-sm)',
-                    backdropFilter: 'blur(4px)',
-                  }}
-                >
-                  DAMPAK {heroArticle.impactScore}/10
-                </span>
-                {heroArticle.featuredImage?.url?.includes('supabase.co') && (
-                  <span
-                    style={{
-                      background: 'rgba(16, 185, 129, 0.4)',
-                      border: '1px solid rgba(52, 211, 153, 0.5)',
-                      color: '#a7f3d0',
-                      padding: '3px 8px',
-                      borderRadius: 'var(--radius-sm)',
-                      backdropFilter: 'blur(4px)',
-                      fontWeight: 600,
-                    }}
-                    title="Aset foto tersimpan di Supabase Storage"
-                  >
-                    Supabase Storage
-                  </span>
-                )}
-                {heroArticle.youtubeVideo && (
-                  <span
-                    style={{
-                      background: 'rgba(0, 0, 0, 0.65)',
-                      border: '1px solid rgba(255, 255, 255, 0.25)',
-                      padding: '3px 8px',
-                      borderRadius: 'var(--radius-sm)',
-                      backdropFilter: 'blur(4px)',
-                    }}
-                  >
-                    VIDEO TERSEDIA
-                  </span>
-                )}
-              </div>
-
-              {/* Bagian Bawah: Judul, Ringkasan, Simbol, Footer (Semua di dalam Gambar) */}
-              <div>
-                <h2 className="news-headline-hero-title">
-                  {heroArticle.title}
-                </h2>
-
-                <p className="news-headline-hero-summary">
-                  {heroArticle.summary}
-                </p>
-
-                <div
-                  style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    alignItems: 'center',
-                    gap: 6,
-                    marginBottom: 12,
-                  }}
-                >
-                  {heroArticle.mentionedSymbols.map((sym) => (
-                    <span
-                      key={sym}
-                      style={{
-                        background: 'rgba(0, 0, 0, 0.65)',
-                        color: '#fff',
-                        border: '1px solid rgba(255, 255, 255, 0.3)',
-                        padding: '2px 8px',
-                        borderRadius: 'var(--radius-sm)',
-                        fontFamily: 'var(--mono)',
-                        fontSize: 'var(--t-micro)',
-                        fontWeight: 600,
-                        backdropFilter: 'blur(4px)',
-                      }}
-                    >
-                      ${sym}
-                    </span>
-                  ))}
-                </div>
-
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    fontSize: 'var(--t-micro)',
-                    fontFamily: 'var(--mono)',
-                    color: 'rgba(255, 255, 255, 0.8)',
-                    borderTop: '1px solid rgba(255, 255, 255, 0.2)',
-                    paddingTop: 10,
-                  }}
-                >
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                    <span>{heroArticle.author} · {heroArticle.readingTimeMinutes} mnt baca</span>
-                    <span>·</span>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                      <IconEye size={12} />
-                      {(heroArticle.viewsCount ?? 0).toLocaleString('id-ID')} tayangan
-                    </span>
-                  </span>
-                  <span
-                    style={{
-                      color: '#ffffff',
-                      fontWeight: 600,
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 4,
-                    }}
-                  >
-                    Baca telaah lengkap →
-                  </span>
-                </div>
-              </div>
-            </div>
-          </Link>
-
-          {/* Kolom Kanan: 40% Berisi 3 Berita Tersusun Ke Bawah (Gambar Kiri, Info Kanan) */}
-          <div className="news-headline-sidebar">
-            {subFeaturedArticles.map((subArticle) => (
-              <Link
-                key={subArticle.id}
-                href={`/berita/${subArticle.slug}`}
-                className="news-sub-card"
-              >
-                <div className="news-sub-img-wrap">
-                  {subArticle.featuredImage?.url ? (
-                    <img
-                      src={subArticle.featuredImage.url}
-                      alt={subArticle.featuredImage.alt ?? subArticle.title}
-                      className="news-sub-img"
-                    />
-                  ) : (
-                    <div
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        background: 'var(--bg-subtle)',
-                      }}
-                    />
-                  )}
-                </div>
-
-                <div className="news-sub-body">
-                  <div>
-                    <div className="news-sub-meta">
-                      <span style={{ textTransform: 'uppercase', color: 'var(--ink)' }}>
-                        {subArticle.category}
-                      </span>
-                      <span>·</span>
-                      <span>{subArticle.readingTimeMinutes} mnt baca</span>
-                      <span>·</span>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: 'var(--ink)' }}>
-                        <IconEye size={11} />
-                        {(subArticle.viewsCount ?? 0).toLocaleString('id-ID')}
-                      </span>
-                      {subArticle.featuredImage?.url?.includes('supabase.co') && (
-                        <>
-                          <span>·</span>
-                          <span style={{ color: 'var(--positive, #10b981)', fontWeight: 600 }}>Supabase</span>
-                        </>
-                      )}
-                    </div>
-
-                    <h3 className="news-sub-title">
-                      {subArticle.title}
-                    </h3>
-
-                    <p className="news-sub-summary">
-                      {subArticle.summary}
-                    </p>
-                  </div>
-
-                  <div className="news-sub-footer">
-                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                      {subArticle.mentionedSymbols.slice(0, 2).map((s) => (
-                        <span key={s} className="badge-ticker">
-                          ${s}
-                        </span>
-                      ))}
-                    </div>
-                    <span
-                      className={`badge-tag ${
-                        subArticle.sentiment === 'bullish'
-                          ? 'badge-sentiment-bullish'
-                          : subArticle.sentiment === 'bearish'
-                            ? 'badge-sentiment-bearish'
-                            : 'badge-sentiment-neutral'
-                      }`}
-                      style={{ fontSize: 9 }}
-                    >
-                      {subArticle.sentiment.toUpperCase()}
-                    </span>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* --- Grid Artikel Berita Lainnya (Mulai dari Berita ke-5) --- */}
-      {remainingArticles.length > 0 ? (
-        <section style={{ marginTop: 'var(--space-2)' }}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: 'var(--space-3)',
-              paddingBottom: 6,
-              borderBottom: '1px solid var(--line)',
-            }}
-          >
-            <h3
-              style={{
-                margin: 0,
-                fontSize: 14,
-                fontWeight: 600,
-                color: 'var(--ink)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.04em',
-                fontFamily: 'var(--mono)',
-              }}
-            >
-              Telaah Pasar &amp; Arsip Intelijen Lainnya
-            </h3>
-            <span
-              style={{
-                fontSize: 'var(--t-micro)',
-                fontFamily: 'var(--mono)',
-                color: 'var(--ink-mute)',
-              }}
-            >
-              {remainingArticles.length} telaah tersedia
-            </span>
-          </div>
-
+      {/* --- Grid Warta & Intelijen AI (Seragam 3 Kolom) --- */}
+      {filteredArticles.length > 0 ? (
+        <section className="news-grid-section">
           <div className="news-grid">
-            {remainingArticles.map((article) => (
+            {filteredArticles.map((article, index) => (
               <Link
                 key={article.id}
                 href={`/berita/${article.slug}`}
-                className="news-card"
+                className={`news-card${index === 0 ? ' is-lead' : ''}`}
               >
                 <div className="news-card-img-wrap">
                   {article.featuredImage?.url ? (
@@ -434,57 +145,47 @@ export function NewsPortalClient({
                       className="news-card-img"
                     />
                   ) : (
-                    <div
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        background: 'var(--bg-subtle)',
-                      }}
-                    />
+                    <div className="news-card-img-placeholder" />
                   )}
+
+                  {/* Lencana Atas Foto */}
+                  <div className="news-card-badges-top">
+                    {index === 0 && (
+                      <span className="badge-tag badge-tag-lead">
+                        UTAMA
+                      </span>
+                    )}
+                    <span className="badge-tag badge-tag-cat">
+                      {article.category.toUpperCase()}
+                    </span>
+                    <span className="badge-tag badge-tag-impact">
+                      DAMPAK {article.impactScore}/10
+                    </span>
+                    {article.youtubeVideo && (
+                      <span className="badge-tag badge-tag-video">VIDEO</span>
+                    )}
+                    {article.featuredImage?.url?.includes('supabase.co') && (
+                      <span className="badge-tag badge-tag-supabase">Supabase</span>
+                    )}
+                  </div>
                 </div>
 
                 <div className="news-card-body">
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      marginBottom: 8,
-                      fontSize: 'var(--t-micro)',
-                      fontFamily: 'var(--mono)',
-                      color: 'var(--ink-mute)',
-                    }}
-                  >
-                    <span>{article.category.toUpperCase()}</span>
+                  <div className="news-card-meta">
+                    <span>{article.author}</span>
                     <span>·</span>
-                    <span>{article.readingTimeMinutes} mnt</span>
-                    {article.featuredImage?.url?.includes('supabase.co') && (
-                      <>
-                        <span>·</span>
-                        <span style={{ color: 'var(--positive, #10b981)', fontWeight: 600 }}>Supabase</span>
-                      </>
-                    )}
-                    {article.youtubeVideo && (
-                      <>
-                        <span>·</span>
-                        <span>VIDEO</span>
-                      </>
-                    )}
+                    <span>{article.readingTimeMinutes} mnt baca</span>
+                    <span>·</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                      <IconEye size={11} />
+                      {(article.viewsCount ?? 0).toLocaleString('id-ID')}
+                    </span>
                   </div>
 
                   <h3 className="news-card-title">{article.title}</h3>
                   <p className="news-card-summary">{article.summary}</p>
 
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexWrap: 'wrap',
-                      gap: 4,
-                      marginTop: 'auto',
-                      marginBottom: 10,
-                    }}
-                  >
+                  <div className="news-card-symbols">
                     {article.mentionedSymbols.slice(0, 4).map((sym) => (
                       <span key={sym} className="badge-ticker">
                         ${sym}
@@ -492,31 +193,25 @@ export function NewsPortalClient({
                     ))}
                   </div>
 
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      fontSize: 'var(--t-micro)',
-                      fontFamily: 'var(--mono)',
-                      color: 'var(--ink-mute)',
-                      borderTop: '1px solid var(--line)',
-                      paddingTop: 8,
-                    }}
-                  >
-                    <span>
+                  <div className="news-card-footer">
+                    <span className="news-card-date">
                       {new Date(article.publishedAt).toLocaleDateString('id-ID', {
                         day: 'numeric',
                         month: 'short',
                         year: 'numeric',
                       })}
                     </span>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                      <IconEye size={12} style={{ color: 'var(--ink-faint)' }} />
-                      {(article.viewsCount ?? 0).toLocaleString('id-ID')}
-                    </span>
-                    <span style={{ textTransform: 'capitalize' }}>
-                      {article.sentiment}
+                    <span
+                      className={`badge-tag ${
+                        article.sentiment === 'bullish'
+                          ? 'badge-sentiment-bullish'
+                          : article.sentiment === 'bearish'
+                            ? 'badge-sentiment-bearish'
+                            : 'badge-sentiment-neutral'
+                      }`}
+                      style={{ fontSize: 9 }}
+                    >
+                      {article.sentiment.toUpperCase()}
                     </span>
                   </div>
                 </div>
@@ -525,21 +220,19 @@ export function NewsPortalClient({
           </div>
         </section>
       ) : (
-        !heroArticle && (
-          <div
-            style={{
-              padding: 'var(--space-6)',
-              textAlign: 'center',
-              background: 'var(--bg-card)',
-              border: '1px solid var(--line)',
-              borderRadius: 'var(--radius-md)',
-              color: 'var(--ink-mute)',
-              fontSize: 'var(--t-small)',
-            }}
-          >
-            Tidak ada telaah pasar yang cocok dengan filter saat ini.
-          </div>
-        )
+        <div
+          style={{
+            padding: 'var(--space-6)',
+            textAlign: 'center',
+            background: 'var(--bg-card)',
+            border: '1px solid var(--line)',
+            borderRadius: 'var(--radius-md)',
+            color: 'var(--ink-mute)',
+            fontSize: 'var(--t-small)',
+          }}
+        >
+          Tidak ada telaah pasar yang cocok dengan filter saat ini.
+        </div>
       )}
 
 

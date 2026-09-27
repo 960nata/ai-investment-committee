@@ -38,7 +38,7 @@ import { SIGNAL_LABELS } from '@/lib/http/shield'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Keamanan | Admin Komite',
+  title: 'Keamanan | Admin AI Investdesk',
   description:
     'Blokir yang dijatuhkan penyaring serangan, sebarannya per hari, dan sisa pagu belanja model hari ini.',
 }

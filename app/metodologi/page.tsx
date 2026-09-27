@@ -93,7 +93,7 @@ export default function MethodologyPage() {
       <header className="md-bar">
         <div className="md-bar-inner">
           <Link href="/" className="md-brand">
-            Komite
+            AI Investdesk
           </Link>
           <nav aria-label="Navigasi metodologi">
             <a href="#cara-kerja">Cara kerja</a>

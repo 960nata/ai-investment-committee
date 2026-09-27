@@ -112,7 +112,7 @@ export interface CyberThreatSummary {
 }
 
 export const KOMITE_TARGET_NODE = {
-  name: 'Komite Core Server Edge',
+  name: 'AI Investdesk Core Server Edge',
   city: 'Jakarta',
   country: 'Indonesia',
   lat: -6.2088,

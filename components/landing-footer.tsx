@@ -24,11 +24,11 @@ export function LandingFooter() {
               <span className="mark-glyph">
                 <IconPulse size={16} />
               </span>
-              <span className="mark-name">Komite</span>
+              <span className="mark-name">AI Investdesk</span>
               <span className="mark-phase">f1</span>
             </div>
             <p className="footer-disclaimer">
-              Komite adalah instrumen pengukur kuantitatif independen. Menampilkan data faktual,
+              AI Investdesk adalah instrumen pengukur kuantitatif independen. Menampilkan data faktual,
               metrik risiko, dan sintesis komite multi-agen. Bukan rekomendasi atau anjuran
               transaksi keuangan.
             </p>
@@ -66,7 +66,7 @@ export function LandingFooter() {
         </div>
 
         <div className="footer-bottom-row mono">
-          <span>&copy; {new Date().getFullYear()} Komite. All quantitative protocols reserved.</span>
+          <span>&copy; {new Date().getFullYear()} AI Investdesk. All quantitative protocols reserved.</span>
           <span>Zero Hallucination Protocol v2.4</span>
         </div>
       </div>

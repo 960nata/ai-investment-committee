@@ -84,7 +84,7 @@ const GUIDE_LINKS = [
   {
     href: '/panduan',
     name: 'Panduan Pengguna',
-    desc: 'Cara kerja Komite dalam 9 slide sederhana, tersedia 5 bahasa',
+    desc: 'Cara kerja AI Investdesk dalam 9 slide sederhana, tersedia 5 bahasa',
     icon: IconGauge,
   },
   {
@@ -363,7 +363,7 @@ export function LandingNav({
             <span className="landing-logo-mark">
               <BrandSpark />
             </span>
-            <span className="mark-name">Komite</span>
+            <span className="mark-name">AI Investdesk</span>
           </Link>
 
           {/* Center Navigation Links with Friendly Mega Dropdowns */}
@@ -847,7 +847,7 @@ export function LandingNav({
                 <Link
                   href="/ringkasan"
                   className="btn btn-primary landing-action-btn"
-                  title="Buka Terminal Komite"
+                  title="Buka Terminal AI Investdesk"
                 >
                   <span className="badge-live-pulse" style={{ width: '6px', height: '6px' }} />
                   <IconGauge size={14} />
@@ -929,7 +929,7 @@ export function LandingNav({
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
-            aria-label="Pencarian Instrumen Komite"
+            aria-label="Pencarian Instrumen AI Investdesk"
           >
             {/* Search Input Bar */}
             <div className="command-input-row">
@@ -1063,7 +1063,7 @@ export function LandingNav({
                 <span className="landing-logo-mark">
                   <BrandSpark />
                 </span>
-                <span className="mark-name">Komite</span>
+                <span className="mark-name">AI Investdesk</span>
               </div>
               <button
                 type="button"

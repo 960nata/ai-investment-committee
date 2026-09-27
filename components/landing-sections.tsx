@@ -722,7 +722,7 @@ export function LandingDisclaimerFooter() {
     <footer className="lp-footer">
       <div className="lp-inner">
         <div className="lp-footer-top">
-          <p className="lp-footer-brand">Komite</p>
+          <p className="lp-footer-brand">AI Investdesk</p>
           <nav className="lp-footer-links" aria-label="Tautan kaki">
             <Link href="/ringkasan">Terminal</Link>
             <Link href="/instruments">Instrumen</Link>

@@ -39,7 +39,7 @@ interface FirebaseAccountInfo {
 async function verifyGoogleToken(token: string): Promise<{ email: string; name: string } | null> {
   try {
     const res = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${token}`, {
-      headers: { 'User-Agent': 'Komite-Auth/1.0' },
+      headers: { 'User-Agent': 'AIInvestdesk-Auth/1.0' },
     })
     if (!res.ok) return null
     const data = (await res.json()) as GoogleTokenInfo
@@ -137,7 +137,7 @@ export async function POST(req: NextRequest) {
     const existing = await getAppUserByEmail(verified.email)
     if (existing && !existing.isActive) {
       return NextResponse.json(
-        { ok: false, error: 'Akun ini dinonaktifkan. Hubungi pengelola Komite.' },
+        { ok: false, error: 'Akun ini dinonaktifkan. Hubungi pengelola AI Investdesk.' },
         { status: 403 },
       )
     }

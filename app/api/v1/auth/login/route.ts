@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
 
     if (!user.isActive) {
       return NextResponse.json(
-        { ok: false, error: 'Akun ini dinonaktifkan. Hubungi pengelola Komite.' },
+        { ok: false, error: 'Akun ini dinonaktifkan. Hubungi pengelola AI Investdesk.' },
         { status: 403 },
       )
     }

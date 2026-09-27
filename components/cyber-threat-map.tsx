@@ -4,7 +4,7 @@
  * Peta Ancaman & Serangan Cyber Interaktif (Leaflet Threat Intelligence Map).
  *
  * Menggambar visualisasi pertahanan siber global:
- * - Node Pertahanan Utama: Komite Server Node (Jakarta, Indonesia) dengan radar pulse hijau/cyan.
+ * - Node Pertahanan Utama: AI Investdesk Server Node (Jakarta, Indonesia) dengan radar pulse hijau/cyan.
  * - Titik Asal Serangan: Koordinat global sumber serangan dengan penanda berkedip sesuai tingkat bahaya (Kritis, Tinggi, Sedang).
  * - Lintasan Serangan (Trajectory Arcs): Garis busur dari asal serangan menuju target.
  * - Mode Realtime: Animasi transmisi serangan langsung dengan ticker insiden berjalan dan tombol Play/Pause.
@@ -23,9 +23,13 @@ import {
   IconLock,
 } from '@/components/icons'
 
-const TILE_URL = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+/** Ubin peta ArcGIS World Dark Gray (Bebas API Key & Tanpa Watermark). */
+const TILE_URL =
+  'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}'
+const TILE_REF_URL =
+  'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}'
 const TILE_ATTRIBUTION =
-  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+  '&copy; <a href="https://www.esri.com/">Esri</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
 
 const TARGET_COORDS: [number, number] = [-6.2088, 106.8456] // Jakarta, ID
 
@@ -78,8 +82,12 @@ export function CyberThreatMap({ attacks, range, totalBlocked }: CyberThreatMapP
 
         L.tileLayer(TILE_URL, {
           attribution: TILE_ATTRIBUTION,
-          subdomains: 'abcd',
           maxZoom: 9,
+        }).addTo(map)
+
+        L.tileLayer(TILE_REF_URL, {
+          maxZoom: 9,
+          opacity: 0.8,
         }).addTo(map)
 
         // 2. Buat Lapisan Marker & Garis Lintasan
@@ -322,7 +330,7 @@ export function CyberThreatMap({ attacks, range, totalBlocked }: CyberThreatMapP
         <div className="cyber-map-legend mono">
           <div className="legend-item">
             <span className="legend-icon node-icon" />
-            <span>Target: Komite Server (ID)</span>
+            <span>Target: AI Investdesk Server (ID)</span>
           </div>
           <div className="legend-item">
             <span className="legend-icon crit-icon" />

@@ -70,7 +70,7 @@ export function AdminLayoutClient({ children }: AdminLayoutClientProps) {
             <span className="mark-glyph">
               <IconPulse size={15} />
             </span>
-            <span className="mark-name">Komite</span>
+            <span className="mark-name">AI Investdesk</span>
             <span className="admin-badge mono">ADMIN</span>
           </Link>
 

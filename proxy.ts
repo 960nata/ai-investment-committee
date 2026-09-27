@@ -48,8 +48,9 @@ const isProduction = process.env.NODE_ENV === 'production'
  * Dibaca dari env, bukan ditulis mati: proyek yang sama bisa berjalan di atas
  * bucket yang berbeda, dan asal yang ditulis mati akan diam-diam salah di sana.
  */
-/** Asal ubin peta. Sepadan dengan TILE_URL di components/visitor-map.tsx. */
-const MAP_TILE_ORIGIN = 'https://*.basemaps.cartocdn.com'
+/** Asal ubin peta. Sepadan dengan TILE_URL di peta Leaflet. */
+const MAP_TILE_ORIGIN =
+  'https://server.arcgisonline.com https://services.arcgisonline.com https://*.basemaps.cartocdn.com'
 
 const imageOrigin = (() => {
   const raw = process.env.NEXT_PUBLIC_SUPABASE_URL

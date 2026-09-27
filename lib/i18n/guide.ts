@@ -47,10 +47,10 @@ export interface GuideContent {
 
 export const GUIDE: Record<Locale, GuideContent> = {
   id: {
-    metaTitle: 'Panduan pengguna — Komite dalam 9 slide',
+    metaTitle: 'Panduan pengguna — AI Investdesk dalam 9 slide',
     metaDescription:
-      'Penjelasan paling sederhana tentang cara kerja Komite: dari harga harian, rumus, empat AI yang berdebat, sampai cara membaca hasilnya.',
-    deckLabel: 'Panduan Komite',
+      'Penjelasan paling sederhana tentang cara kerja AI Investdesk: dari harga harian, rumus, empat AI yang berdebat, sampai cara membaca hasilnya.',
+    deckLabel: 'Panduan AI Investdesk',
     prev: 'Sebelumnya',
     next: 'Berikutnya',
     slideOf: (n, t) => `${n} dari ${t}`,
@@ -61,8 +61,8 @@ export const GUIDE: Record<Locale, GuideContent> = {
       {
         art: 'hello',
         kicker: 'Halo!',
-        title: 'Ini Komite',
-        body: 'Komite membaca data pasar setiap hari, lalu memberi tahu apa kata datanya. Bukan menyuruh kamu membeli atau menjual.',
+        title: 'Ini AI Investdesk',
+        body: 'AI Investdesk membaca data pasar setiap hari, lalu memberi tahu apa kata datanya. Bukan menyuruh kamu membeli atau menjual.',
       },
       {
         art: 'noise',
@@ -103,7 +103,7 @@ export const GUIDE: Record<Locale, GuideContent> = {
         art: 'unknown',
         kicker: 'Jujur',
         title: 'Kalau tidak tahu, kami bilang',
-        body: 'Kalau datanya kurang, Komite menulis "tidak dinilai". Lebih baik bilang tidak tahu daripada mengarang jawaban.',
+        body: 'Kalau datanya kurang, AI Investdesk menulis "tidak dinilai". Lebih baik bilang tidak tahu daripada mengarang jawaban.',
         labels: ['Tidak dinilai'],
       },
       {
@@ -117,16 +117,16 @@ export const GUIDE: Record<Locale, GuideContent> = {
         art: 'promise',
         kicker: 'Ingat ya',
         title: 'Alat bantu, bukan nasihat',
-        body: 'Komite membantu kamu memahami data. Keputusan dan risikonya tetap milikmu. Selamat mencoba!',
+        body: 'AI Investdesk membantu kamu memahami data. Keputusan dan risikonya tetap milikmu. Selamat mencoba!',
       },
     ],
   },
 
   en: {
-    metaTitle: 'User guide — Komite in 9 slides',
+    metaTitle: 'User guide — AI Investdesk in 9 slides',
     metaDescription:
-      'The simplest explanation of how Komite works: daily prices, formulas, four AIs that debate, and how to read the result.',
-    deckLabel: 'Komite guide',
+      'The simplest explanation of how AI Investdesk works: daily prices, formulas, four AIs that debate, and how to read the result.',
+    deckLabel: 'AI Investdesk guide',
     prev: 'Previous',
     next: 'Next',
     slideOf: (n, t) => `${n} of ${t}`,
@@ -137,8 +137,8 @@ export const GUIDE: Record<Locale, GuideContent> = {
       {
         art: 'hello',
         kicker: 'Hi there!',
-        title: 'This is Komite',
-        body: 'Komite reads market data every day and tells you what the data says. It never tells you to buy or sell.',
+        title: 'This is AI Investdesk',
+        body: 'AI Investdesk reads market data every day and tells you what the data says. It never tells you to buy or sell.',
       },
       {
         art: 'noise',
@@ -179,7 +179,7 @@ export const GUIDE: Record<Locale, GuideContent> = {
         art: 'unknown',
         kicker: 'Honest',
         title: 'If we do not know, we say so',
-        body: 'When there is not enough data, Komite writes "not rated". Saying "I don\'t know" beats making up an answer.',
+        body: 'When there is not enough data, AI Investdesk writes "not rated". Saying "I don\'t know" beats making up an answer.',
         labels: ['Not rated'],
       },
       {
@@ -193,16 +193,16 @@ export const GUIDE: Record<Locale, GuideContent> = {
         art: 'promise',
         kicker: 'Remember',
         title: 'A helper, not advice',
-        body: 'Komite helps you understand the data. The decision and the risk stay yours. Enjoy exploring!',
+        body: 'AI Investdesk helps you understand the data. The decision and the risk stay yours. Enjoy exploring!',
       },
     ],
   },
 
   zh: {
-    metaTitle: '使用指南 — 9 页看懂 Komite',
+    metaTitle: '使用指南 — 9 页看懂 AI Investdesk',
     metaDescription:
-      '用最简单的话说明 Komite 如何运作：每日价格、计算公式、四个互相辩论的 AI，以及如何读懂结果。',
-    deckLabel: 'Komite 使用指南',
+      '用最简单的话说明 AI Investdesk 如何运作：每日价格、计算公式、四个互相辩论的 AI，以及如何读懂结果。',
+    deckLabel: 'AI Investdesk 使用指南',
     prev: '上一页',
     next: '下一页',
     slideOf: (n, t) => `第 ${n} / ${t} 页`,
@@ -213,8 +213,8 @@ export const GUIDE: Record<Locale, GuideContent> = {
       {
         art: 'hello',
         kicker: '你好！',
-        title: '这里是 Komite',
-        body: 'Komite 每天阅读市场数据，然后告诉你数据在说什么。它从不叫你买入或卖出。',
+        title: '这里是 AI Investdesk',
+        body: 'AI Investdesk 每天阅读市场数据，然后告诉你数据在说什么。它从不叫你买入或卖出。',
       },
       {
         art: 'noise',
@@ -255,7 +255,7 @@ export const GUIDE: Record<Locale, GuideContent> = {
         art: 'unknown',
         kicker: '诚实',
         title: '不知道，就直说',
-        body: '数据不够时，Komite 会写"未评估"。说"不知道"总比编一个答案好。',
+        body: '数据不够时，AI Investdesk 会写"未评估"。说"不知道"总比编一个答案好。',
         labels: ['未评估'],
       },
       {
@@ -269,16 +269,16 @@ export const GUIDE: Record<Locale, GuideContent> = {
         art: 'promise',
         kicker: '请记住',
         title: '是助手，不是投资建议',
-        body: 'Komite 帮你看懂数据。决定和风险始终属于你自己。祝你探索愉快！',
+        body: 'AI Investdesk 帮你看懂数据。决定和风险始终属于你自己。祝你探索愉快！',
       },
     ],
   },
 
   ja: {
-    metaTitle: 'ご利用ガイド — 9枚でわかる Komite',
+    metaTitle: 'ご利用ガイド — 9枚でわかる AI Investdesk',
     metaDescription:
-      'Komite のしくみをいちばんやさしく説明します。毎日の価格、計算式、議論する4つのAI、そして結果の読み方。',
-    deckLabel: 'Komite ガイド',
+      'AI Investdesk のしくみをいちばんやさしく説明します。毎日の価格、計算式、議論する4つのAI、そして結果の読み方。',
+    deckLabel: 'AI Investdesk ガイド',
     prev: '前へ',
     next: '次へ',
     slideOf: (n, t) => `${n} / ${t}`,
@@ -289,8 +289,8 @@ export const GUIDE: Record<Locale, GuideContent> = {
       {
         art: 'hello',
         kicker: 'こんにちは！',
-        title: 'これが Komite です',
-        body: 'Komite は毎日マーケットのデータを読み、データが何を示しているかを伝えます。「買え」「売れ」とは言いません。',
+        title: 'これが AI Investdesk です',
+        body: 'AI Investdesk は毎日マーケットのデータを読み、データが何を示しているかを伝えます。「買え」「売れ」とは言いません。',
       },
       {
         art: 'noise',
@@ -331,7 +331,7 @@ export const GUIDE: Record<Locale, GuideContent> = {
         art: 'unknown',
         kicker: '正直に',
         title: 'わからないときは、そう言います',
-        body: 'データが足りないとき、Komite は「評価なし」と書きます。答えをつくるより「わからない」と言うほうがいいからです。',
+        body: 'データが足りないとき、AI Investdesk は「評価なし」と書きます。答えをつくるより「わからない」と言うほうがいいからです。',
         labels: ['評価なし'],
       },
       {
@@ -345,16 +345,16 @@ export const GUIDE: Record<Locale, GuideContent> = {
         art: 'promise',
         kicker: 'おぼえておいてね',
         title: '助けにはなるけど、助言ではありません',
-        body: 'Komite はデータを理解するお手伝いをします。決めるのも、リスクを負うのもあなたです。楽しんでください！',
+        body: 'AI Investdesk はデータを理解するお手伝いをします。決めるのも、リスクを負うのもあなたです。楽しんでください！',
       },
     ],
   },
 
   ru: {
-    metaTitle: 'Руководство — Komite за 9 слайдов',
+    metaTitle: 'Руководство — AI Investdesk за 9 слайдов',
     metaDescription:
-      'Самое простое объяснение того, как работает Komite: ежедневные цены, формулы, четыре спорящих ИИ и как читать результат.',
-    deckLabel: 'Руководство Komite',
+      'Самое простое объяснение того, как работает AI Investdesk: ежедневные цены, формулы, четыре спорящих ИИ и как читать результат.',
+    deckLabel: 'Руководство AI Investdesk',
     prev: 'Назад',
     next: 'Далее',
     slideOf: (n, t) => `${n} из ${t}`,
@@ -365,8 +365,8 @@ export const GUIDE: Record<Locale, GuideContent> = {
       {
         art: 'hello',
         kicker: 'Привет!',
-        title: 'Это Komite',
-        body: 'Komite каждый день читает рыночные данные и рассказывает, что они говорят. Он никогда не говорит вам покупать или продавать.',
+        title: 'Это AI Investdesk',
+        body: 'AI Investdesk каждый день читает рыночные данные и рассказывает, что они говорят. Он никогда не говорит вам покупать или продавать.',
       },
       {
         art: 'noise',
@@ -407,7 +407,7 @@ export const GUIDE: Record<Locale, GuideContent> = {
         art: 'unknown',
         kicker: 'Честно',
         title: 'Если не знаем — так и говорим',
-        body: 'Когда данных мало, Komite пишет «без оценки». Лучше сказать «не знаю», чем придумать ответ.',
+        body: 'Когда данных мало, AI Investdesk пишет «без оценки». Лучше сказать «не знаю», чем придумать ответ.',
         labels: ['Без оценки'],
       },
       {
@@ -421,7 +421,7 @@ export const GUIDE: Record<Locale, GuideContent> = {
         art: 'promise',
         kicker: 'Запомните',
         title: 'Помощник, а не совет',
-        body: 'Komite помогает понять данные. Решение и риск остаются за вами. Приятного знакомства!',
+        body: 'AI Investdesk помогает понять данные. Решение и риск остаются за вами. Приятного знакомства!',
       },
     ],
   },

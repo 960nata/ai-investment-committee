@@ -24,18 +24,18 @@ import { PublicNewsPortal } from '@/components/public-news-portal'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Warta & Intelijen Pasar AI | Komite',
+  title: 'Warta & Intelijen Pasar AI | AI Investdesk',
   description:
     'Laporan intelijen ekonomi makro, ledakan teknologi AI, sektor energi data center, dan korelasi pergerakan saham global serta emiten IDX oleh komite AI. Terbuka untuk umum.',
   openGraph: {
-    title: 'Warta & Intelijen Pasar AI | Komite',
+    title: 'Warta & Intelijen Pasar AI | AI Investdesk',
     description:
       'Laporan intelijen mendalam mengupas konvergensi ekonomi makro, energi, dan chip AI terhadap portofolio saham dan kripto.',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Warta & Intelijen Pasar AI | Komite',
+    title: 'Warta & Intelijen Pasar AI | AI Investdesk',
     description:
       'Analisis tajam komite AI menghubungkan belanja capex AI, energi listrik, dan saham terkait.',
   },

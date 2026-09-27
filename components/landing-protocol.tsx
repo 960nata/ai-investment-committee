@@ -14,9 +14,10 @@ import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
  * Angka di sini ilustrasi, dan ditandai begitu di layar.
  */
 
-type AgentId = 'analis' | 'strateg' | 'risiko' | 'ketua'
+export type AgentId = 'analis' | 'strateg' | 'risiko' | 'ketua'
 
-const AGENTS: { id: AgentId; initials: string; name: string; duty: string; rule: string }[] = [
+/** Dipakai juga oleh ruang sidang di dashboard, supaya kursinya sama persis. */
+export const AGENTS: { id: AgentId; initials: string; name: string; duty: string; rule: string }[] = [
   {
     id: 'analis',
     initials: 'AN',

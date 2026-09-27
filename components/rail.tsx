@@ -54,7 +54,7 @@ export function Rail() {
             <span className="mark-glyph">
               <IconPulse size={14} />
             </span>
-            <span className="mark-name">Komite</span>
+            <span className="mark-name">AI Investdesk</span>
             <span className="mark-phase">f1</span>
           </div>
           <button
@@ -92,7 +92,7 @@ export function Rail() {
           keputusan.
           <div style={{ marginTop: 'var(--space-2)', paddingTop: 'var(--space-2)', borderTop: '1px solid var(--line)' }}>
             <Link href="/admin" className="mono" style={{ color: 'var(--ink-faint)', fontSize: '11px', textDecoration: 'none' }}>
-              &rarr; Portal Admin Komite
+              &rarr; Portal Admin AI Investdesk
             </Link>
           </div>
         </div>

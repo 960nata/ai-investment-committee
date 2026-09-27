@@ -9,7 +9,7 @@ export function AdminLogoutButton() {
   const [loading, setLoading] = useState(false)
 
   async function handleLogout() {
-    if (!confirm('Akhiri sesi Administrator Komite?')) return
+    if (!confirm('Akhiri sesi Administrator AI Investdesk?')) return
     setLoading(true)
 
     try {

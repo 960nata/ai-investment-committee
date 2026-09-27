@@ -51,7 +51,7 @@ export function NextAiLanding({
                   <circle cx="12" cy="12" r="1.5" fill="#ffac60" />
                 </svg>
               </span>
-              <span className="nextai-logo-text">Komite Investasi AI</span>
+              <span className="nextai-logo-text">AI Investdesk</span>
             </Link>
 
             <nav className="nextai-links">

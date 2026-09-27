@@ -6,7 +6,7 @@ import { AiTokensDashboardClient } from '@/components/ai-tokens/ai-tokens-dashbo
 export const dynamic = 'force-dynamic'
 
 export const metadata = {
-  title: 'Analisis AI Token & API Keys — Admin Komite',
+  title: 'Analisis AI Token & API Keys — Admin AI Investdesk',
   description:
     'Dashboard telemetri dan analisis penggunaan kunci API AI (Gemini, Groq, OpenRouter), batas kuota 429 TooManyRequests, dan grafik ApexCharts.',
 }

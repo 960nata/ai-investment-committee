@@ -17,7 +17,7 @@ export default async function AdminUsersPage() {
           </div>
           <h1 className="admin-page-headline">Manajemen Pengguna &amp; Hak Akses</h1>
           <p className="admin-page-standfirst">
-            Pemisahan ketat hak akses antara Pengguna Biasa (analis read-only) dan Administrator Komite (akses penuh basis data, CMS, dan iklan).
+            Pemisahan ketat hak akses antara Pengguna Biasa (analis read-only) dan Administrator AI Investdesk (akses penuh basis data, CMS, dan iklan).
           </p>
         </div>
       </div>

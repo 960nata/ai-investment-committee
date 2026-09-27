@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
       youtubeVideo: youtubeVideo || null,
       keyTakeaways: Array.isArray(body.keyTakeaways) ? body.keyTakeaways : [],
       contentMarkdown: body.contentMarkdown,
-      author: body.author?.trim() || 'Tim Analis Komite',
+      author: body.author?.trim() || 'Tim Analis AI Investdesk',
       readingTimeMinutes: body.readingTimeMinutes || Math.max(2, Math.ceil(body.contentMarkdown.length / 800)),
       publishedAt: body.publishedAt ? new Date(body.publishedAt) : new Date(),
     }

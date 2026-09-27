@@ -29,10 +29,13 @@ import type { VisitPoint } from '@/lib/db/visit-queries'
  */
 const MARKER_COLOR = '#e0a13c'
 
-/** Ubin peta. Harus ikut diizinkan `img-src` di proxy.ts, atau ubinnya diblokir. */
-const TILE_URL = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+/** Ubin peta ArcGIS World Dark Gray (Bebas API Key & Tanpa Watermark). */
+const TILE_URL =
+  'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}'
+const TILE_REF_URL =
+  'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}'
 const TILE_ATTRIBUTION =
-  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+  '&copy; <a href="https://www.esri.com/">Esri</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
 
 export function VisitorMap({ points }: { points: VisitPoint[] }) {
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -56,7 +59,7 @@ export function VisitorMap({ points }: { points: VisitPoint[] }) {
           center: [-2.5, 118],
           zoom: 4,
           minZoom: 2,
-          maxZoom: 12,
+          maxZoom: 14,
           scrollWheelZoom: false,
           attributionControl: true,
           worldCopyJump: true,
@@ -64,8 +67,12 @@ export function VisitorMap({ points }: { points: VisitPoint[] }) {
 
         L.tileLayer(TILE_URL, {
           attribution: TILE_ATTRIBUTION,
-          subdomains: 'abcd',
-          maxZoom: 12,
+          maxZoom: 14,
+        }).addTo(map)
+
+        L.tileLayer(TILE_REF_URL, {
+          maxZoom: 14,
+          opacity: 0.8,
         }).addTo(map)
 
         if (points.length > 0) {

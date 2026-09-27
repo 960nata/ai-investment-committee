@@ -119,7 +119,7 @@ export default function AdminLoginPage() {
             <IconPulse size={18} style={{ color: 'var(--signal)' }} />
           </span>
           <span className="mark-name" style={{ fontSize: '20px' }}>
-            Komite
+            AI Investdesk
           </span>
         </Link>
         <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>

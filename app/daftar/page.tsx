@@ -96,7 +96,7 @@ function RegisterForm() {
             <IconPulse size={18} />
           </span>
           <span className="mark-name" style={{ fontSize: '20px' }}>
-            Komite
+            AI Investdesk
           </span>
         </Link>
         <p className="mono" style={{ fontSize: '11px', color: 'var(--ink-faint)', marginTop: '6px' }}>
@@ -114,7 +114,7 @@ function RegisterForm() {
 
         <form onSubmit={handleSubmit} className="auth-form">
           <div>
-            <h1 className="auth-title">Buat Akun Komite</h1>
+            <h1 className="auth-title">Buat Akun AI Investdesk</h1>
             <p className="auth-lead">
               Gratis, tanpa kartu kredit. Sekali daftar, seluruh terminal terbuka: grafik harga,
               putusan empat agen AI, katalog instrumen, dan laboratorium backtest.
