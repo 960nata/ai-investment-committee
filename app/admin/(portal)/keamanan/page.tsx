@@ -16,6 +16,7 @@
  */
 
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import {
   IconActivity,
   IconAlert,
@@ -111,6 +112,13 @@ export default async function AdminSecurityPage() {
             mana pun &mdash; pemindaian alamat, perkakas serangan, dan muatan suntikan ditolak
             tanpa memakai satu pun perintah berbayar.
           </p>
+
+          <div className="admin-hero-actions" style={{ marginTop: '14px' }}>
+            <Link href="/admin/serangan-cyber" className="btn btn-primary mono" style={{ background: '#ef4444', borderColor: '#dc2626' }}>
+              <IconRadar size={14} />
+              <span>Buka Peta &amp; Radar Serangan Cyber (10 Tab)</span>
+            </Link>
+          </div>
         </div>
 
         <div className="admin-hero-chips mono" suppressHydrationWarning>

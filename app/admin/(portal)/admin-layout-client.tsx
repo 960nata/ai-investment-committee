@@ -30,8 +30,14 @@ export function AdminLayoutClient({ children }: AdminLayoutClientProps) {
 
   // Cari judul modul aktif untuk breadcrumb topbar
   let moduleTitle = 'Ringkasan Sistem'
-  if (pathname.startsWith('/admin/analytics')) {
+  if (pathname.startsWith('/admin/serangan-cyber')) {
+    moduleTitle = 'Radar Serangan Cyber Global'
+  } else if (pathname.startsWith('/admin/ai-tokens')) {
+    moduleTitle = 'Analisis AI Token & API Keys'
+  } else if (pathname.startsWith('/admin/analytics')) {
     moduleTitle = 'Analitik & Cyber Radar'
+  } else if (pathname.startsWith('/admin/keamanan')) {
+    moduleTitle = 'Pemantau Serangan WAF'
   } else if (pathname.startsWith('/admin/berita/baru')) {
     moduleTitle = 'Tulis Warta Baru'
   } else if (pathname.includes('/edit')) {
@@ -120,6 +126,15 @@ export function AdminLayoutClient({ children }: AdminLayoutClientProps) {
             </Link>
 
             <Link
+              href="/admin/ai-tokens"
+              className={`admin-nav-link ${pathname.startsWith('/admin/ai-tokens') ? 'active' : ''}`}
+              onClick={() => setMobileOpen(false)}
+            >
+              <IconPulse size={15} />
+              <span>Analisis AI Token</span>
+            </Link>
+
+            <Link
               href="/admin/analytics"
               className={`admin-nav-link ${pathname.startsWith('/admin/analytics') ? 'active' : ''}`}
               onClick={() => setMobileOpen(false)}
@@ -129,12 +144,21 @@ export function AdminLayoutClient({ children }: AdminLayoutClientProps) {
             </Link>
 
             <Link
+              href="/admin/serangan-cyber"
+              className={`admin-nav-link ${pathname.startsWith('/admin/serangan-cyber') ? 'active' : ''}`}
+              onClick={() => setMobileOpen(false)}
+            >
+              <IconShield size={15} />
+              <span>Serangan Cyber</span>
+            </Link>
+
+            <Link
               href="/admin/keamanan"
               className={`admin-nav-link ${pathname.startsWith('/admin/keamanan') ? 'active' : ''}`}
               onClick={() => setMobileOpen(false)}
             >
-              <IconShield size={15} />
-              <span>Pemantau Serangan</span>
+              <IconLock size={15} />
+              <span>Log Blokir WAF</span>
             </Link>
           </div>
 

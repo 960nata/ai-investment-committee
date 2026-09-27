@@ -71,7 +71,10 @@ export function isGa4Configured(): boolean {
  * sendiri-sendiri, dan sering memang begitu urutan pemasangannya.
  */
 export function getMeasurementId(): string | null {
-  const id = process.env.NEXT_PUBLIC_GA_ID?.trim()
+  const id = (
+    process.env.NEXT_PUBLIC_GA_ID ||
+    process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
+  )?.trim()
   return id && id.startsWith('G-') ? id : null
 }
 

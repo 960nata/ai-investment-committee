@@ -19,6 +19,7 @@ import {
   openRouterAdapter,
 } from './providers/openai-compatible'
 import { collectKeys, nextKey, penalise, poolStatus, type PooledKey } from './keyring'
+import { recordLlmCall } from './telemetry'
 import { LlmError, type LlmAdapter, type LlmRequest, type LlmResponse } from './types'
 
 /** Berapa kunci berbeda dicoba di satu penyedia sebelum pindah penyedia. */
@@ -132,12 +133,36 @@ export async function complete(request: LlmRequest): Promise<LlmResponse> {
           `[LLM] ${adapter.id} kunci #${key.index} berhasil (${response.latencyMs}ms, ` +
             `${response.outputTokens ?? '?'} token keluar)`,
         )
+        void recordLlmCall({
+          providerId: adapter.id,
+          model: adapter.model,
+          keyIndex: key.index,
+          keyFingerprint: key.fingerprint,
+          success: true,
+          status: 200,
+          inputTokens: response.inputTokens ?? 0,
+          outputTokens: response.outputTokens ?? 0,
+          latencyMs: response.latencyMs,
+        })
         return response
       } catch (err) {
         const llmError =
           err instanceof LlmError
             ? err
             : new LlmError(adapter.id, 'server', err instanceof Error ? err.message : String(err))
+
+        void recordLlmCall({
+          providerId: adapter.id,
+          model: adapter.model,
+          keyIndex: key.index,
+          keyFingerprint: key.fingerprint,
+          success: false,
+          status: llmError.status ?? (llmError.kind === 'rate_limited' ? 429 : 500),
+          errorKind: llmError.kind,
+          inputTokens: 0,
+          outputTokens: 0,
+          latencyMs: 400,
+        })
 
         attempts.push({
           providerId: adapter.id,

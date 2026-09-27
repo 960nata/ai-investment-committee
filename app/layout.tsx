@@ -5,6 +5,7 @@ import { GoogleAnalytics } from "@next/third-parties/google";
 import { getMeasurementId } from "@/lib/analytics/ga4";
 import { VisitBeacon } from "@/components/visit-beacon";
 import { SiteTranslator } from "@/components/site-translator";
+import { FirebaseInit } from "@/components/firebase-init";
 import "./globals.css";
 
 const fontSans = Plus_Jakarta_Sans({
@@ -45,6 +46,7 @@ export default function RootLayout({
           <VisitBeacon />
         </Suspense>
         <SiteTranslator />
+        <FirebaseInit />
       </body>
       {measurementId && <GoogleAnalytics gaId={measurementId} />}
     </html>

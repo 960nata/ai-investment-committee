@@ -15,6 +15,8 @@ import {
   IconLock,
   IconArrowRight,
   IconRadar,
+  IconPulse,
+  IconShield,
 } from '@/components/icons'
 import { getMarketNewsList, getAdSettings, getAppUsers } from '@/lib/db/news-queries'
 import { isSupabaseStorageConfigured } from '@/lib/storage/supabase-storage'
@@ -241,19 +243,36 @@ export default async function AdminOverviewPage() {
           </div>
         </Link>
 
-        {/* Aksi 5: Analitik & Cyber Radar */}
-        <Link href="/admin/analytics" className="admin-action-card">
+        {/* Aksi 5: Peta Serangan Cyber Global */}
+        <Link href="/admin/serangan-cyber" className="admin-action-card">
           <div className="admin-action-icon-box" style={{ background: 'rgba(239, 68, 68, 0.12)', color: '#ef4444' }}>
-            <IconRadar size={20} />
+            <IconShield size={20} />
           </div>
           <div className="admin-action-text">
-            <h3 className="admin-action-heading">Analitik &amp; Cyber Radar</h3>
+            <h3 className="admin-action-heading">Peta Serangan Cyber</h3>
             <p className="admin-action-desc">
-              Peta geolokasi IP Leaflet, telemetri kunjungan per halaman, audit perangkat lengkap, dan mitigasi ancaman WAF.
+              Peta Leaflet radar serangan siber global, 10 tab rentang waktu (Realtime s.d. 2 Tahun), dan intersep WAF edge.
             </p>
           </div>
           <div className="admin-action-arrow mono">
             <span>Buka Radar</span>
+            <IconArrowRight size={13} />
+          </div>
+        </Link>
+
+        {/* Aksi 6: Analisis AI Token & Kunci */}
+        <Link href="/admin/ai-tokens" className="admin-action-card">
+          <div className="admin-action-icon-box" style={{ background: 'rgba(250, 134, 42, 0.12)', color: 'var(--accent, #fa862a)' }}>
+            <IconPulse size={20} />
+          </div>
+          <div className="admin-action-text">
+            <h3 className="admin-action-heading">Analisis AI Token &amp; API Keys</h3>
+            <p className="admin-action-desc">
+              Grafik ApexCharts pemantauan kuota 80+ kunci API (Gemini, Groq), deteksi 429 TooManyRequests, dan popup chart per kunci.
+            </p>
+          </div>
+          <div className="admin-action-arrow mono">
+            <span>Buka Analisis</span>
             <IconArrowRight size={13} />
           </div>
         </Link>

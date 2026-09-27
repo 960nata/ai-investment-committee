@@ -11,6 +11,7 @@
  */
 
 import { InstrumentExplorer } from '@/components/instrument-explorer'
+import { UserAnalyticsDashboard } from '@/components/user-analytics-dashboard'
 import type { Candle } from '@/components/candlestick-chart'
 import {
   IconCandles,
@@ -31,6 +32,8 @@ import {
   STALE_AFTER_MINUTES,
   type DashboardStats,
 } from '@/lib/db/queries'
+import { getVisitSummary } from '@/lib/db/visit-queries'
+import { getMeasurementId } from '@/lib/analytics/ga4'
 import { TAB_LAYOUT } from '@/lib/db/schema'
 import { MODEL_VERSION } from '@/lib/scoring/weights'
 import type { HorizonView } from '@/components/score-panel'
@@ -166,6 +169,12 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
 
       {error && <DatabaseNotice detail={error} />}
 
+      {/* Telemetri Google Analytics 4 & Peta Sebaran Lokasi Pengunjung (Leaflet) */}
+      <UserAnalyticsDashboard
+        measurementId={getMeasurementId()}
+        initialSummary={data?.visitSummary}
+      />
+
       {data && (
         <InstrumentExplorer
           instruments={data.instruments}
@@ -226,11 +235,12 @@ function Readout({
 }
 
 async function load({ symbol, tab }: { symbol?: string; tab?: string } = {}) {
-  const [stats, health, instruments, scores] = await Promise.all([
+  const [stats, health, instruments, scores, visitSummary] = await Promise.all([
     getDashboardStats(),
     listAdapterHealth(),
     listInstrumentQuotes(),
     listLatestScores(MODEL_VERSION),
+    getVisitSummary('30d').catch(() => null),
   ])
 
   // Skor dikelompokkan per instrumen dan diurutkan pendek, menengah, panjang —
@@ -327,6 +337,7 @@ async function load({ symbol, tab }: { symbol?: string; tab?: string } = {}) {
     initialCandles,
     queueConfigured: isQStashConfigured(),
     cacheAvailable: cache.isAvailable(),
+    visitSummary,
   }
 }
 
