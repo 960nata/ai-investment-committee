@@ -19,12 +19,14 @@ import {
   IconSearch,
   IconTrendUp,
   IconTrendDown,
+  IconUser,
 } from '@/components/icons'
 import { AssetIcon } from '@/components/asset-icons'
 import { MarketMarquee, type MarqueeTicker } from '@/components/market-marquee'
 import type { InstrumentQuote } from '@/lib/db/queries'
 import { LanguageMenu } from '@/components/language-menu'
 import type { Locale } from '@/lib/i18n/locales'
+import { UserMenu, type UserMenuProfile } from '@/components/user-menu'
 
 interface LandingNavProps {
   instruments?: InstrumentQuote[]
@@ -40,7 +42,7 @@ interface LandingNavProps {
   isFresh?: boolean
   isAdmin?: boolean
   /** Sesi yang sedang berjalan; null berarti pengunjung anonim. */
-  user?: { name: string; role: 'admin' | 'user' } | null
+  user?: UserMenuProfile | null
   /** Bahasa yang tersedia untuk halaman ini (artikel warta); kosong berarti kelimanya. */
   languages?: readonly Locale[]
 }
@@ -832,41 +834,7 @@ export function LandingNav({
           <div className="landing-nav-actions">
             <LanguageMenu available={languages} />
             {signedIn ? (
-              <>
-                {isAdmin && (
-                  <Link
-                    href="/admin"
-                    className="btn btn-quiet landing-action-btn landing-admin-btn"
-                    title="Buka Dashboard Administrator"
-                  >
-                    <IconLock size={13} />
-                    <span>Admin</span>
-                  </Link>
-                )}
-
-                <Link
-                  href="/ringkasan"
-                  className="btn btn-primary landing-action-btn"
-                  title="Buka Terminal AI Investdesk"
-                >
-                  <span className="badge-live-pulse" style={{ width: '6px', height: '6px' }} />
-                  <IconGauge size={14} />
-                  <span>
-                    Terminal
-                    {firstName && <span className="nav-user-name"> · {firstName}</span>}
-                  </span>
-                  <IconArrowRight size={13} />
-                </Link>
-
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  className="btn btn-quiet landing-action-btn landing-logout-btn"
-                  title={user ? `Keluar dari akun ${user.name}` : 'Tutup sesi'}
-                >
-                  <span>Keluar</span>
-                </button>
-              </>
+              <UserMenu user={user} isAdmin={isAdmin} variant="landing" />
             ) : (
               <Link
                 href="/login"
@@ -1266,6 +1234,14 @@ export function LandingNav({
                     >
                       <IconGauge size={16} />
                       <span>Terminal Pasar</span>
+                    </Link>
+                    <Link
+                      href="/profil"
+                      className="mobile-menu-link"
+                      onClick={() => setMobileOpen(false)}
+                    >
+                      <IconUser size={16} />
+                      <span>Profil Saya</span>
                     </Link>
                     <button
                       type="button"

@@ -40,7 +40,16 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <Topbar
           status={status}
           isAdmin={isAdmin}
-          user={session ? { name: session.name, email: session.email } : null}
+          user={
+            session
+              ? {
+                  name: session.name,
+                  email: session.email,
+                  role: session.role,
+                  avatarUrl: session.avatarUrl ?? null,
+                }
+              : null
+          }
           action={
             process.env.NODE_ENV !== 'production' ? (
               <IngestButton job="ingest-crypto-daily" />

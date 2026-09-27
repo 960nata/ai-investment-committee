@@ -13,18 +13,41 @@
 
 import { complete } from '@/lib/ai/registry'
 import { translateNewsToAllLocales } from '@/lib/agents/news-translator'
-import { saveMarketNews, getMarketNewsList } from '@/lib/db/news-queries'
+import { saveMarketNews, getMarketNewsList, getMarketNewsBySlug } from '@/lib/db/news-queries'
 import {
   mirrorInternetImageToSupabase,
   storeRemoteImageAsAvif,
 } from '@/lib/storage/supabase-storage'
 import { buildPhotoQuery, searchInternetPhotos, type PhotoCandidate } from '@/lib/media/image-search'
-import type { NewMarketNews } from '@/lib/db/schema'
+import { findYoutubeVideo } from '@/lib/media/youtube-search'
+import type { SourceDocument } from '@/lib/news/sources'
+import type { NewMarketNews, MarketNewsRow } from '@/lib/db/schema'
+
+export const NEWS_CATEGORIES = [
+  'ekonomi-makro',
+  'teknologi-ai',
+  'energi-komoditas',
+  'saham-idx',
+  'crypto-fintech',
+] as const
+
+export type NewsCategory = (typeof NEWS_CATEGORIES)[number]
 
 export interface GenerateArticleInput {
   topic?: string
-  category?: 'ekonomi-makro' | 'teknologi-ai' | 'energi-komoditas' | 'saham-idx' | 'crypto-fintech'
+  category?: NewsCategory
   targetSymbols?: string[]
+  /**
+   * Berita asli yang jadi bahan tulisan. Bila ada, model hanya boleh memakai
+   * fakta dari sini dan daftar tautannya dicetak di akhir artikel.
+   */
+  sources?: SourceDocument[]
+  /**
+   * Tulis versi empat bahasa lain saat itu juga. Job otomatis mematikannya
+   * dan menyerahkan terjemahan ke job terpisah supaya satu invocation tidak
+   * melewati batas durasi function.
+   */
+  translate?: boolean
 }
 
 /**
@@ -106,39 +129,17 @@ const THEMATIC_IMAGES = {
 }
 
 /**
- * Kurasi video YouTube resmi dari media finansial & analis terpercaya
+ * Video untuk artikel bibit. Hanya ID yang sudah diperiksa lewat oEmbed YouTube;
+ * empat ID lama di daftar ini ternyata tidak pernah ada dan sudah dibuang.
+ * Artikel baru tidak memakai daftar ini — videonya dicari lewat YouTube Data API.
  */
 const CURATED_YOUTUBE_VIDEOS = {
-  ai_power_crisis: {
-    videoId: '0m3N0cI5QjQ',
-    title: 'How AI Is Fueling A Massive Energy Boom',
-    channel: 'CNBC International',
-    relevance: 'Eksplorasi mendalam krisis listrik data center AI dan lonjakan saham pembangkit listrik.'
-  },
   nvidia_blackwell: {
     videoId: 'Y2F8yisiS6E',
-    title: 'NVIDIA CEO Jensen Huang on Next-Gen AI Infrastructure',
-    channel: 'Bloomberg Technology',
-    relevance: 'Wawancara resmi arsitektur chip AI generasi baru dan belanja capex hyperscaler.'
+    title: 'GTC March 2024 Keynote with NVIDIA CEO Jensen Huang',
+    channel: 'NVIDIA',
+    relevance: 'Paparan resmi arsitektur chip AI generasi baru dan kebutuhan infrastruktur pusat data.'
   },
-  fed_rate_macro: {
-    videoId: 'c_qfL67H-84',
-    title: 'Federal Reserve Chair Jerome Powell on Economic Outlook & Interest Rates',
-    channel: 'Federal Reserve',
-    relevance: 'Pernyataan langsung arah kebijakan moneter dan proyeksi inflasi AS.'
-  },
-  gold_commodities: {
-    videoId: 'dE1N8k2v0iQ',
-    title: 'Why Central Banks Are Buying Gold At Record Pace',
-    channel: 'Bloomberg Television',
-    relevance: 'Analisis rekor pembelian cadangan devisa emas oleh bank sentral global.'
-  },
-  idx_indonesia_economy: {
-    videoId: 'j8K_r82m9Qk',
-    title: 'Prospek Ekonomi Indonesia & Peluang Sektor Unggulan IHSG',
-    channel: 'CNBC Indonesia',
-    relevance: 'Ulasan perkembangan makroekonomi domestik dan rotasi saham komoditas/energi.'
-  }
 }
 
 /**
@@ -156,7 +157,7 @@ export const SEED_ARTICLES: NewMarketNews[] = [
     sentiment: 'bullish',
     impactScore: 9,
     featuredImage: THEMATIC_IMAGES.ai_datacenter,
-    youtubeVideo: CURATED_YOUTUBE_VIDEOS.ai_power_crisis,
+    youtubeVideo: CURATED_YOUTUBE_VIDEOS.nvidia_blackwell,
     keyTakeaways: [
       'Pusat data AI generasi baru (NVIDIA Blackwell) membutuhkan daya 3 hingga 5 kali lipat lebih padat per rak server dibanding komputasi cloud tradisional.',
       'Perusahaan teknologi raksasa (Microsoft, Google, Amazon, Meta) mengunci kontrak listrik bebas emisi jangka panjang 10–20 tahun.',
@@ -239,7 +240,7 @@ Investor yang hanya mengoleksi saham perangkat lunak berisiko kehilangan rotasi 
     sentiment: 'bullish',
     impactScore: 8,
     featuredImage: THEMATIC_IMAGES.wall_street,
-    youtubeVideo: CURATED_YOUTUBE_VIDEOS.fed_rate_macro,
+    youtubeVideo: null,
     keyTakeaways: [
       'Pemangkasan suku bunga acuan The Fed menurunkan imbal hasil US Treasury sehingga memicu arus dana asing (foreign inflow) kembali ke pasar negara berkembang (emerging markets).',
       'Bank Indonesia memiliki ruang moneter lebih leluasa untuk menjaga stabilitas Rupiah sekaligus mendorong pertumbuhan kredit domestik.',
@@ -282,7 +283,7 @@ Ketika Federal Reserve AS mulai menurunkan suku bunga dana federal (*Fed Funds R
     sentiment: 'bullish',
     impactScore: 8,
     featuredImage: THEMATIC_IMAGES.gold_commodity,
-    youtubeVideo: CURATED_YOUTUBE_VIDEOS.gold_commodities,
+    youtubeVideo: null,
     keyTakeaways: [
       'Pembelian emas oleh bank sentral (terutama People Bank of China dan bank sentral emerging markets) melampaui 1.000 ton per tahun secara berturut-turut.',
       'Kekhawatiran pembekuan aset devisa berbasis dolar pasca-konflik geopolitik mempercepat diversifikasi ke aset cadangan tanpa risiko pihak ketiga (counterparty risk).',
@@ -342,7 +343,7 @@ Kekuatan ekosistem semikonduktor saat ini terpusat pada tiga pilar yang saling m
     slug: 'eskalasi-geopolitik-selat-hormuz-minyak-mentah-brent-dan-rekor-emas',
     title: 'Eskalasi Konflik Geopolitik & Disrupsi Jalur Minyak: Mengapa Emas Mengunci Rekor Baru dan Dolar Menguat',
     summary: 'Ketegangan militer di jalur pasokan minyak dunia memicu premi risiko global. Analisis dampak langsung terhadap harga minyak mentah Brent, lonjakan safe-haven emas fisik, serta tekanan depresiasi nilai tukar mata uang berkembang.',
-    category: 'komoditi-emas',
+    category: 'energi-komoditas',
     tags: ['Geopolitik', 'Minyak Mentah', 'Emas', 'Komoditi', 'Inflasi', 'Dolar AS'],
     mentionedSymbols: ['CL=F', 'BZ=F', 'XAUUSD', 'MEDC.JK', 'PGAS.JK', 'USDIDR'],
     sentiment: 'bullish',
@@ -608,25 +609,56 @@ export async function acquireFeaturedPhoto(options: {
 }
 
 /**
- * Jalankan agen AI untuk memproduksi artikel berita & analisis pasar baru secara on-demand.
+ * Jalankan agen AI untuk memproduksi artikel berita & analisis pasar baru.
  * Menggunakan model LLM dari keyring aktif (Gemini/Groq/OpenRouter).
+ *
+ * Dua jalur: dengan `sources` (job warta otomatis) model menulis dari berita
+ * asli yang sudah terbit dan daftar sumbernya dicetak di akhir artikel; tanpa
+ * `sources` (tombol redaksi) model menulis analisis dari topik yang diberikan.
  */
-export async function generateLiveNewsArticle(input: GenerateArticleInput = {}): Promise<NewMarketNews> {
+export async function generateLiveNewsArticle(input: GenerateArticleInput = {}): Promise<MarketNewsRow> {
   const defaultTopic = input.topic || 'Dampak Efisiensi Energi Nuklir SMR dan Pembangkit Listrik Terhadap Saham Infrastruktur AI dan Komoditas Tembaga'
-  const category = input.category || 'energi-komoditas'
+  const category: NewsCategory = input.category || 'energi-komoditas'
   const targetSymbols = input.targetSymbols || ['NVDA', 'BREN.JK', 'AMMN.JK', 'GOLD']
+  const sources = input.sources ?? []
+  const hasSources = sources.length > 0
+
+  const today = new Date().toLocaleDateString('id-ID', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'Asia/Jakarta',
+  })
+
+  const sourceBlock = hasSources
+    ? `
+BAHAN BERITA (satu-satunya sumber fakta Anda):
+${sources
+  .map(
+    (s, i) => `[SUMBER ${i + 1}] ${s.source} — ${s.title}
+Terbit: ${s.publishedAt.toISOString()}
+${s.body}`,
+  )
+  .join('\n\n')}
+`
+    : ''
+
+  const factRule = hasSources
+    ? `3. ATURAN FAKTA MUTLAK: setiap angka, nama, kutipan, tanggal, dan peristiwa HARUS berasal dari BAHAN BERITA di atas. DILARANG menambah angka, harga, persentase, atau kejadian yang tidak tertulis di bahan. Analisis dan implikasi portofolio boleh Anda susun sendiri, tapi tandai sebagai analisis ("kami menilai", "berpotensi"), bukan sebagai fakta. Sebut sumbernya di kalimat saat mengutip fakta penting (mis. "menurut CNBC Indonesia").`
+    : `3. Jangan klise atau teori umum — berikan rasionalisasi arus modal, argumen bull vs bear, dan implikasi portofolio. JANGAN mengarang angka terbaru (harga hari ini, persentase kenaikan, data rilis) yang tidak Anda ketahui pasti; lebih baik tanpa angka daripada angka karangan.`
 
   const prompt = `Anda adalah "AI Chief Financial Journalist & Intelligence Desk" pada komite investasi kuantitatif institusional.
 Tugas Anda adalah menulis satu artikel berita dan analisis intelijen pasar mendalam, kredibel, tajam, dan SEO-friendly.
-
+Tanggal hari ini: ${today}.
+${sourceBlock}
 Fokus Topik: ${defaultTopic}
 Kategori: ${category}
-Simbol Aset Terkait: ${targetSymbols.join(', ')}
+Simbol Aset Terkait: ${targetSymbols.length > 0 ? targetSymbols.join(', ') : '(tentukan sendiri dari bahan; kosongkan bila tidak ada)'}
 
 Artikel HARUS memenuhi kriteria:
-1. Menghubungkan tren makro ekonomi / teknologi AI / energi dengan dampaknya ke saham riil (US tech, emiten IDX Indonesia, komoditas emas/energi, atau kripto).
-2. Gaya bahasa jurnalisme finansial otoritatif (seperti Bloomberg, Financial Times, CNBC), dalam BAHASA INDONESIA yang lugas dan berwibawa.
-3. Jangan klise atau teori umum — berikan angka, rasionalisasi arus modal, argumen bull vs bear, dan implikasi portofolio.
+1. Menghubungkan peristiwa dengan dampaknya ke aset riil (US tech, emiten IDX Indonesia, komoditas emas/energi, atau kripto).
+2. Gaya bahasa jurnalisme finansial otoritatif (seperti Bloomberg, Financial Times, CNBC), dalam BAHASA INDONESIA yang lugas dan berwibawa. Tulis ulang dengan kalimat Anda sendiri — jangan menyalin paragraf sumber.
+${factRule}
 4. Format output WAJIB JSON murni tanpa markdown wrapping dengan struktur:
 {
   "slug": "kebab-case-slug-maks-80-karakter",
@@ -634,7 +666,7 @@ Artikel HARUS memenuhi kriteria:
   "summary": "Ringkasan eksekutif 1-2 kalimat untuk meta description SEO (maks 180 karakter)",
   "category": "${category}",
   "tags": ["Tag1", "Tag2", "Tag3", "Tag4"],
-  "mentionedSymbols": ["${targetSymbols.join('", "')}"],
+  "mentionedSymbols": ${targetSymbols.length > 0 ? JSON.stringify(targetSymbols) : '["KODE1.JK", "KODE2"]'},
   "sentiment": "bullish" | "bearish" | "neutral" | "mixed",
   "impactScore": 1-10,
   "keyTakeaways": [
@@ -643,10 +675,11 @@ Artikel HARUS memenuhi kriteria:
     "Poin kunci eksekutif 3",
     "Poin kunci eksekutif 4"
   ],
-  "contentMarkdown": "Isi lengkap artikel minimal 400 kata. Anda sangat dianjurkan memadukan Markdown dan tag HTML seperti di Microsoft Word (seperti <u>garis bawah</u>, <mark>highlight poin penting</mark>, <strong>tebal</strong>, <em>miring</em>, <table> tabel komparasi finansial, <blockquote> kutipan analisis, <hr> garis pemisah, dsb) untuk penyajian riset yang sangat rapi dan profesional.",
+  "contentMarkdown": "Isi lengkap artikel minimal 400 kata. Anda sangat dianjurkan memadukan Markdown dan tag HTML seperti di Microsoft Word (seperti <u>garis bawah</u>, <mark>highlight poin penting</mark>, <strong>tebal</strong>, <em>miring</em>, <table> tabel komparasi finansial, <blockquote> kutipan analisis, <hr> garis pemisah, dsb) untuk penyajian riset yang sangat rapi dan profesional. JANGAN menulis bagian daftar sumber; sistem menambahkannya sendiri.",
   "imageSearchQuery": "3-6 kata kunci BAHASA INGGRIS untuk mencari FOTO JURNALISTIK NYATA di internet yang cocok jadi sampul artikel ini. Sebut objek fisik yang bisa dipotret kamera, misal 'geothermal power plant turbine' atau 'copper mine heavy machinery'. DILARANG memakai kata abstrak seperti 'growth', 'opportunity', 'market sentiment', dan dilarang menyebut nama merek atau logo perusahaan.",
   "imageAlt": "Teks alternatif gambar untuk pembaca tunanetra, Bahasa Indonesia, maksimal 120 karakter",
   "imageCaption": "Keterangan foto gaya redaksi yang menghubungkan isi foto dengan isi artikel, Bahasa Indonesia, maksimal 160 karakter",
+  "videoSearchQuery": "3-7 kata kunci untuk mencari VIDEO BERITA di YouTube tentang peristiwa yang sama, sebut pelaku dan peristiwanya, mis. 'IHSG asing net sell saham bank' atau 'Fed rate decision Powell press conference'",
   "author": "AI Intelligence Desk",
   "readingTimeMinutes": 3
 }
@@ -665,8 +698,11 @@ foto asli di internet memakai "imageSearchQuery" Anda, mengunduhnya, dan menyimp
         content: prompt
       }
     ],
-    temperature: 0.6,
-    maxOutputTokens: 2500,
+    // Lebih dingin bila ada bahan: tugasnya merangkum fakta, bukan berimajinasi.
+    temperature: hasSources ? 0.35 : 0.6,
+    // 400+ kata berikut HTML dan pembungkus JSON sering melewati 2.500 token,
+    // dan balasan yang terpotong berarti JSON yang tidak bisa diurai.
+    maxOutputTokens: 5000,
     json: true
   })
 
@@ -684,78 +720,75 @@ foto asli di internet memakai "imageSearchQuery" Anda, mengunduhnya, dan menyimp
     imageSearchQuery?: string
     imageAlt?: string
     imageCaption?: string
+    videoSearchQuery?: string
     author?: string
     readingTimeMinutes?: number
   }
 
+  // Balasan yang tidak bisa diurai dibatalkan, bukan diterbitkan apa adanya.
+  // Dulu teks mentah model disimpan sebagai isi artikel, dan yang tampil di
+  // portal adalah JSON setengah jadi.
   let parsed: ParsedNewsPayload
   try {
     const raw = response.text.trim()
     const cleanJson = raw.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim()
     parsed = JSON.parse(cleanJson)
   } catch (err) {
-    console.error('[NewsAgent] Gagal parse JSON LLM, gunakan fallback:', err)
-    parsed = {
-      slug: `analisis-pasar-${Date.now()}`,
-      title: defaultTopic,
-      summary: `Analisis mendalam mengenai ${defaultTopic} dan implikasinya terhadap alokasi portofolio saham dan aset digital.`,
-      category,
-      tags: ['Pasar Modal', 'AI', 'Investasi'],
-      mentionedSymbols: targetSymbols,
-      sentiment: 'neutral',
-      impactScore: 7,
-      keyTakeaways: [
-        'Volatilitas makro memicu pergeseran alokasi aset institusional.',
-        'Sektor teknologi dan energi menjadi pusat perhatian perputaran dana.',
-        'Investor dianjurkan mengukur margin of safety secara disiplin.'
-      ],
-      contentMarkdown: response.text,
-      author: 'AI Intelligence Desk',
-      readingTimeMinutes: 3
-    }
+    throw new Error(
+      `Balasan model (${response.providerId}/${response.model}) bukan JSON yang sah, ` +
+        `artikel tidak diterbitkan: ${err instanceof Error ? err.message : String(err)}`,
+    )
   }
 
-  // Jamin slug bersih, aman URL, dan ramah SEO
-  const rawCandidate = parsed.slug || parsed.title || defaultTopic
-  const cleanSlug = slugify(rawCandidate) || `analisis-${Date.now().toString(36)}`
+  const title = parsed.title?.trim()
+  const content = parsed.contentMarkdown?.trim()
+  if (!title || !content || content.split(/\s+/).length < 200) {
+    throw new Error('Balasan model tidak memuat judul atau isi artikel yang layak, artikel tidak diterbitkan.')
+  }
+
+  const cleanSlug = await uniqueSlug(slugify(parsed.slug || title) || `analisis-${Date.now().toString(36)}`)
 
   // Cari foto asli di internet, unduh, konversi AVIF, unggah ke Supabase Storage.
   // Urutannya mengikat: baris ini harus selesai lebih dulu, dan bila gagal ia
   // melempar galat sehingga artikel tidak pernah tersimpan dengan sampul yang
   // masih menumpang CDN pihak lain.
   console.log(`[NewsAgent] Menyiapkan sampul untuk artikel: ${cleanSlug}...`)
-  const featuredImg = await acquireFeaturedPhoto({
-    slug: cleanSlug,
-    query: parsed.imageSearchQuery,
-    topic: parsed.title || defaultTopic,
-    category,
-    symbols: targetSymbols,
-    alt: parsed.imageAlt,
-    caption: parsed.imageCaption,
-  })
+  const [featuredImg, videoEmbed] = await Promise.all([
+    acquireFeaturedPhoto({
+      slug: cleanSlug,
+      query: parsed.imageSearchQuery,
+      topic: title,
+      category,
+      symbols: targetSymbols,
+      alt: parsed.imageAlt,
+      caption: parsed.imageCaption,
+    }),
+    // Video tidak wajib. Tanpa kunci API atau tanpa hasil yang bisa diputar,
+    // artikel terbit tanpa video dan pemutarnya tidak dirender sama sekali.
+    findYoutubeVideo(parsed.videoSearchQuery || title, 'id').catch(() => null),
+  ])
 
-  let videoEmbed = CURATED_YOUTUBE_VIDEOS.ai_power_crisis
-  if (category === 'ekonomi-makro' || category === 'crypto-fintech') {
-    videoEmbed = CURATED_YOUTUBE_VIDEOS.fed_rate_macro
-  } else if (category === 'saham-idx') {
-    videoEmbed = CURATED_YOUTUBE_VIDEOS.idx_indonesia_economy
-  }
+  const articleCategory = (NEWS_CATEGORIES as readonly string[]).includes(parsed.category ?? '')
+    ? parsed.category!
+    : category
 
   // Sampul sudah aman di bucket sendiri — sekarang artikelnya boleh dirakit.
   const newArticle: NewMarketNews = {
     slug: cleanSlug,
-    title: parsed.title || defaultTopic,
+    title: title.slice(0, 255),
     summary: parsed.summary || 'Analisis intelijen pasar keuangan dan teknologi AI.',
-    category: parsed.category || category,
+    category: articleCategory,
     tags: Array.isArray(parsed.tags) ? parsed.tags : ['Investasi', 'Pasar'],
     mentionedSymbols: Array.isArray(parsed.mentionedSymbols) ? parsed.mentionedSymbols : targetSymbols,
-    sentiment: parsed.sentiment || 'neutral',
-    impactScore: Number(parsed.impactScore) || 7,
+    sentiment: ['bullish', 'bearish', 'neutral', 'mixed'].includes(parsed.sentiment ?? '')
+      ? parsed.sentiment!
+      : 'neutral',
+    impactScore: Math.min(10, Math.max(1, Number(parsed.impactScore) || 7)),
     featuredImage: featuredImg,
     youtubeVideo: videoEmbed,
     keyTakeaways: Array.isArray(parsed.keyTakeaways) ? parsed.keyTakeaways : [],
-    contentMarkdown: parsed.contentMarkdown || response.text,
-    author: parsed.author || 'AI Intelligence Desk',
+    contentMarkdown: hasSources ? `${content}\n\n${renderSourceList(sources)}` : content,
+    author: (parsed.author || 'AI Intelligence Desk').slice(0, 64),
     readingTimeMinutes: Number(parsed.readingTimeMinutes) || 3,
     publishedAt: new Date()
   }
@@ -766,17 +799,48 @@ foto asli di internet memakai "imageSearchQuery" Anda, mengunduhnya, dan menyimp
   // Versi empat bahasa lain ditulis sesudah sumbernya aman tersimpan. Kegagalan
   // di sini tidak membatalkan artikel: versi yang belum jadi dilengkapi nanti
   // oleh `translateMissingNews`, dan pembaca bahasa itu hanya belum melihatnya.
-  try {
-    const report = await translateNewsToAllLocales(saved)
-    console.log(
-      `[NewsAgent] ${saved.slug}: ${report.done.length} versi bahasa tersimpan, ` +
-        `${report.failed.length} gagal`,
-    )
-  } catch (err) {
-    console.warn('[NewsAgent] Penulisan versi bahasa lain gagal:', err)
+  if (input.translate !== false) {
+    try {
+      const report = await translateNewsToAllLocales(saved)
+      console.log(
+        `[NewsAgent] ${saved.slug}: ${report.done.length} versi bahasa tersimpan, ` +
+          `${report.failed.length} gagal`,
+      )
+    } catch (err) {
+      console.warn('[NewsAgent] Penulisan versi bahasa lain gagal:', err)
+    }
   }
 
   return saved
+}
+
+/**
+ * Slug yang belum terpakai. `saveMarketNews` menimpa baris dengan slug sama,
+ * jadi dua peristiwa berbeda berjudul mirip bisa saling menghapus tanpa jejak.
+ */
+async function uniqueSlug(base: string): Promise<string> {
+  if (!(await getMarketNewsBySlug(base))) return base
+  const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+  const dated = `${base.slice(0, 80)}-${stamp}`
+  if (!(await getMarketNewsBySlug(dated))) return dated
+  return `${base.slice(0, 80)}-${Date.now().toString(36)}`
+}
+
+/** Daftar sumber di akhir artikel: pembaca bisa memeriksa sendiri faktanya. */
+function renderSourceList(sources: SourceDocument[]): string {
+  const escape = (text: string) =>
+    text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+
+  // Baris "- ..." diubah MarkdownView menjadi <li> dan dibungkus <ul> sendiri;
+  // menulis <ul> di sini membuat daftarnya terbungkus dua kali.
+  const items = sources
+    .map(
+      (s) =>
+        `- <a href="${escape(s.link)}" target="_blank" rel="noopener nofollow">${escape(s.title)}</a> — ${escape(s.source)}`,
+    )
+    .join('\n')
+
+  return `<hr />\n\n### Sumber\n\n${items}`
 }
 
 /**

@@ -20,12 +20,13 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { IconClock, IconPulse, IconMenu, IconLock, IconClose } from './icons'
+import { IconClock, IconPulse, IconMenu, IconLock } from './icons'
 import { Lamp, type State } from './ui'
 import { SECTIONS } from './rail'
 import { LanguageMenu } from './language-menu'
 import { useSidebar } from './sidebar-context'
 import { SITE_NAME } from '@/lib/brand'
+import { UserMenu, type UserMenuProfile } from './user-menu'
 
 const TITLES = new Map(
   SECTIONS.flatMap((s) => s.links).map((l) => [l.href, l.label] as const),
@@ -47,22 +48,11 @@ export function Topbar({
   action?: React.ReactNode
   isAdmin?: boolean
   /** Pemegang sesi. Null hanya mungkin terjadi pada sesi admin lewat PIN. */
-  user?: { name: string; email: string } | null
+  user?: UserMenuProfile | null
 }) {
   const pathname = usePathname()
-  const router = useRouter()
   const title = TITLES.get(pathname) ?? SITE_NAME
   const { toggle } = useSidebar()
-
-  async function handleLogout() {
-    try {
-      await fetch('/api/v1/auth/logout', { method: 'POST' })
-    } catch {
-      // Gagal menghubungi server bukan alasan menahan orang di dalam akunnya.
-    }
-    router.push('/')
-    router.refresh()
-  }
 
   return (
     <header className="topbar">
@@ -117,20 +107,7 @@ export function Topbar({
 
       <div className="topbar-session">
         <LanguageMenu />
-        {user && (
-          <span className="topbar-user mono" title={user.email}>
-            {user.name}
-          </span>
-        )}
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="btn btn-quiet mono topbar-logout"
-          title="Keluar dari sesi ini"
-        >
-          <IconClose size={12} />
-          <span>Keluar</span>
-        </button>
+        <UserMenu user={user} isAdmin={isAdmin} variant="dashboard" />
       </div>
     </header>
   )

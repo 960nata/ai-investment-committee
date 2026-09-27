@@ -15,6 +15,7 @@ const GoogleAuthSchema = z.object({
   googleIdToken: z.string().optional(),
   name: z.string().optional(),
   email: z.string().email().optional(),
+  photoUrl: z.string().optional(),
 })
 
 interface GoogleTokenInfo {
@@ -36,7 +37,7 @@ interface FirebaseAccountInfo {
   }>
 }
 
-async function verifyGoogleToken(token: string): Promise<{ email: string; name: string } | null> {
+async function verifyGoogleToken(token: string): Promise<{ email: string; name: string; avatarUrl?: string | null } | null> {
   try {
     const res = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${token}`, {
       headers: { 'User-Agent': 'AIInvestdesk-Auth/1.0' },
@@ -49,6 +50,7 @@ async function verifyGoogleToken(token: string): Promise<{ email: string; name: 
     return {
       email: data.email.toLowerCase(),
       name: data.name || data.email.split('@')[0],
+      avatarUrl: data.picture || null,
     }
   } catch {
     return null
@@ -58,7 +60,7 @@ async function verifyGoogleToken(token: string): Promise<{ email: string; name: 
 async function verifyFirebaseToken(
   token: string,
   apiKey: string,
-): Promise<{ email: string; name: string } | null> {
+): Promise<{ email: string; name: string; avatarUrl?: string | null } | null> {
   try {
     const res = await fetch(
       `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`,
@@ -75,6 +77,7 @@ async function verifyFirebaseToken(
     return {
       email: user.email.toLowerCase(),
       name: user.displayName || user.email.split('@')[0],
+      avatarUrl: user.photoUrl || null,
     }
   } catch {
     return null
@@ -97,10 +100,10 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const { idToken, googleIdToken, name: fallbackName, email: fallbackEmail } = parsed.data
+  const { idToken, googleIdToken, name: fallbackName, email: fallbackEmail, photoUrl: fallbackPhoto } = parsed.data
   const apiKey = process.env.FIREBASE_API_KEY || ''
 
-  let verified: { email: string; name: string } | null = null
+  let verified: { email: string; name: string; avatarUrl?: string | null } | null = null
 
   // 1. Coba verifikasi lewat Firebase identitytoolkit
   if (apiKey) {
@@ -123,6 +126,7 @@ export async function POST(req: NextRequest) {
     verified = {
       email: fallbackEmail.toLowerCase(),
       name: fallbackName || fallbackEmail.split('@')[0],
+      avatarUrl: fallbackPhoto || null,
     }
   }
 
@@ -142,18 +146,23 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    const initialAvatar = existing?.avatarUrl || verified.avatarUrl || fallbackPhoto || null
+
     const user = await upsertAppUser({
       email: verified.email,
       name: verified.name || fallbackName || 'Pengguna Google',
       role: existing?.role ?? 'user',
+      avatarUrl: initialAvatar,
       isActive: true,
     })
 
     await markUserLogin(user.id).catch(() => {})
 
+    const finalAvatar = user.avatarUrl || initialAvatar
+
     const response = NextResponse.json({
       ok: true,
-      data: { name: user.name, email: user.email, role: user.role },
+      data: { name: user.name, email: user.email, role: user.role, avatarUrl: finalAvatar },
     })
 
     response.cookies.set({
@@ -163,6 +172,7 @@ export async function POST(req: NextRequest) {
         email: user.email,
         name: user.name,
         role: user.role === 'admin' ? 'admin' : 'user',
+        avatarUrl: finalAvatar,
       }),
       ...sessionCookieOptions(SESSION_MAX_AGE_SECONDS),
     })

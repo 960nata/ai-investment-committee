@@ -801,6 +801,7 @@ export const appUser = pgTable(
     // Boleh kosong: akun yang dibuat manual lewat portal admin belum punya kata
     // sandi, dan akun tanpa kata sandi memang tidak bisa dipakai masuk sendiri.
     passwordHash: varchar('password_hash', { length: 255 }),
+    avatarUrl: text('avatar_url'),
     isActive: boolean('is_active').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     lastLoginAt: timestamp('last_login_at', { withTimezone: true }),

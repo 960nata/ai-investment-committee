@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
 
     const response = NextResponse.json({
       ok: true,
-      data: { name: user.name, email: user.email, role: user.role },
+      data: { name: user.name, email: user.email, role: user.role, avatarUrl: user.avatarUrl },
     })
 
     response.cookies.set({
@@ -74,6 +74,7 @@ export async function POST(req: NextRequest) {
         email: user.email,
         name: user.name,
         role: user.role === 'admin' ? 'admin' : 'user',
+        avatarUrl: user.avatarUrl ?? null,
       }),
       ...sessionCookieOptions(SESSION_MAX_AGE_SECONDS),
     })

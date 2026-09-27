@@ -80,7 +80,7 @@ export default async function WartaPublikPage({ searchParams }: Props) {
         }
         isFresh={freshness?.freshness === 'fresh'}
         isAdmin={isAdmin}
-        user={session ? { name: session.name, role: session.role } : null}
+        user={session}
       />
 
       <PublicNewsPortal

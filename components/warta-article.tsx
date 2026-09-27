@@ -152,7 +152,7 @@ export async function WartaArticle({ slug, locale }: { slug: string; locale: Loc
         }
         isFresh={freshness?.freshness === 'fresh'}
         isAdmin={isAdmin}
-        user={session ? { name: session.name, role: session.role } : null}
+        user={session}
         languages={available}
       />
 

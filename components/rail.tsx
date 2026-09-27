@@ -13,7 +13,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { IconFlow, IconGauge, IconPulse, IconRows, IconNews, IconClose } from './icons'
+import { IconFlow, IconGauge, IconPulse, IconRows, IconNews, IconClose, IconUser } from './icons'
 import { useSidebar } from './sidebar-context'
 
 export const SECTIONS = [
@@ -30,6 +30,12 @@ export const SECTIONS = [
     links: [
       { href: '/backtest', label: 'Backtest', icon: IconPulse },
       { href: '/pipeline', label: 'Pipeline', icon: IconFlow },
+    ],
+  },
+  {
+    label: 'Akun',
+    links: [
+      { href: '/profil', label: 'Profil Saya', icon: IconUser },
     ],
   },
 ]

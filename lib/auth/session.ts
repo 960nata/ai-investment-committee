@@ -28,6 +28,7 @@ export interface UserSession {
   email: string
   name: string
   role: 'admin' | 'user'
+  avatarUrl?: string | null
   /** Detik epoch saat tiket kedaluwarsa. */
   exp: number
 }
@@ -121,6 +122,7 @@ export function readSessionToken(token: string | undefined | null): UserSession 
       email: payload.email,
       name: typeof payload.name === 'string' ? payload.name : 'Analis AI Investdesk',
       role: payload.role === 'admin' ? 'admin' : 'user',
+      avatarUrl: typeof payload.avatarUrl === 'string' ? payload.avatarUrl : null,
       exp: payload.exp,
     }
   } catch {

@@ -113,6 +113,7 @@ export async function ensureNewsTable(): Promise<void> {
     -- Kolom kata sandi ditambahkan belakangan; basis data yang sudah berjalan
     -- lebih dulu tetap ikut terurus tanpa migrasi manual.
     ALTER TABLE app_user ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255);
+    ALTER TABLE app_user ADD COLUMN IF NOT EXISTS avatar_url TEXT;
 
     CREATE INDEX IF NOT EXISTS app_user_role_idx ON app_user (role);
 
@@ -377,6 +378,7 @@ const PUBLIC_USER_COLUMNS = {
   email: appUser.email,
   name: appUser.name,
   role: appUser.role,
+  avatarUrl: appUser.avatarUrl,
   isActive: appUser.isActive,
   createdAt: appUser.createdAt,
   lastLoginAt: appUser.lastLoginAt,
@@ -526,6 +528,50 @@ export async function deleteAppUser(id: number): Promise<boolean> {
 
   const res = await db.delete(appUser).where(eq(appUser.id, id)).returning({ id: appUser.id })
   return res.length > 0
+}
+
+/**
+ * Perbarui avatar user (URL webp).
+ */
+export async function updateUserAvatar(
+  id: number,
+  avatarUrl: string,
+): Promise<PublicAppUser | null> {
+  await ensureNewsTable()
+
+  const res = await db
+    .update(appUser)
+    .set({ avatarUrl })
+    .where(eq(appUser.id, id))
+    .returning(PUBLIC_USER_COLUMNS)
+
+  return res[0] ?? null
+}
+
+/**
+ * Perbarui profil dasar user (nama / foto).
+ */
+export async function updateUserProfile(
+  id: number,
+  data: { name?: string; avatarUrl?: string },
+): Promise<PublicAppUser | null> {
+  await ensureNewsTable()
+
+  const payload: Partial<AppUserRow> = {}
+  if (typeof data.name === 'string' && data.name.trim().length > 0) {
+    payload.name = data.name.trim()
+  }
+  if (typeof data.avatarUrl === 'string') {
+    payload.avatarUrl = data.avatarUrl
+  }
+
+  const res = await db
+    .update(appUser)
+    .set(payload)
+    .where(eq(appUser.id, id))
+    .returning(PUBLIC_USER_COLUMNS)
+
+  return res[0] ?? null
 }
 
 // ---------------------------------------------------------------------------
