@@ -32,7 +32,7 @@ export function LanguageSwitch({
           aria-current={l === current ? 'true' : undefined}
         >
           <Flag code={LOCALE_INFO[l].flag} size={20} />
-          {LOCALE_INFO[l].native}
+          {LOCALE_INFO[l].country}
         </Link>
       ))}
     </nav>

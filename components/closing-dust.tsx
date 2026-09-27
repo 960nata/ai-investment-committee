@@ -3,16 +3,10 @@
 import { useEffect, useRef } from 'react'
 
 /*
- * Debu halus atmosferik di hero section.
- * Partikel debu berukuran mikro, tenang, dan tingkat terangnya murni mengikuti
- * denyut napas berkas sinar (terang-redup halus tanpa kedip/glitch).
+ * Debu emas halus atmosferik di seksi penutup ("Lihat sendiri datanya").
+ * Partikel mikro berukuran lembut, melayang tenang di bawah kubah pendar amber,
+ * tanpa kedip/glitch, murni mengikuti denyut napas kubah cahaya.
  */
-
-const BEAM_CENTER_DEG = 55
-const BEAM_SPREAD_DEG = 16
-const BEAM_REACH_PX = 1200
-const SOURCE_RIGHT_RATIO = 0.04
-const SOURCE_TOP_PX = -40
 
 interface Mote {
   x: number
@@ -23,7 +17,7 @@ interface Mote {
   phase: number
 }
 
-export function HeroDust() {
+export function ClosingDust() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
@@ -34,8 +28,6 @@ export function HeroDust() {
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     let width = 0
     let height = 0
-    let ox = 0
-    let oy = SOURCE_TOP_PX
     let motes: Mote[] = []
     let frame = 0
     let visible = true
@@ -43,22 +35,20 @@ export function HeroDust() {
     function spawn(anywhere: boolean): Mote {
       let x: number
       let y: number
-      if (anywhere || Math.random() < 0.2) {
+      if (anywhere || Math.random() < 0.25) {
         x = Math.random() * width
         y = Math.random() * height
       } else {
-        const deg = BEAM_CENTER_DEG + (Math.random() * 2 - 1) * BEAM_SPREAD_DEG * 1.2
-        const rad = (deg * Math.PI) / 180
-        const dist = 40 + Math.random() * BEAM_REACH_PX
-        x = ox - Math.sin(rad) * dist
-        y = oy + Math.cos(rad) * dist
+        const spread = (Math.random() - 0.5) * Math.min(width * 0.65, 600)
+        x = width * 0.5 + spread
+        y = Math.random() * Math.min(height * 0.85, 420)
       }
       return {
         x,
         y,
-        vx: -0.05 + (Math.random() - 0.5) * 0.08,
-        vy: 0.03 + Math.random() * 0.07,
-        r: 0.35 + Math.random() * 0.45, // Partikel mikro halus (0.35px - 0.8px)
+        vx: (Math.random() - 0.5) * 0.08,
+        vy: -0.03 - Math.random() * 0.05, // Melayang naik sangat perlahan
+        r: 0.35 + Math.random() * 0.45,  // Partikel mikro halus (0.35px - 0.8px)
         phase: Math.random() * Math.PI * 2,
       }
     }
@@ -72,25 +62,18 @@ export function HeroDust() {
       canvas.width = Math.round(width * dpr)
       canvas.height = Math.round(height * dpr)
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-      ox = width * (1 - SOURCE_RIGHT_RATIO)
-      oy = SOURCE_TOP_PX
 
-      // Jumlah sedikit dan elegan (~20 di mobile, max ~30 di desktop)
-      const count = Math.min(30, Math.max(18, Math.round((width * height) / 38000)))
+      // Jumlah sedikit dan elegan (~16 di mobile, max ~24 di desktop)
+      const count = Math.min(24, Math.max(14, Math.round((width * height) / 40000)))
       motes = Array.from({ length: count }, () => spawn(true))
     }
 
-    /** Seberapa terang cahaya di titik ini, 0 sampai 1 */
+    /** Seberapa terang cahaya di titik ini relatif terhadap kubah cahaya atas */
     function lightAt(x: number, y: number): number {
-      const vx = x - ox
-      const vy = y - oy
-      const dist = Math.hypot(vx, vy)
-      if (dist > BEAM_REACH_PX * 1.15) return 0
-      const deg = (Math.atan2(-vx, vy) * 180) / Math.PI
-      const off = (deg - BEAM_CENTER_DEG) / BEAM_SPREAD_DEG
-      const across = Math.exp(-off * off)
-      const along = Math.max(0, 1 - dist / (BEAM_REACH_PX * 1.15))
-      return across * along
+      const dx = (x - width * 0.5) / (width * 0.45)
+      const dy = y / (height * 0.85)
+      const dist = Math.hypot(dx * 1.3, dy)
+      return Math.max(0, 1 - dist)
     }
 
     function draw(time: number) {
@@ -98,8 +81,8 @@ export function HeroDust() {
       ctx.clearRect(0, 0, width, height)
       ctx.globalCompositeOperation = 'lighter'
 
-      // Denyut napas cahaya amber utama (siklus ~6.5s halus tanpa kedip)
-      const beamPulse = 0.65 + 0.35 * Math.sin(time * 0.00096)
+      // Denyut napas cahaya penutup (~7s siklus halus, selaras dengan CSS glow)
+      const beamPulse = 0.65 + 0.35 * Math.sin(time * 0.0009)
 
       for (let i = 0; i < motes.length; i++) {
         const m = motes[i]
@@ -112,19 +95,18 @@ export function HeroDust() {
           }
         }
 
-        // Fade halus di tepi canvas agar tidak popping/glitch
+        // Fade tepi canvas agar tidak popping
         const edgeX = Math.min(1, Math.min(m.x + 15, width + 15 - m.x) / 35)
         const edgeY = Math.min(1, Math.min(m.y + 15, height + 15 - m.y) / 35)
         const edgeFade = Math.max(0, Math.min(edgeX, edgeY))
 
         const rawLight = lightAt(m.x, m.y)
-        // Cahaya murni bersumber dari berkas sinar & denyut napasnya (tanpa flicker buatan)
         const light = rawLight * beamPulse * edgeFade
         if (light < 0.03) continue
 
-        const alpha = Math.min(0.85, light * 0.9)
+        const alpha = Math.min(0.85, light * 0.85)
 
-        // Pendar lembut bergradasi mikro (kontinu tanpa loncatan threshold)
+        // Pendar lembut bergradasi mikro
         const haloR = m.r * 2.2
         const g = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, haloR)
         g.addColorStop(0, `rgba(255, 220, 175, ${alpha})`)
@@ -166,5 +148,5 @@ export function HeroDust() {
     }
   }, [])
 
-  return <canvas ref={canvasRef} className="nextai-dust" aria-hidden="true" />
+  return <canvas ref={canvasRef} className="lp-closing-dust" aria-hidden="true" />
 }

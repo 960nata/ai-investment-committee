@@ -23,6 +23,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { IconClock, IconPulse, IconMenu, IconLock, IconClose } from './icons'
 import { Lamp, type State } from './ui'
 import { SECTIONS } from './rail'
+import { LanguageMenu } from './language-menu'
 import { useSidebar } from './sidebar-context'
 
 const TITLES = new Map(
@@ -113,7 +114,8 @@ export function Topbar({
 
       {action && <span className="topbar-action">{action}</span>}
 
-      <span className="topbar-session">
+      <div className="topbar-session">
+        <LanguageMenu />
         {user && (
           <span className="topbar-user mono" title={user.email}>
             {user.name}
@@ -128,7 +130,7 @@ export function Topbar({
           <IconClose size={12} />
           <span>Keluar</span>
         </button>
-      </span>
+      </div>
     </header>
   )
 }

@@ -15,6 +15,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { IconFlow, IconGauge, IconPulse, IconRows, IconNews, IconClose } from './icons'
 import { useSidebar } from './sidebar-context'
+import { LanguageMenu } from './language-menu'
 
 export const SECTIONS = [
   {
@@ -85,6 +86,11 @@ export function Rail() {
             ))}
           </nav>
         ))}
+
+        <div className="rail-group rail-lang-group" style={{ marginTop: 'auto', paddingTop: 'var(--space-2)' }}>
+          <span className="rail-label">Bahasa · Language</span>
+          <LanguageMenu variant="drawer" onNavigate={close} />
+        </div>
 
         <div className="rail-foot">
           <strong>Alat ukur</strong>

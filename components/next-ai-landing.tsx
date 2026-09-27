@@ -86,7 +86,7 @@ export function NextAiLanding({
 
         {/* Berkas cahaya amber/emas */}
         <div className="nextai-aurora-rays" aria-hidden="true">
-          {BEAM_LAYERS.map((layer) => (
+          {BEAM_LAYERS.map((layer, idx) => (
             <span
               key={layer.rot}
               className="nextai-ray"
@@ -99,6 +99,7 @@ export function NextAiLanding({
                   '--ray-blur': `${layer.blur}px`,
                   '--ray-peak': layer.peak,
                   '--ray-len': `${layer.len}%`,
+                  animationDelay: `${idx * 0.75}s`,
                 } as CSSProperties
               }
             >

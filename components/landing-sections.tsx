@@ -4,6 +4,7 @@ import type { LatestScore } from '@/lib/db/queries'
 import type { MarketNewsRow } from '@/lib/db/schema'
 import { FEATURES } from '@/lib/features/registry'
 import { LandingMarketChart, type MarketSample } from '@/components/landing-market-chart'
+import { ClosingDust } from '@/components/closing-dust'
 
 /*
  * Seksi beranda di bawah hero.
@@ -699,6 +700,7 @@ export function ClosingSection({
   return (
     <section className="lp lp-closing">
       <div className="lp-closing-glow" aria-hidden="true" />
+      <ClosingDust />
       <div className="lp-inner lp-reveal">
         <h2 className="lp-closing-title">Lihat sendiri datanya</h2>
         <p className="lp-closing-sub">Tanpa kartu kredit, tanpa masa percobaan.</p>

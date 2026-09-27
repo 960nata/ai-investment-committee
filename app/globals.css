@@ -1465,6 +1465,57 @@ body.rail-lock {
   50% { opacity: 0.4; transform: scale(0.85); }
 }
 
+.quote-price {
+  transition: color 0.2s ease, text-shadow 0.2s ease, transform 0.2s ease;
+  display: inline-block;
+}
+
+.quote-price.tick-up {
+  color: #10b981 !important;
+  text-shadow: 0 0 10px rgba(16, 185, 129, 0.45);
+  transform: translateY(-1px);
+}
+
+.quote-price.tick-down {
+  color: #ef4444 !important;
+  text-shadow: 0 0 10px rgba(239, 68, 68, 0.45);
+  transform: translateY(1px);
+}
+
+.live-motion-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.live-motion-btn:hover {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: rgba(16, 185, 129, 0.5);
+}
+
+.live-motion-btn.paused {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--ink-mute);
+  border-color: var(--line);
+}
+
+.live-motion-btn.paused .live-dot {
+  background: #64748b;
+  animation: none;
+}
+
 .chart-wide {
   height: 440px;
 }
@@ -8214,6 +8265,61 @@ body.rail-lock {
   }
 }
 
+.topbar .lang-menu {
+  display: inline-flex;
+  align-items: center;
+}
+
+.topbar .lang-menu-trigger {
+  height: 28px;
+  padding: 0 8px;
+  gap: 5px;
+  border-radius: var(--radius-xs);
+  border-color: var(--line);
+  background: var(--surface-2);
+  color: var(--ink);
+  font-size: 11px;
+}
+
+.topbar .lang-menu-trigger:hover,
+.topbar .lang-menu-trigger.is-open {
+  border-color: var(--signal);
+  background: var(--surface-3);
+  color: var(--signal);
+}
+
+.topbar .lang-menu-pop {
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 100;
+}
+
+.rail-lang-group {
+  margin-top: auto;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--line);
+}
+
+.rail-lang-group .lang-drawer {
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.rail-lang-group .lang-drawer button {
+  padding: 5px 8px;
+  font-size: 11.5px;
+  gap: 6px;
+  border-radius: var(--radius-xs);
+  border-color: var(--line);
+  background: var(--surface-2);
+}
+
+.rail-lang-group .lang-drawer button:hover {
+  background: var(--surface-3);
+  border-color: var(--signal);
+}
+
 /* ===========================================================================
    DENYUT PASAR — PERGANTIAN KARTU
    ---------------------------------------------------------------------------
@@ -10329,14 +10435,27 @@ body.rail-lock {
   transform: rotate(55deg);
   background: radial-gradient(
     ellipse 62% 100% at 50% 0%,
-    rgba(255, 172, 96, 0.2) 0%,
-    rgba(250, 134, 42, 0.13) 30%,
-    rgba(137, 54, 14, 0.06) 58%,
+    rgba(255, 172, 96, 0.24) 0%,
+    rgba(250, 134, 42, 0.16) 30%,
+    rgba(137, 54, 14, 0.08) 58%,
     transparent 80%
   );
   filter: blur(64px);
   pointer-events: none;
   z-index: 0;
+  will-change: opacity, transform;
+  animation: nextai-beam-breathe 7s ease-in-out infinite alternate;
+}
+
+@keyframes nextai-beam-breathe {
+  0% {
+    opacity: 0.65;
+    transform: rotate(54deg) scale(0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: rotate(56deg) scale(1.03);
+  }
 }
 
 /* Wadah penempatan berkas cahaya di pojok kanan atas */
@@ -10361,7 +10480,7 @@ body.rail-lock {
   transform-origin: 50% 0;
   filter: blur(var(--ray-blur));
   will-change: opacity;
-  animation: nextai-ray-breathe 16s ease-in-out infinite alternate;
+  animation: nextai-ray-breathe 6.5s ease-in-out infinite alternate;
 }
 
 .nextai-ray > i {
@@ -10396,10 +10515,13 @@ body.rail-lock {
 }
 
 @keyframes nextai-ray-breathe {
-  from {
-    opacity: 0.6;
+  0% {
+    opacity: 0.45;
   }
-  to {
+  50% {
+    opacity: 0.75;
+  }
+  100% {
     opacity: 1;
   }
 }
@@ -10413,13 +10535,24 @@ body.rail-lock {
   height: 58%;
   background: radial-gradient(
     circle at 60% 32%,
-    rgba(250, 134, 42, 0.22) 0%,
-    rgba(255, 172, 96, 0.12) 38%,
+    rgba(250, 134, 42, 0.25) 0%,
+    rgba(255, 172, 96, 0.14) 38%,
     transparent 70%
   );
   filter: blur(46px);
   pointer-events: none;
   z-index: 0;
+  will-change: opacity;
+  animation: nextai-glow-breathe 8s ease-in-out infinite alternate;
+}
+
+@keyframes nextai-glow-breathe {
+  0% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 1;
+  }
 }
 
 /* Kanvas debu: lihat HeroDust. Di atas sinar, di bawah teks. */
@@ -10444,15 +10577,17 @@ body.rail-lock {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .nextai-ray {
+  .nextai-ray,
+  .nextai-aurora-beam,
+  .nextai-aurora-glow {
     animation: none;
-    opacity: 0.6;
+    opacity: 0.8;
   }
 }
 
 .nextai-hero-container {
   position: absolute;
-  top: 50%;
+  top: calc(50% + 100px);
   left: 50%;
   transform: translate(-50%, -50%);
   width: 100%;
@@ -14303,12 +14438,13 @@ body.rail-lock {
 /* --- Penutup: sinar hero kembali ------------------------------------------- */
 
 .lp-closing {
+  position: relative;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  min-height: 450px;
-  padding: 40px 24px;
+  min-height: 500px;
+  padding: 80px 24px 72px;
   text-align: center;
 }
 
@@ -14321,11 +14457,41 @@ body.rail-lock {
   transform: translateX(-50%);
   background: radial-gradient(
     ellipse 50% 70% at 50% 0%,
-    rgba(250, 134, 42, 0.28),
-    rgba(250, 134, 42, 0.08) 45%,
+    rgba(255, 172, 96, 0.22),
+    rgba(250, 134, 42, 0.26) 22%,
+    rgba(250, 134, 42, 0.08) 50%,
     transparent 75%
   );
+  filter: blur(28px);
   pointer-events: none;
+  z-index: 0;
+  will-change: opacity, transform;
+  animation: lp-closing-glow-breathe 7s ease-in-out infinite alternate;
+}
+
+@keyframes lp-closing-glow-breathe {
+  0% {
+    opacity: 0.65;
+    transform: translateX(-50%) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1.04);
+  }
+}
+
+.lp-closing-dust {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.lp-closing .lp-inner {
+  position: relative;
+  z-index: 1;
 }
 
 .lp-closing-title {
@@ -14334,6 +14500,7 @@ body.rail-lock {
   font-weight: 800;
   line-height: 1;
   letter-spacing: -0.045em;
+  text-shadow: 0 4px 30px rgba(0, 0, 0, 0.7);
 }
 
 .lp-closing-sub {
@@ -15929,15 +16096,15 @@ body.rail-lock {
 }
 
 .lang-menu-globe {
-  display: flex;
-  align-items: center;
-  color: #fa862a;
+  display: none;
 }
 
-.lang-menu-label {
-  font-size: 12px;
+.lang-menu-code {
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  font-family: var(--mono);
+  letter-spacing: 0.05em;
+  color: #ffffff;
 }
 
 .lang-menu-chevron {
@@ -16023,6 +16190,25 @@ body.rail-lock {
   color: #ffffff;
 }
 
+.lang-menu-name {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex: 1;
+}
+
+.lang-menu-country {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #f1f5f9;
+}
+
+.lang-menu-native-sub {
+  font-size: 11.5px;
+  color: #94a3b8;
+  font-weight: 400;
+}
+
 .lang-menu-native {
   flex: 1;
   font-size: 13.5px;
@@ -16081,15 +16267,9 @@ body.rail-lock {
   background: rgba(250, 134, 42, 0.12);
 }
 
-
-/* Di ponsel sempit tombolnya cukup globe + bendera. */
 @media (max-width: 640px) {
-  .landing-nav-actions .lang-menu-label {
-    display: none;
-  }
-
   .lang-menu-trigger {
-    padding: 0 8px;
+    padding: 0 7px;
     gap: 5px;
   }
 }

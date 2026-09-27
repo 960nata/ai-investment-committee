@@ -19,6 +19,10 @@ export const TRANSLATED_LOCALES = LOCALES.filter((l) => l !== SOURCE_LOCALE) as 
 >[]
 
 export interface LocaleInfo {
+  /** Singkatan negara/bahasa 2 huruf kapital untuk tombol di header (ID, EN, CN, JP, RU). */
+  code: string
+  /** Nama negara dalam Bahasa Indonesia (Indonesia, Inggris, China, Jepang, Rusia). */
+  country: string
   /** Nama bahasa dalam bahasanya sendiri, untuk pemilih bahasa. */
   native: string
   /** Nama bahasa dalam Bahasa Indonesia, untuk prompt dan log. */
@@ -37,6 +41,8 @@ export interface LocaleInfo {
 
 export const LOCALE_INFO: Record<Locale, LocaleInfo> = {
   id: {
+    code: 'ID',
+    country: 'Indonesia',
     native: 'Indonesia',
     indonesian: 'Bahasa Indonesia',
     english: 'Indonesian',
@@ -46,6 +52,8 @@ export const LOCALE_INFO: Record<Locale, LocaleInfo> = {
     ogLocale: 'id_ID',
   },
   en: {
+    code: 'EN',
+    country: 'Inggris',
     native: 'English',
     indonesian: 'Bahasa Inggris',
     english: 'English',
@@ -55,6 +63,8 @@ export const LOCALE_INFO: Record<Locale, LocaleInfo> = {
     ogLocale: 'en_US',
   },
   zh: {
+    code: 'CN',
+    country: 'China',
     native: '中文',
     indonesian: 'Bahasa Mandarin (aksara sederhana)',
     english: 'Simplified Chinese',
@@ -64,6 +74,8 @@ export const LOCALE_INFO: Record<Locale, LocaleInfo> = {
     ogLocale: 'zh_CN',
   },
   ja: {
+    code: 'JP',
+    country: 'Jepang',
     native: '日本語',
     indonesian: 'Bahasa Jepang',
     english: 'Japanese',
@@ -73,6 +85,8 @@ export const LOCALE_INFO: Record<Locale, LocaleInfo> = {
     ogLocale: 'ja_JP',
   },
   ru: {
+    code: 'RU',
+    country: 'Rusia',
     native: 'Русский',
     indonesian: 'Bahasa Rusia',
     english: 'Russian',

@@ -114,7 +114,12 @@ export function LanguageMenu({
       translate="no"
     >
       <Flag code={LOCALE_INFO[l].flag} size={variant === 'drawer' ? 22 : 20} />
-      <span className="lang-menu-native">{LOCALE_INFO[l].native}</span>
+      <span className="lang-menu-name">
+        <span className="lang-menu-country">{LOCALE_INFO[l].country}</span>
+        {LOCALE_INFO[l].native !== LOCALE_INFO[l].country && (
+          <span className="lang-menu-native-sub">({LOCALE_INFO[l].native})</span>
+        )}
+      </span>
       {l === SOURCE_LOCALE && <span className="lang-menu-tag">Asli</span>}
       <span className="lang-menu-tick" aria-hidden="true">
         {l === current ? '✓' : ''}
@@ -138,19 +143,12 @@ export function LanguageMenu({
         aria-haspopup="true"
         aria-expanded={open}
         aria-controls={menuId}
-        aria-label={`${TITLE[current]}: ${LOCALE_INFO[current].native}`}
+        aria-label={`${TITLE[current]}: ${LOCALE_INFO[current].country}`}
         onClick={() => setOpen((o) => !o)}
-        title="Terjemahkan Halaman / Translate Page"
+        title="Pilih Bahasa / Choose Language"
       >
-        <span className="lang-menu-globe" aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10" />
-            <line x1="2" y1="12" x2="22" y2="12" />
-            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-          </svg>
-        </span>
         <Flag code={LOCALE_INFO[current].flag} size={18} />
-        <span className="lang-menu-label">{LOCALE_INFO[current].native}</span>
+        <span className="lang-menu-code">{LOCALE_INFO[current].code}</span>
         <span className="lang-menu-chevron" aria-hidden="true">
           ▾
         </span>
