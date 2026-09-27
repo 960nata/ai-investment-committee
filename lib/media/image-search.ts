@@ -295,6 +295,41 @@ function stripHtml(value?: string): string | undefined {
 }
 
 /**
+ * Penyedia yang pencariannya pencocokan teks biasa, bukan semantik. Hasilnya
+ * sering melenceng jauh: "wall street trading floor" pernah mengembalikan foto
+ * pompa air desa di Inggris. Kandidat dari sini wajib memuat kata kuncinya.
+ */
+const KEYWORD_MATCH_PROVIDERS = new Set(['openverse', 'wikimedia'])
+
+const STOPWORDS = new Set([
+  'the', 'and', 'with', 'from', 'into', 'over', 'under', 'for', 'of', 'in', 'on', 'at', 'to',
+  'a', 'an', 'red', 'green', 'blue', 'close', 'view', 'photo', 'image', 'modern', 'large', 'screens',
+])
+
+function keywordsOf(query: string): string[] {
+  return query
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w.length >= 3 && !STOPWORDS.has(w))
+}
+
+/**
+ * Apakah judul atau halaman sumber kandidat menyebut setidaknya dua kata
+ * kunci bermakna. Kata di URL halaman ikut dihitung karena judul Wikimedia
+ * sering kosong sementara nama berkasnya deskriptif.
+ */
+function isRelevant(candidate: PhotoCandidate, keywords: string[]): boolean {
+  if (!KEYWORD_MATCH_PROVIDERS.has(candidate.provider) || keywords.length === 0) return true
+  const haystack = `${candidate.title ?? ''} ${decodeURIComponent(candidate.sourcePage ?? '')}`
+    .toLowerCase()
+    .replace(/[_-]+/g, ' ')
+  // Satu kata tidak cukup: "wall street" cocok dengan "red-brick wall", dan
+  // "gold bars" dengan lukisan Manet. Dua kata kunci menyaring kebetulan itu.
+  const needed = Math.min(2, keywords.length)
+  return keywords.filter((k) => new RegExp(`\\b${k}`).test(haystack)).length >= needed
+}
+
+/**
  * Cari foto asli di internet untuk satu kata kunci.
  *
  * Penyedia dijalankan berbarengan, bukan berurutan: pencarian yang gagal atau
@@ -316,10 +351,12 @@ export async function searchInternetPhotos(query: string): Promise<PhotoCandidat
 
   const seen = new Set<string>()
   const candidates: PhotoCandidate[] = []
+  const keywords = keywordsOf(clean)
 
   for (const batch of batches) {
     for (const candidate of batch) {
       if (!isUsable(candidate)) continue
+      if (!isRelevant(candidate, keywords)) continue
       if (seen.has(candidate.url)) continue
       seen.add(candidate.url)
       candidates.push(candidate)

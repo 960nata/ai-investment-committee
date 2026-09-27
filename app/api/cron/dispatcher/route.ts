@@ -44,7 +44,7 @@ const COMMITTEE_BATCH_SIZE = 2
  * berkas KSEI memuat semua saham, satu deret makro tidak punya simbol. Dibagi
  * per batch, job ini akan jalan berulang kali untuk pekerjaan yang sama.
  */
-const WHOLE_SOURCE_JOBS = new Set(['ingest-ksei-monthly', 'ingest-macro'])
+const WHOLE_SOURCE_JOBS = new Set(['ingest-ksei-monthly', 'ingest-macro', 'warta-otomatis', 'warta-terjemah'])
 
 function batchSizeFor(jobName: string): number {
   return jobName.startsWith('komite-') ? COMMITTEE_BATCH_SIZE : BATCH_SIZE

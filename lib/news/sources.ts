@@ -71,7 +71,8 @@ function decodeEntities(text: string): string {
     .replace(/&quot;/g, '"')
     .replace(/&#39;|&apos;/g, "'")
     .replace(/&nbsp;/g, ' ')
-    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
     .replace(/&amp;/g, '&')
 }
 
@@ -140,9 +141,10 @@ async function fetchFeed(feed: NewsFeed): Promise<Headline[]> {
  *
  * Feed diambil berbarengan; satu media yang mati tidak menahan yang lain.
  * Hasilnya diurutkan dari yang paling baru dan dibatasi umurnya — berita dua
- * hari lalu sudah bukan bahan warta.
+ * hari lalu sudah bukan bahan warta. Satu hari penuh supaya akhir pekan,
+ * saat media menerbitkan jauh lebih sedikit, tetap punya bahan.
  */
-export async function collectRecentHeadlines(maxAgeHours = 18): Promise<Headline[]> {
+export async function collectRecentHeadlines(maxAgeHours = 24): Promise<Headline[]> {
   const batches = await Promise.all(NEWS_FEEDS.map(fetchFeed))
   const cutoff = Date.now() - maxAgeHours * 3600_000
   const seen = new Set<string>()
@@ -157,6 +159,29 @@ export async function collectRecentHeadlines(maxAgeHours = 18): Promise<Headline
       return true
     })
     .sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime())
+}
+
+/**
+ * Domain yang boleh diambil halamannya: hanya milik media di NEWS_FEEDS.
+ *
+ * Isi feed tidak sepenuhnya kita kendalikan. Tanpa batasan ini, satu tautan
+ * yang disisipkan ke feed bisa membuat server portal mengambil alamat internal
+ * (metadata cloud, basis data) atas namanya sendiri.
+ */
+const ALLOWED_SOURCE_HOSTS = [...new Set(NEWS_FEEDS.map((f) => new URL(f.url).hostname.replace(/^www\./, '')))]
+  // Feed RSS di subdomain berbeda dari artikelnya (feeds.content.dowjones.io).
+  .concat(['marketwatch.com'])
+
+export function isAllowedSourceUrl(link: string): boolean {
+  try {
+    const url = new URL(link)
+    if (url.protocol !== 'https:') return false
+    if (url.username || url.password || (url.port && url.port !== '443')) return false
+    const host = url.hostname.toLowerCase()
+    return ALLOWED_SOURCE_HOSTS.some((allowed) => host === allowed || host.endsWith(`.${allowed}`))
+  } catch {
+    return false
+  }
 }
 
 /** Buang parameter pelacak supaya berita yang sama tidak terhitung dua kali. */
@@ -184,12 +209,19 @@ export function normaliseLink(link: string): string {
 export async function fetchSourceDocument(headline: Headline): Promise<SourceDocument> {
   let body = ''
 
+  if (!isAllowedSourceUrl(headline.link)) {
+    console.warn(`[NewsSources] Tautan di luar daftar media ditolak: ${headline.link}`)
+    return { ...headline, body: headline.summary }
+  }
+
   try {
     const res = await fetchWithTimeout(headline.link, {
       label: `artikel ${headline.source}`,
       headers: { 'User-Agent': USER_AGENT, Accept: 'text/html' },
     })
-    if (res.ok) {
+    // Pengalihan diikuti fetch secara otomatis; tujuan akhirnya diperiksa
+    // ulang supaya satu redirect tidak membawa server ke alamat internal.
+    if (res.ok && isAllowedSourceUrl(res.url || headline.link)) {
       const html = (await res.text()).replace(/<(script|style|noscript)[\s\S]*?<\/\1>/gi, '')
       const paragraphs = (html.match(/<p[\s>][\s\S]*?<\/p>/gi) ?? [])
         .map((p) => cleanText(p))

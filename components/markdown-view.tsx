@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useMemo } from 'react'
+import { sanitizeHtml } from '@/lib/security/sanitize-html'
 
 interface Props {
   content: string
@@ -32,11 +33,10 @@ export function MarkdownView({ content }: Props) {
 function processMarkdownAndHtml(raw: string): string {
   if (!raw) return ''
 
-  // 1. Sanitasi awal untuk mencegah script berbahaya
-  let text = raw
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replace(/on\w+\s*=\s*["'][^"']*["']/gi, '')
-    .replace(/javascript\s*:/gi, '')
+  // 1. Sanitasi daftar izin: hanya tag dan atribut aman yang dipertahankan.
+  //    Isi warta ditulis model dari halaman situs luar, jadi HTML-nya tidak
+  //    bisa dipercaya begitu saja walau sudah dibersihkan saat disimpan.
+  let text = sanitizeHtml(raw)
 
   // 2. Normalisasi Markdown Tables menjadi HTML <table>
   text = processMarkdownTables(text)
@@ -81,7 +81,9 @@ function processMarkdownAndHtml(raw: string): string {
     .filter(Boolean)
     .join('\n')
 
-  return wrapped
+  // Sekali lagi setelah konversi Markdown, supaya tidak ada pola Markdown yang
+  // bisa dirakit menjadi tag berbahaya.
+  return sanitizeHtml(wrapped)
 }
 
 /**

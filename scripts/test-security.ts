@@ -19,6 +19,8 @@ import { checkBearer, requireAdmin, requireCron, timingSafeEqual } from '../lib/
 import { RULES } from '../lib/http/ratelimit'
 import { inspect } from '../lib/http/shield'
 import { maskIp, resetLocalBans } from '../lib/http/blocklist'
+import { sanitizeHtml } from '../lib/security/sanitize-html'
+import { isAllowedSourceUrl } from '../lib/news/sources'
 
 // ---------------------------------------------------------------------------
 
@@ -412,6 +414,73 @@ const run = async () => {
     const bare = new Request('https://contoh.test/')
     assert(requireAdmin(bare).ok, 'penjaga operasional longgar di luar produksi')
     assert(requireCron(bare).ok, 'penjaga cron longgar di luar produksi')
+  })
+
+  // -------------------------------------------------------------------------
+  // Isi warta: HTML tulisan model, kadang dari halaman situs luar
+
+  await test('sanitasi warta membuang skrip dan atribut event, bertanda kutip atau tidak', () => {
+    const attacks = [
+      '<script>alert(1)</script>',
+      '<img src=x onerror=alert(1)>',
+      '<p onclick="alert(1)">x</p>',
+      "<p onmouseover='alert(1)'>x</p>",
+      '<svg><script>alert(1)</script></svg>',
+      '<svg onload=alert(1)>',
+      '<iframe src="https://evil.test"></iframe>',
+      '<a href="javascript:alert(1)">x</a>',
+      '<a href="jav&#x61;script:alert(1)">x</a>',
+      '<a href="  JaVaScRiPt:alert(1)">x</a>',
+      '<a href="data:text/html,<script>alert(1)</script>">x</a>',
+      '<a href="//evil.test">x</a>',
+      '<object data="x"></object><embed src="x">',
+      '<style>body{display:none}</style>',
+      '<form action="https://evil.test"><input name=p></form>',
+      '<div style="position:fixed;inset:0">x</div>',
+      '<math><mtext><img src=x onerror=alert(1)></mtext></math>',
+    ]
+    for (const attack of attacks) {
+      const out = sanitizeHtml(attack).toLowerCase()
+      assert(!/<(script|img|svg|iframe|object|embed|style|form|input|math)\b/.test(out), `tag berbahaya lolos: ${attack} -> ${out}`)
+      assert(!/\son\w+\s*=/.test(out), `atribut event lolos: ${attack} -> ${out}`)
+      assert(!/javascript:|data:|href="\/\//.test(out), `URL berbahaya lolos: ${attack} -> ${out}`)
+      assert(!/style=/.test(out), `atribut style lolos: ${attack} -> ${out}`)
+    }
+  })
+
+  await test('sanitasi warta mempertahankan format artikel yang sah', () => {
+    const legit =
+      '## Judul\n\n<strong>tebal</strong> <em>miring</em> <u>garis</u> <mark>sorot</mark>\n\n' +
+      '<table><thead><tr><th>Aset</th></tr></thead><tbody><tr><td>BBCA.JK</td></tr></tbody></table>\n\n' +
+      '<blockquote><p>kutipan</p></blockquote><hr />\n\n' +
+      '- <a href="https://www.cnbcindonesia.com/x" target="_blank">sumber</a>\n\n' +
+      'Harga < 5% dan **Markdown** tetap utuh.'
+    const out = sanitizeHtml(legit)
+    for (const keep of ['<strong>', '<em>', '<u>', '<mark>', '<table>', '<th>', '<td>', '<blockquote>', '<hr />', '## Judul', '**Markdown**', 'Harga < 5%']) {
+      assert(out.includes(keep), `format sah hilang: ${keep}`)
+    }
+    assert(out.includes('href="https://www.cnbcindonesia.com/x"'), 'tautan https harus tetap ada')
+    assert(out.includes('rel="noopener noreferrer nofollow"'), 'tautan tab baru wajib memutus window.opener')
+  })
+
+  await test('pengambil berita hanya mau membuka domain media yang terdaftar', () => {
+    assert(isAllowedSourceUrl('https://www.cnbcindonesia.com/market/123/x'), 'CNBC Indonesia seharusnya diizinkan')
+    assert(isAllowedSourceUrl('https://www.antaranews.com/berita/1/x'), 'ANTARA seharusnya diizinkan')
+    assert(isAllowedSourceUrl('https://www.marketwatch.com/story/x'), 'MarketWatch seharusnya diizinkan')
+    for (const bad of [
+      'http://www.cnbcindonesia.com/x',
+      'https://169.254.169.254/latest/meta-data/',
+      'https://localhost/admin',
+      'https://127.0.0.1/',
+      'https://cnbcindonesia.com.evil.test/',
+      'https://evilcnbcindonesia.com/',
+      'https://user:pass@www.cnbcindonesia.com/',
+      'https://www.cnbcindonesia.com:8443/',
+      'file:///etc/passwd',
+      'bukan url',
+    ]) {
+      assert(!isAllowedSourceUrl(bad), `seharusnya ditolak: ${bad}`)
+    }
   })
 
   // -------------------------------------------------------------------------

@@ -4,6 +4,7 @@
  *   npm run job ingest-crypto-daily
  *   npm run job compute-features-crypto
  *   npm run job ingest-crypto-daily -- --from 2024-01-01
+ *   npm run job warta-otomatis -- --dry-run   (tulis draf, tanpa menyimpan)
  *
  * Jalur yang sama dengan yang dipakai QStash, hanya tanpa HTTP dan tanpa tanda
  * tangan. Berguna untuk mengisi riwayat pertama kali dan untuk memeriksa
@@ -19,6 +20,8 @@ import { runFundamentalJob } from '../lib/fundamentals/job'
 import { runCrossSectionJob } from '../lib/features/cross-section-job'
 import { runKseiJob } from '../lib/ownership/job'
 import { runMacroJob, macroAssumptions } from '../lib/macro/job'
+import { runAutoNewsJob } from '../lib/agents/auto-news'
+import { translateMissingNews } from '../lib/agents/news-translator'
 import type { MarketCode } from '../lib/db/schema'
 
 const JOBS = [
@@ -38,6 +41,8 @@ const JOBS = [
   'normalise-cross-section',
   'ingest-ksei-monthly',
   'ingest-macro',
+  'warta-otomatis',
+  'warta-terjemah',
 ] as const
 
 type JobName = (typeof JOBS)[number]
@@ -107,6 +112,42 @@ async function main(): Promise<void> {
     console.log(`  ERP Indonesia (asumsi): ${(a.erpIndonesia * 100).toFixed(1)}%`)
     console.log(`  batas g_terminal: IDN ${(a.terminalGrowthCap.IDN * 100).toFixed(2)}% · USA ${(a.terminalGrowthCap.USA * 100).toFixed(2)}%`)
     console.log(`  selesai dalam ${((Date.now() - started) / 1000).toFixed(1)} detik\n`)
+    return
+  }
+
+  // Warta tidak terikat pasar maupun instrumen: bahannya RSS media keuangan.
+  if (job === 'warta-otomatis') {
+    console.log(`\n${job} · RSS media keuangan`)
+    const started = Date.now()
+    const result = await runAutoNewsJob({ dryRun: process.argv.includes('--dry-run') })
+    console.log(`  ${result.headlinesSeen} judul terkumpul`)
+    if (result.draft) {
+      const d = result.draft
+      console.log(`\n  DRAF (tidak disimpan)`)
+      console.log(`  judul    : ${d.title}`)
+      console.log(`  slug     : ${d.slug}`)
+      console.log(`  kategori : ${d.category} · ${d.sentiment} · dampak ${d.impactScore}/10`)
+      console.log(`  simbol   : ${d.mentionedSymbols.join(', ') || '-'}`)
+      console.log(`  ringkasan: ${d.summary}`)
+      console.log(`  foto     : ${d.featuredImage?.url ?? 'tidak ada'} (${d.featuredImage?.credit ?? '-'})`)
+      console.log(`  video    : ${d.youtubeVideo ? `https://youtu.be/${d.youtubeVideo.videoId} ${d.youtubeVideo.title} · ${d.youtubeVideo.channel}` : 'tidak ada'}`)
+      console.log(`\n${d.contentMarkdown}\n`)
+    }
+    if (result.skipped) console.log(`  dilewati: ${result.skipped}`)
+    for (const p of result.published) {
+      console.log(`  ✓ /warta/${p.slug}`)
+      console.log(`    ${p.title}`)
+      for (const s of p.sources) console.log(`    sumber: ${s}`)
+    }
+    console.log(`  selesai dalam ${((Date.now() - started) / 1000).toFixed(1)} detik\n`)
+    return
+  }
+
+  if (job === 'warta-terjemah') {
+    const report = await translateMissingNews(Number(flag('limit')) || 5)
+    console.log(`\n${job} · ${report.done.length} versi tersimpan, ${report.failed.length} gagal`)
+    for (const f of report.failed) console.log(`  ! ${f.locale} ${f.slug}: ${f.error}`)
+    console.log('')
     return
   }
 

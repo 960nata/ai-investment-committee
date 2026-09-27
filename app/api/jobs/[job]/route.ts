@@ -27,8 +27,18 @@ import { runFundamentalJob } from '@/lib/fundamentals/job'
 import { runCommittee } from '@/lib/agents/committee'
 import { runKseiJob } from '@/lib/ownership/job'
 import { runMacroJob } from '@/lib/macro/job'
+import { runAutoNewsJob } from '@/lib/agents/auto-news'
+import { translateMissingNews } from '@/lib/agents/news-translator'
+import { publishJob } from '@/lib/queue/qstash'
 
 export const dynamic = 'force-dynamic'
+
+/**
+ * Warta otomatis memanggil model dua kali, mengunduh foto, dan membaca halaman
+ * berita sumber; jauh lebih lama daripada batch ingest biasa. 300 detik adalah
+ * batas plan Hobby dengan Fluid Compute.
+ */
+export const maxDuration = 300
 
 /** Nama job = segmen URL worker. Job tak dikenal ditolak, bukan didiamkan. */
 const HANDLERS: Record<string, (payload: JobPayload) => Promise<BatchResult>> = {
@@ -48,6 +58,8 @@ const HANDLERS: Record<string, (payload: JobPayload) => Promise<BatchResult>> = 
   'ingest-ksei-monthly': kseiBatch,
   'ingest-macro': macroBatch,
   'komite-review': reviewCommittee,
+  'warta-otomatis': autoNewsBatch,
+  'warta-terjemah': translateNewsBatch,
 }
 
 interface BatchResult {
@@ -339,5 +351,60 @@ async function macroBatch(): Promise<BatchResult> {
     quarantined: 0,
     errors: r.errors,
     extra: { macroRows: r.rowsWritten },
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Warta otomatis
+// ---------------------------------------------------------------------------
+
+/**
+ * Satu putaran redaksi otomatis: pilih peristiwa dari RSS, tulis, terbitkan.
+ *
+ * Terjemahan empat bahasa sengaja dikirim sebagai job terpisah. Digabung di
+ * sini, satu invocation berisi enam panggilan model dan mudah melewati batas
+ * durasi; dipisah, kegagalan terjemahan juga tidak mengulang penulisan artikel.
+ */
+async function autoNewsBatch(payload: JobPayload): Promise<BatchResult> {
+  const outcome = await runAutoNewsJob()
+
+  if (outcome.published.length > 0) {
+    try {
+      await publishJob({
+        jobName: 'warta-terjemah',
+        batchKey: `${payload.batchKey}-terjemah`,
+        symbols: [],
+        market: payload.market,
+      })
+    } catch (err) {
+      // Tidak fatal: artikel sudah terbit, versi bahasanya bisa dilengkapi
+      // kapan saja lewat `npm run job warta-terjemah`.
+      console.warn('[Worker/warta-otomatis] Job terjemahan gagal dikirim:', err)
+    }
+  }
+
+  return {
+    itemsProcessed: outcome.published.length,
+    itemsFailed: 0,
+    candlesWritten: 0,
+    quarantined: 0,
+    errors: [],
+    extra: {
+      published: outcome.published,
+      skipped: outcome.skipped ?? null,
+      headlinesSeen: outcome.headlinesSeen,
+    },
+  }
+}
+
+/** Lengkapi versi bahasa lain untuk beberapa warta terbaru yang belum lengkap. */
+async function translateNewsBatch(): Promise<BatchResult> {
+  const report = await translateMissingNews(2)
+  return {
+    itemsProcessed: report.done.length,
+    itemsFailed: report.failed.length,
+    candlesWritten: 0,
+    quarantined: 0,
+    errors: report.failed.map((f) => `${f.slug}/${f.locale}: ${f.error}`),
   }
 }

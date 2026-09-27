@@ -57,6 +57,10 @@ const SCHEDULES: ScheduleSeed[] = [
   { jobName: 'ingest-ksei-monthly', hoursOfDay: [16], timezone: 'Asia/Jakarta', tradingDaysOnly: true, market: 'IDX', enabled: true, note: '16.00 WIB, kepemilikan KSEI bila bulan baru terbit' },
   // Deret makro berubah bulanan atau tahunan; sehari sekali lebih dari cukup.
   { jobName: 'ingest-macro', hoursOfDay: [3], timezone: 'UTC', tradingDaysOnly: false, market: null, enabled: true, note: '03.00 UTC, suku bunga, inflasi, PDB' },
+  // Warta otomatis dari RSS media keuangan. Tiga kali sehari mengikuti ritme
+  // berita: pagi setelah Wall Street tutup, siang saat jeda sesi IDX, dan sore
+  // setelah IDX tutup. Satu artikel per putaran, dan editor AI boleh menolak.
+  { jobName: 'warta-otomatis', hoursOfDay: [7, 12, 17], timezone: 'Asia/Jakarta', tradingDaysOnly: false, market: null, enabled: true, note: '07.00, 12.00, 17.00 WIB, satu warta dari berita terbaru' },
 ]
 
 async function seedSchedules(): Promise<void> {

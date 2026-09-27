@@ -26,6 +26,7 @@ import {
 import { filterUnusedLinks, markSourcesUsed } from '@/lib/db/news-source-queries'
 import { getMarketNewsList } from '@/lib/db/news-queries'
 import { generateLiveNewsArticle, NEWS_CATEGORIES, type NewsCategory } from '@/lib/agents/news-agent'
+import type { MarketNewsRow } from '@/lib/db/schema'
 
 /** Judul sebanyak ini sudah mewakili satu siklus berita tanpa membengkakkan prompt. */
 const MAX_HEADLINES_FOR_EDITOR = 60
@@ -34,6 +35,8 @@ export interface AutoNewsResult {
   published: Array<{ slug: string; title: string; sources: string[] }>
   skipped?: string
   headlinesSeen: number
+  /** Hanya pada dry-run: artikel yang akan terbit, tanpa pernah disimpan. */
+  draft?: MarketNewsRow
 }
 
 interface EditorPick {
@@ -98,7 +101,7 @@ Balas JSON murni:
  * Jalankan satu putaran warta otomatis. Menerbitkan paling banyak satu artikel;
  * jadwal yang menentukan berapa kali sehari putaran ini berjalan.
  */
-export async function runAutoNewsJob(): Promise<AutoNewsResult> {
+export async function runAutoNewsJob(options: { dryRun?: boolean } = {}): Promise<AutoNewsResult> {
   const all = await collectRecentHeadlines()
   const unused = await filterUnusedLinks(all.map((h) => normaliseLink(h.link)))
   const fresh = all.filter((h) => unused.has(normaliseLink(h.link))).slice(0, MAX_HEADLINES_FOR_EDITOR)
@@ -143,7 +146,17 @@ export async function runAutoNewsJob(): Promise<AutoNewsResult> {
     targetSymbols: (decision.targetSymbols ?? []).slice(0, 5),
     sources,
     translate: false,
+    dryRun: options.dryRun,
   })
+
+  if (options.dryRun) {
+    return {
+      published: [],
+      skipped: 'dry-run: tidak ada yang disimpan',
+      headlinesSeen: all.length,
+      draft: article,
+    }
+  }
 
   // Ditandai setelah artikel tersimpan. Bila penulisan gagal, berita yang sama
   // masih bisa dipilih ulang pada putaran berikutnya.

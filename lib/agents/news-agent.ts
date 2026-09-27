@@ -20,6 +20,7 @@ import {
 } from '@/lib/storage/supabase-storage'
 import { buildPhotoQuery, searchInternetPhotos, type PhotoCandidate } from '@/lib/media/image-search'
 import { findYoutubeVideo } from '@/lib/media/youtube-search'
+import { sanitizeHtml } from '@/lib/security/sanitize-html'
 import type { SourceDocument } from '@/lib/news/sources'
 import type { NewMarketNews, MarketNewsRow } from '@/lib/db/schema'
 
@@ -48,6 +49,11 @@ export interface GenerateArticleInput {
    * melewati batas durasi function.
    */
   translate?: boolean
+  /**
+   * Uji coba: semua langkah berjalan (model, pencarian foto dan video), tapi
+   * tidak ada yang diunggah ke storage maupun disimpan ke basis data.
+   */
+  dryRun?: boolean
 }
 
 /**
@@ -740,13 +746,51 @@ foto asli di internet memakai "imageSearchQuery" Anda, mengunduhnya, dan menyimp
     )
   }
 
-  const title = parsed.title?.trim()
-  const content = parsed.contentMarkdown?.trim()
+  // Judul dan ringkasan tampil sebagai teks biasa; isi artikel boleh berisi
+  // HTML, tapi hanya dari daftar izin. Dibersihkan sebelum disimpan supaya
+  // basis data tidak pernah memuat HTML berbahaya, bukan hanya saat dirender.
+  const title = parsed.title?.replace(/<[^>]*>/g, '').trim()
+  const content = sanitizeHtml(parsed.contentMarkdown ?? '').trim()
   if (!title || !content || content.split(/\s+/).length < 200) {
     throw new Error('Balasan model tidak memuat judul atau isi artikel yang layak, artikel tidak diterbitkan.')
   }
 
   const cleanSlug = await uniqueSlug(slugify(parsed.slug || title) || `analisis-${Date.now().toString(36)}`)
+
+  if (input.dryRun) {
+    const [photos, video] = await Promise.all([
+      searchInternetPhotos(parsed.imageSearchQuery || buildPhotoQuery(title, category, targetSymbols)),
+      findYoutubeVideo(parsed.videoSearchQuery || title, 'id').catch(() => null),
+    ])
+    const draftContent = hasSources ? `${content}\n\n${renderSourceList(sources)}` : content
+    console.log(
+      `[NewsAgent] DRY-RUN ${cleanSlug}: ${draftContent.split(/\s+/).length} kata, ` +
+        `${photos.length} kandidat foto (${photos[0]?.provider ?? '-'}), ` +
+        `video: ${video ? `${video.title} · ${video.channel}` : 'tidak ada'}`,
+    )
+    return {
+      id: 0,
+      slug: cleanSlug,
+      title,
+      summary: parsed.summary ?? '',
+      category,
+      tags: parsed.tags ?? [],
+      mentionedSymbols: parsed.mentionedSymbols ?? targetSymbols,
+      sentiment: parsed.sentiment ?? 'neutral',
+      impactScore: Number(parsed.impactScore) || 7,
+      featuredImage: photos[0]
+        ? { url: photos[0].url, alt: parsed.imageAlt ?? title, credit: photos[0].credit }
+        : null,
+      youtubeVideo: video,
+      keyTakeaways: parsed.keyTakeaways ?? [],
+      contentMarkdown: draftContent,
+      author: parsed.author ?? 'AI Intelligence Desk',
+      readingTimeMinutes: Number(parsed.readingTimeMinutes) || 3,
+      viewsCount: 0,
+      publishedAt: new Date(),
+      createdAt: new Date(),
+    }
+  }
 
   // Cari foto asli di internet, unduh, konversi AVIF, unggah ke Supabase Storage.
   // Urutannya mengikat: baris ini harus selesai lebih dulu, dan bila gagal ia
@@ -778,7 +822,7 @@ foto asli di internet memakai "imageSearchQuery" Anda, mengunduhnya, dan menyimp
     title: title.slice(0, 255),
     summary: parsed.summary || 'Analisis intelijen pasar keuangan dan teknologi AI.',
     category: articleCategory,
-    tags: Array.isArray(parsed.tags) ? parsed.tags : ['Investasi', 'Pasar'],
+    tags: Array.isArray(parsed.tags) ? parsed.tags.filter((t) => typeof t === 'string').slice(0, 8) : ['Investasi', 'Pasar'],
     mentionedSymbols: Array.isArray(parsed.mentionedSymbols) ? parsed.mentionedSymbols : targetSymbols,
     sentiment: ['bullish', 'bearish', 'neutral', 'mixed'].includes(parsed.sentiment ?? '')
       ? parsed.sentiment!
@@ -786,7 +830,9 @@ foto asli di internet memakai "imageSearchQuery" Anda, mengunduhnya, dan menyimp
     impactScore: Math.min(10, Math.max(1, Number(parsed.impactScore) || 7)),
     featuredImage: featuredImg,
     youtubeVideo: videoEmbed,
-    keyTakeaways: Array.isArray(parsed.keyTakeaways) ? parsed.keyTakeaways : [],
+    keyTakeaways: Array.isArray(parsed.keyTakeaways)
+      ? parsed.keyTakeaways.filter((k) => typeof k === 'string').slice(0, 8)
+      : [],
     contentMarkdown: hasSources ? `${content}\n\n${renderSourceList(sources)}` : content,
     author: (parsed.author || 'AI Intelligence Desk').slice(0, 64),
     readingTimeMinutes: Number(parsed.readingTimeMinutes) || 3,

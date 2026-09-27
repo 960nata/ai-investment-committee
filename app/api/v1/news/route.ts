@@ -5,6 +5,9 @@ import { isRequestAdminAuthenticated, verifyAdminSession } from '@/lib/auth/admi
 
 export const dynamic = 'force-dynamic'
 
+/** Penerbitan manual menulis, mencari foto dan video, lalu menerjemahkan ke empat bahasa sekaligus. */
+export const maxDuration = 300
+
 /**
  * GET /api/v1/news
  *
