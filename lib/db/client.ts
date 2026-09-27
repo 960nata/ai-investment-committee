@@ -28,12 +28,11 @@ const STATEMENT_TIMEOUT_MS = 15_000
 /**
  * Banyak koneksi per klien.
  *
- * Di serverless tiap invocation menangani sedikit permintaan, jadi satu koneksi
- * sudah cukup dan menjaga jumlah koneksi ke pooler tetap kecil. Di mesin
- * pengembang satu koneksi justru menyiksa: satu halaman menembakkan hampir
- * sepuluh kueri sekaligus dan semuanya antre di belakang satu soket.
+ * Pooler transaksi Supabase (port 6543) dirancang untuk multiplexing.
+ * Menyetel 8 koneksi di produksi memungkinkan query di Promise.all
+ * berjalan paralel tanpa harus mengantre satu per satu di satu soket.
  */
-const MAX_CONNECTIONS = isProduction ? 1 : 5
+const MAX_CONNECTIONS = isProduction ? 8 : 5
 
 declare global {
   var __pgDb: Database | undefined

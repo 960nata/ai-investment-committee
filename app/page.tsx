@@ -1,3 +1,4 @@
+import { unstable_cache } from 'next/cache'
 import {
   listInstrumentQuotes,
   getCandles,
@@ -31,6 +32,7 @@ import {
 } from '@/components/landing-sections'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 60
 
 /** Instrumen yang kartu skornya dipajang di beranda. */
 const SAMPLE_SYMBOL = 'BTCUSDT'
@@ -52,29 +54,76 @@ function isoDaysAgo(days: number): string {
 }
 
 /**
+ * Data pasar publik beranda di-cache selama 60 detik (SWR).
+ * Mencegah serverless function menjalankan 10 kueri berulang dari nol
+ * di tiap kunjungan dan menghindari FUNCTION_INVOCATION_TIMEOUT di Vercel.
+ */
+const getCachedLandingData = unstable_cache(
+  async (scoredVersion: string) => {
+    const [instruments, latestNews, freshness, sample, confidence] =
+      await Promise.all([
+        listInstrumentQuotes().catch(() => []),
+        getMarketNewsList({ limit: 6 }).catch(() => []),
+        getDataFreshness().catch(() => null),
+        getLatestScoresForSymbol(SAMPLE_SYMBOL, scoredVersion).catch(() => null),
+        getLatestScoreConfidenceCounts(scoredVersion).catch(() => ({
+          total: 0,
+          byConfidence: {} as Record<string, number>,
+        })),
+      ])
+
+    const chartSamples = (
+      await Promise.all(
+        CHART_SAMPLES.map(async (sample) => {
+          const inst = instruments.find((i) => i.symbol === sample.symbol)
+          if (!inst) return null
+          const rows = await getCandles(inst.id, isoDaysAgo(CHART_DAYS), isoDaysAgo(0)).catch(() => [])
+          if (rows.length < 2) return null
+          return {
+            tab: sample.tab,
+            symbol: inst.symbol,
+            name: inst.name,
+            currency: inst.currency,
+            candles: rows.map((c) => ({
+              date: c.date,
+              open: Number(c.open),
+              high: Number(c.high),
+              low: Number(c.low),
+              close: Number(c.close),
+              volume: Number(c.volume),
+            })),
+          }
+        }),
+      )
+    ).filter((s) => s !== null)
+
+    return {
+      instruments,
+      latestNews,
+      freshness,
+      sample,
+      confidence,
+      chartSamples,
+    }
+  },
+  ['landing-market-public-data'],
+  { revalidate: 60 }
+)
+
+/**
  * Beranda.
- *
- * Tiap kueri di sini dipakai sesuatu di layar. Halaman ini dibuka paling sering
- * dan dirender ulang di tiap kunjungan; kueri yang hasilnya dibuang adalah
- * beban basis data yang dibayar tanpa mendapat apa-apa.
  */
 export default async function LandingPage() {
   const scoredVersion =
     (await getLatestScoredModelVersion(MODEL_VERSION).catch(() => null)) ?? MODEL_VERSION
 
-  const [instruments, latestNews, freshness, sample, confidence, isAdmin, session] =
-    await Promise.all([
-      listInstrumentQuotes().catch(() => []),
-      getMarketNewsList({ limit: 6 }).catch(() => []),
-      getDataFreshness().catch(() => null),
-      getLatestScoresForSymbol(SAMPLE_SYMBOL, scoredVersion).catch(() => null),
-      getLatestScoreConfidenceCounts(scoredVersion).catch(() => ({
-        total: 0,
-        byConfidence: {} as Record<string, number>,
-      })),
-      verifyAdminSession().catch(() => false),
-      getCurrentUser(),
-    ])
+  const [landingData, isAdmin, session] = await Promise.all([
+    getCachedLandingData(scoredVersion),
+    verifyAdminSession().catch(() => false),
+    getCurrentUser(),
+  ])
+
+  const { instruments, latestNews, freshness, sample, confidence, chartSamples } = landingData
 
   // Cadangan pita harga di header ketika penenunan per kategori kosong.
   const navHighlights = [
@@ -85,33 +134,6 @@ export default async function LandingPage() {
     instruments.find((i) => i.symbol === 'XAUUSD' || i.symbol === 'PAXGUSDT'),
     instruments.find((i) => i.symbol === 'BZ=F' || i.symbol === 'CL=F'),
   ].filter(Boolean) as InstrumentQuote[]
-
-  // Grafik lilin di seksi batas: empat contoh, satu per kelas aset, dari candle
-  // harian yang tersimpan. Contoh yang instrumennya tidak ada dilewati saja.
-  const chartSamples = (
-    await Promise.all(
-      CHART_SAMPLES.map(async (sample) => {
-        const inst = instruments.find((i) => i.symbol === sample.symbol)
-        if (!inst) return null
-        const rows = await getCandles(inst.id, isoDaysAgo(CHART_DAYS), isoDaysAgo(0)).catch(() => [])
-        if (rows.length < 2) return null
-        return {
-          tab: sample.tab,
-          symbol: inst.symbol,
-          name: inst.name,
-          currency: inst.currency,
-          candles: rows.map((c) => ({
-            date: c.date,
-            open: Number(c.open),
-            high: Number(c.high),
-            low: Number(c.low),
-            close: Number(c.close),
-            volume: Number(c.volume),
-          })),
-        }
-      }),
-    )
-  ).filter((s) => s !== null)
 
   const pulsePool = buildPulsePool(instruments)
   const withData = instruments.filter((i) => i.candleCount > 0)

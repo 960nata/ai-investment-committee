@@ -561,6 +561,7 @@ export async function getDataFreshness(): Promise<DataFreshness> {
       maxFetchedAt: sql<string | null>`max(${candleDaily.fetchedAt})`,
     })
     .from(candleDaily)
+    .where(sql`${candleDaily.date} = (select max(date) from candle_daily)`)
 
   const latestFetchedAt = rows[0]?.maxFetchedAt ?? null
   const ageMinutes = latestFetchedAt
@@ -1443,6 +1444,7 @@ export async function getLatestScoreConfidenceCounts(
       select distinct on (instrument_id, horizon) confidence
       from score_daily
       where model_version = ${modelVersion}
+        and date >= (select max(date) from score_daily where model_version = ${modelVersion}) - interval '7 days'
       order by instrument_id, horizon, date desc
     ) latest
     group by confidence

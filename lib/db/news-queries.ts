@@ -28,6 +28,19 @@ let tablesInitialized = false
 export async function ensureNewsTable(): Promise<void> {
   if (tablesInitialized) return
 
+  // Cek cepat apakah tabel sudah ada di Postgres sebelum menjalankan DDL berat
+  try {
+    const res = await db.execute<{ exists: boolean }>(sql`
+      SELECT to_regclass('market_news') IS NOT NULL AS exists;
+    `)
+    if (res[0]?.exists) {
+      tablesInitialized = true
+      return
+    }
+  } catch {
+    // Lanjutkan membuat tabel jika pemeriksaan gagal
+  }
+
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS market_news (
       id SERIAL PRIMARY KEY,

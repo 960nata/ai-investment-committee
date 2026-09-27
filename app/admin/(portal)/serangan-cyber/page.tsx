@@ -38,6 +38,7 @@ import { CyberThreatMap } from '@/components/cyber-threat-map'
 import { shieldIsPersistent } from '@/lib/http/blocklist'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 60
 
 export const metadata: Metadata = {
   title: 'Peta Serangan Cyber | Admin Komite',
