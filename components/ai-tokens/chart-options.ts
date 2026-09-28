@@ -42,11 +42,13 @@ export function chartOptions(
     theme: { mode: 'dark' },
     dataLabels: { enabled: false },
     stroke: type === 'bar' ? { width: 0 } : { curve: 'smooth', width: 2 },
-    fill:
-      type === 'area'
-        ? { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.4, opacityTo: 0.04, stops: [0, 90, 100] } }
-        : undefined,
-    plotOptions: type === 'bar' ? { bar: { borderRadius: 3, columnWidth: '60%' } } : undefined,
+    // Kunci ditambahkan hanya bila ada isinya. `plotOptions: undefined` menimpa
+    // bawaan ApexCharts, lalu v7 membaca `config.plotOptions.line` dan seluruh
+    // halaman runtuh dengan "Cannot read properties of undefined (reading 'line')".
+    ...(type === 'area' && {
+      fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.4, opacityTo: 0.04, stops: [0, 90, 100] } },
+    }),
+    ...(type === 'bar' && { plotOptions: { bar: { borderRadius: 3, columnWidth: '60%' } } }),
     xaxis: {
       categories,
       tickAmount: Math.min(categories.length, 12),
@@ -68,7 +70,9 @@ export function chartOptions(
     },
     tooltip: {
       theme: 'dark',
+      // v7 melempar galat bila `shared` hidup tanpa `intersect` dimatikan tegas.
       shared: true,
+      intersect: false,
       y: {
         formatter: (v: number | null) => (v == null ? '—' : `${v.toLocaleString('id-ID')}${unit}`),
       },
