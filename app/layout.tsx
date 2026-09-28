@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import { GoogleAnalytics } from "@next/third-parties/google";
+import { Analytics } from "@vercel/analytics/next";
 import { getMeasurementId } from "@/lib/analytics/ga4";
 import { VisitBeacon } from "@/components/visit-beacon";
 import { MotionProvider } from "@/components/motion-kit";
@@ -50,6 +51,12 @@ export default function RootLayout({
           <VisitBeacon />
         </Suspense>
         <SiteTranslator />
+        {/*
+         * Skripnya dilayani dari asal sendiri (/_vercel/insights), jadi CSP di
+         * proxy.ts tidak perlu ditambah: ia dimuat oleh bundel bernonce, dan
+         * 'strict-dynamic' sudah mempercayainya.
+         */}
+        <Analytics />
       </body>
       {measurementId && <GoogleAnalytics gaId={measurementId} />}
     </html>
