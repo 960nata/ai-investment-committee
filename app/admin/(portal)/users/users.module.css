@@ -1,0 +1,284 @@
+/*
+ * Tata letak halaman Manajemen Pengguna.
+ *
+ * Satu ritme jarak untuk seluruh halaman: 24px antar-bagian, 20px di dalam
+ * kartu, 12–16px antar-elemen di dalamnya. Sebelumnya tiap bagian memakai
+ * angkanya sendiri lewat atribut `style`, dan itu yang membuatnya tampak
+ * berdesakan di satu tempat dan longgar di tempat lain.
+ */
+
+.page {
+  display: grid;
+  gap: 24px;
+}
+
+.feedback {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: var(--measured-dim);
+  border: 1px solid var(--measured);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+
+/* --- Matriks hak akses --------------------------------------------------- */
+
+.roles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.roleCard {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding: 20px;
+  background: var(--surface-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.roleCardAdmin {
+  border-color: var(--signal);
+}
+
+.roleList {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
+.roleList li {
+  display: grid;
+  grid-template-columns: 14px 1fr;
+  gap: 8px;
+}
+
+.roleList li::before {
+  content: '●';
+  font-size: 9px;
+  line-height: 19px;
+  color: var(--measured);
+}
+
+.roleList li.denied {
+  color: var(--ink-faint);
+}
+
+.roleList li.denied::before {
+  content: '✕';
+  font-size: 11px;
+  color: var(--halted);
+}
+
+/* --- Kartu daftar pengguna ----------------------------------------------- */
+
+.listCard {
+  background: var(--surface-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.listHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.listTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.listCount {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: var(--ink-mute);
+}
+
+/* --- Form tambah pengguna ------------------------------------------------ */
+
+.form {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  background: var(--surface-0);
+  border-bottom: 1px solid var(--line);
+}
+
+.formTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+}
+
+.label {
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+
+.input {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 12px;
+  background: var(--surface-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--signal);
+}
+
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* --- Tabel --------------------------------------------------------------- */
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: collapse;
+}
+
+.table th {
+  padding: 12px 20px;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: left;
+  color: var(--ink-mute);
+  background: var(--surface-0);
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 14px 20px;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--line);
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.table tbody tr:hover td {
+  background: var(--surface-0);
+}
+
+.alignRight {
+  text-align: right !important;
+}
+
+.idCell {
+  width: 56px;
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+
+.userName {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.userEmail {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--ink-mute);
+}
+
+.roleSelect {
+  min-height: 30px;
+  padding: 4px 10px;
+  background: var(--surface-0);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.roleSelectAdmin {
+  background: rgba(224, 161, 60, 0.15);
+  color: var(--signal);
+}
+
+.status {
+  padding: 4px 10px;
+  font-size: 10px;
+  background: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.date {
+  font-size: 11px;
+  color: var(--ink-mute);
+  white-space: nowrap;
+}
+
+.deleteBtn {
+  padding: 6px 8px;
+  color: var(--halted);
+}
+
+.empty {
+  padding: 32px 20px !important;
+  text-align: center;
+  color: var(--ink-mute);
+}
+
+@media (max-width: 640px) {
+  .page {
+    gap: 16px;
+  }
+
+  .roleCard,
+  .listHead,
+  .form {
+    padding: 16px;
+  }
+
+  .table th,
+  .table td {
+    padding: 12px 16px;
+  }
+}

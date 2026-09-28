@@ -1,17 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import {
-  IconUser,
-  IconShield,
-  IconCheck,
-  IconAlert,
-  IconTrash,
-  IconPlus,
-} from '@/components/icons'
+import { IconCheck, IconTrash, IconPlus } from '@/components/icons'
 // Sengaja tipe tanpa sidik kata sandi: barisnya sampai ke peramban, dan tipe
 // yang memuat kolom itu akan membuat pengirimannya terlihat wajar.
 import type { PublicAppUser } from '@/lib/db/news-queries'
+import styles from './users.module.css'
 
 export function UsersClient({ initialUsers }: { initialUsers: PublicAppUser[] }) {
   const [users, setUsers] = useState<PublicAppUser[]>(initialUsers)
@@ -117,83 +111,49 @@ export function UsersClient({ initialUsers }: { initialUsers: PublicAppUser[] })
   }
 
   return (
-    <div>
+    <div className={styles.page}>
       {feedback && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '10px 14px',
-            background: 'var(--measured-dim)',
-            border: '1px solid var(--measured)',
-            borderRadius: 'var(--radius-sm)',
-            marginBottom: '16px',
-            fontSize: '13px',
-          }}
-        >
+        <div className={styles.feedback}>
           <IconCheck size={16} style={{ color: 'var(--measured)' }} />
           <span>{feedback}</span>
         </div>
       )}
 
       {/* Matriks Perbedaan Hak Akses User vs Admin */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-          gap: '16px',
-          marginBottom: '24px',
-        }}
-      >
-        <div className="admin-card" style={{ marginBottom: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-            <span className="tag mono" style={{ color: 'var(--blue)', borderColor: 'rgba(59,130,246,0.3)' }}>
-              Hak Akses: User Biasa (Analis / Reader)
-            </span>
-          </div>
-          <p style={{ fontSize: '13px', color: 'var(--ink-soft)', lineHeight: 1.5, margin: 0 }}>
-            ● Memantau terminal kuantitatif 448 instrumen dan grafik candlestick realtime.<br />
-            ● Membaca putusan resmi komite &amp; transkrip dialektika 4 agen AI.<br />
-            ● Membaca artikel warta intelijen pasar dan menjalankan simulasi backtest.<br />
-            <span style={{ color: 'var(--ink-faint)' }}>✕ Tidak dapat mengubah artikel berita, mengatur iklan, atau mengubah data user.</span>
-          </p>
-        </div>
+      <div className={styles.roles}>
+        <section className={styles.roleCard}>
+          <span className="tag mono" style={{ color: 'var(--blue)', borderColor: 'rgba(59,130,246,0.3)', justifySelf: 'start' }}>
+            Hak Akses: User Biasa (Analis / Reader)
+          </span>
+          <ul className={styles.roleList}>
+            <li>Memantau terminal kuantitatif 448 instrumen dan grafik candlestick realtime.</li>
+            <li>Membaca putusan resmi komite &amp; transkrip dialektika 4 agen AI.</li>
+            <li>Membaca artikel warta intelijen pasar dan menjalankan simulasi backtest.</li>
+            <li className={styles.denied}>Tidak dapat mengubah artikel berita, mengatur iklan, atau mengubah data user.</li>
+          </ul>
+        </section>
 
-        <div className="admin-card" style={{ marginBottom: 0, border: '1px solid var(--signal)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-            <span className="tag mono" style={{ color: 'var(--signal)', borderColor: 'rgba(224,161,60,0.3)' }}>
-              Hak Akses: Administrator AI Investdesk
-            </span>
-          </div>
-          <p style={{ fontSize: '13px', color: 'var(--ink-soft)', lineHeight: 1.5, margin: 0 }}>
-            ● Memiliki seluruh hak akses User biasa.<br />
-            ● Membuat, mengedit, dan menghapus artikel warta di CMS Redaksi.<br />
-            ● Mengunggah gambar aset berita langsung ke Supabase Storage.<br />
-            ● Mengontrol player video YouTube dan visibilitasnya.<br />
-            ● Mengatur &amp; menyalakan/mematikan 4 slot iklan AdSense.<br />
-            ● Mengelola peran akun dan mendaftarkan analis baru.
-          </p>
-        </div>
+        <section className={`${styles.roleCard} ${styles.roleCardAdmin}`}>
+          <span className="tag mono" style={{ color: 'var(--signal)', borderColor: 'rgba(224,161,60,0.3)', justifySelf: 'start' }}>
+            Hak Akses: Administrator AI Investdesk
+          </span>
+          <ul className={styles.roleList}>
+            <li>Memiliki seluruh hak akses User biasa.</li>
+            <li>Membuat, mengedit, dan menghapus artikel warta di CMS Redaksi.</li>
+            <li>Mengunggah gambar aset berita langsung ke Supabase Storage.</li>
+            <li>Mengontrol player video YouTube dan visibilitasnya.</li>
+            <li>Mengatur &amp; menyalakan/mematikan 4 slot iklan AdSense.</li>
+            <li>Mengelola peran akun dan mendaftarkan analis baru.</li>
+          </ul>
+        </section>
       </div>
 
       {/* Tabel Pengguna */}
-      <div className="admin-card">
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            marginBottom: '16px',
-            flexWrap: 'wrap',
-            gap: '12px',
-          }}
-        >
+      <section className={styles.listCard}>
+        <div className={styles.listHead}>
           <div>
-            <h2 style={{ fontSize: '15px', fontWeight: 600, margin: 0 }}>Daftar Akun Pengguna</h2>
-            <p className="mono" style={{ fontSize: '11px', color: 'var(--ink-mute)', margin: '2px 0 0' }}>
-              Total: {users.length} pengguna terdata
-            </p>
+            <h2 className={styles.listTitle}>Daftar Akun Pengguna</h2>
+            <p className={`mono ${styles.listCount}`}>Total: {users.length} pengguna terdata</p>
           </div>
 
           <button
@@ -207,149 +167,95 @@ export function UsersClient({ initialUsers }: { initialUsers: PublicAppUser[] })
           </button>
         </div>
 
-        {/* Modal / Form Tambah User */}
+        {/* Form Tambah User */}
         {showAddModal && (
-          <div
-            style={{
-              padding: '16px',
-              background: 'var(--surface-0)',
-              border: '1px solid var(--line-strong)',
-              borderRadius: 'var(--radius-sm)',
-              marginBottom: '20px',
-            }}
-          >
-            <h3 style={{ fontSize: '14px', fontWeight: 600, margin: '0 0 12px' }}>
-              Registrasi Akun Pengguna Baru
-            </h3>
-            <form onSubmit={handleAddUserSubmit} style={{ display: 'grid', gap: '12px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
-                <div>
-                  <label className="mono" style={{ display: 'block', fontSize: '11px', color: 'var(--ink-soft)', marginBottom: '4px' }}>
-                    Alamat Email:*
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    value={newEmail}
-                    onChange={(e) => setNewEmail(e.target.value)}
-                    placeholder="analis@perusahaan.com"
-                    style={{
-                      width: '100%',
-                      padding: '6px 10px',
-                      background: 'var(--surface-1)',
-                      border: '1px solid var(--line)',
-                      borderRadius: 'var(--radius-sm)',
-                      color: 'var(--ink)',
-                      fontSize: '13px',
-                    }}
-                  />
-                </div>
+          <form onSubmit={handleAddUserSubmit} className={styles.form}>
+            <h3 className={styles.formTitle}>Registrasi Akun Pengguna Baru</h3>
 
-                <div>
-                  <label className="mono" style={{ display: 'block', fontSize: '11px', color: 'var(--ink-soft)', marginBottom: '4px' }}>
-                    Nama Lengkap / Panggilan:
-                  </label>
-                  <input
-                    type="text"
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                    placeholder="Nama Pengguna"
-                    style={{
-                      width: '100%',
-                      padding: '6px 10px',
-                      background: 'var(--surface-1)',
-                      border: '1px solid var(--line)',
-                      borderRadius: 'var(--radius-sm)',
-                      color: 'var(--ink)',
-                      fontSize: '13px',
-                    }}
-                  />
-                </div>
+            <div className={styles.fields}>
+              <label className={styles.field}>
+                <span className={`mono ${styles.label}`}>Alamat Email:*</span>
+                <input
+                  type="email"
+                  required
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  placeholder="analis@perusahaan.com"
+                  className={styles.input}
+                />
+              </label>
 
-                <div>
-                  <label className="mono" style={{ display: 'block', fontSize: '11px', color: 'var(--ink-soft)', marginBottom: '4px' }}>
-                    Peran (Role):*
-                  </label>
-                  <select
-                    value={newRole}
-                    onChange={(e) => setNewRole(e.target.value as 'admin' | 'user')}
-                    style={{
-                      width: '100%',
-                      padding: '6px 10px',
-                      background: 'var(--surface-1)',
-                      border: '1px solid var(--line)',
-                      borderRadius: 'var(--radius-sm)',
-                      color: 'var(--ink)',
-                      fontSize: '13px',
-                    }}
-                  >
-                    <option value="user">User Biasa (Read-Only Analisis)</option>
-                    <option value="admin">Administrator (Akses Penuh CMS &amp; Ads)</option>
-                  </select>
-                </div>
-              </div>
+              <label className={styles.field}>
+                <span className={`mono ${styles.label}`}>Nama Lengkap / Panggilan:</span>
+                <input
+                  type="text"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder="Nama Pengguna"
+                  className={styles.input}
+                />
+              </label>
 
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
-                <button
-                  type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="btn btn-quiet"
-                  style={{ fontSize: '12px' }}
+              <label className={styles.field}>
+                <span className={`mono ${styles.label}`}>Peran (Role):*</span>
+                <select
+                  value={newRole}
+                  onChange={(e) => setNewRole(e.target.value as 'admin' | 'user')}
+                  className={styles.input}
                 >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  disabled={addingUser}
-                  className="btn btn-primary"
-                  style={{ fontSize: '12px', fontFamily: 'var(--mono)' }}
-                >
-                  {addingUser ? 'Mendaftarkan...' : 'Daftarkan Pengguna'}
-                </button>
-              </div>
-            </form>
-          </div>
+                  <option value="user">User Biasa (Read-Only Analisis)</option>
+                  <option value="admin">Administrator (Akses Penuh CMS &amp; Ads)</option>
+                </select>
+              </label>
+            </div>
+
+            <div className={styles.formActions}>
+              <button
+                type="button"
+                onClick={() => setShowAddModal(false)}
+                className="btn btn-quiet"
+                style={{ fontSize: '12px' }}
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                disabled={addingUser}
+                className="btn btn-primary"
+                style={{ fontSize: '12px', fontFamily: 'var(--mono)' }}
+              >
+                {addingUser ? 'Mendaftarkan...' : 'Daftarkan Pengguna'}
+              </button>
+            </div>
+          </form>
         )}
 
         {/* Tabel User */}
-        <div style={{ overflowX: 'auto' }}>
-          <table className="admin-table">
+        <div className={styles.tableWrap}>
+          <table className={styles.table}>
             <thead>
               <tr>
-                <th style={{ width: '40px' }}>ID</th>
+                <th>ID</th>
                 <th>Nama &amp; Email</th>
                 <th>Peran (Role)</th>
                 <th>Status</th>
                 <th>Terdaftar</th>
-                <th style={{ textAlign: 'right' }}>Aksi</th>
+                <th className={styles.alignRight}>Aksi</th>
               </tr>
             </thead>
             <tbody>
               {users.map((user) => (
                 <tr key={user.id}>
-                  <td className="mono" style={{ fontSize: '11px', color: 'var(--ink-faint)' }}>
-                    #{user.id}
-                  </td>
+                  <td className={`mono ${styles.idCell}`}>#{user.id}</td>
                   <td>
-                    <div style={{ fontWeight: 600, fontSize: '13px' }}>{user.name}</div>
-                    <div className="mono" style={{ fontSize: '11px', color: 'var(--ink-mute)' }}>
-                      {user.email}
-                    </div>
+                    <div className={styles.userName}>{user.name}</div>
+                    <div className={`mono ${styles.userEmail}`}>{user.email}</div>
                   </td>
                   <td>
                     <select
                       value={user.role}
                       onChange={(e) => handleRoleChange(user.id, e.target.value as 'admin' | 'user')}
-                      className="mono"
-                      style={{
-                        padding: '3px 8px',
-                        background: user.role === 'admin' ? 'rgba(224,161,60,0.15)' : 'var(--surface-0)',
-                        color: user.role === 'admin' ? 'var(--signal)' : 'var(--ink)',
-                        border: '1px solid var(--line)',
-                        borderRadius: 'var(--radius-sm)',
-                        fontSize: '11px',
-                        cursor: 'pointer',
-                      }}
+                      className={`mono ${styles.roleSelect} ${user.role === 'admin' ? styles.roleSelectAdmin : ''}`}
                     >
                       <option value="user">user</option>
                       <option value="admin">admin</option>
@@ -359,32 +265,28 @@ export function UsersClient({ initialUsers }: { initialUsers: PublicAppUser[] })
                     <button
                       type="button"
                       onClick={() => handleStatusToggle(user.id, user.isActive)}
-                      className="tag mono"
+                      className={`tag mono ${styles.status}`}
                       style={{
-                        fontSize: '10px',
-                        cursor: 'pointer',
                         color: user.isActive ? 'var(--green)' : 'var(--halted)',
                         borderColor: user.isActive ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)',
-                        background: 'none',
                       }}
                       title="Klik untuk mengubah status aktif"
                     >
                       {user.isActive ? '● Aktif' : '○ Dinonaktifkan'}
                     </button>
                   </td>
-                  <td className="mono" style={{ fontSize: '11px', color: 'var(--ink-mute)' }}>
+                  <td className={`mono ${styles.date}`}>
                     {new Date(user.createdAt).toLocaleDateString('id-ID', {
                       day: 'numeric',
                       month: 'short',
                       year: 'numeric',
                     })}
                   </td>
-                  <td style={{ textAlign: 'right' }}>
+                  <td className={styles.alignRight}>
                     <button
                       type="button"
                       onClick={() => handleDelete(user.id, user.email)}
-                      className="btn btn-quiet"
-                      style={{ padding: '3px 6px', color: 'var(--halted)' }}
+                      className={`btn btn-quiet ${styles.deleteBtn}`}
                       title="Hapus user"
                     >
                       <IconTrash size={12} />
@@ -395,7 +297,7 @@ export function UsersClient({ initialUsers }: { initialUsers: PublicAppUser[] })
 
               {users.length === 0 && (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', padding: '24px', color: 'var(--ink-mute)' }}>
+                  <td colSpan={6} className={styles.empty}>
                     Belum ada pengguna terdaftar.
                   </td>
                 </tr>
@@ -403,7 +305,7 @@ export function UsersClient({ initialUsers }: { initialUsers: PublicAppUser[] })
             </tbody>
           </table>
         </div>
-      </div>
+      </section>
     </div>
   )
 }
