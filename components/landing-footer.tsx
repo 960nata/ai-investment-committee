@@ -12,6 +12,7 @@
  */
 
 import Link from 'next/link'
+import { MadeBy } from '@/components/credit'
 import { IconPulse } from '@/components/icons'
 import { DonationFooterLink } from '@/components/donation-footer-link'
 import { PremiumFooterLink } from '@/components/premium-footer-link'
@@ -71,7 +72,7 @@ export function LandingFooter() {
 
         <div className="footer-bottom-row mono">
           <span>&copy; {new Date().getFullYear()} AI Investdesk. All quantitative protocols reserved.</span>
-          <span>Zero Hallucination Protocol v2.4</span>
+          <MadeBy />
         </div>
       </div>
     </footer>

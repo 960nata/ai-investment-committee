@@ -19096,11 +19096,9 @@ body.rail-lock {
 .picker { position: relative; display: block; min-width: 220px; max-height: none; overflow: visible; }
 
 .picker-list {
-  position: absolute;
-  z-index: 30;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
+  /* Posisi `fixed` dihitung komponen; daftarnya dirender di body lewat portal. */
+  position: fixed;
+  z-index: 1000;
   max-height: 280px;
   overflow-y: auto;
   border: 1px solid var(--line-strong);
@@ -19833,4 +19831,25 @@ body.rail-lock {
 /* Pita pengumuman kosong tidak boleh menyisakan jarak di atas halaman. */
 .notice-strip:empty {
   display: none;
+}
+
+/* Kredit pembuat di footer (components/credit.tsx). */
+.made-by {
+  color: inherit;
+  font-size: inherit;
+}
+
+.made-by a {
+  color: var(--signal, #e0a13c);
+  text-decoration: none;
+  border-bottom: 1px dotted currentColor;
+}
+
+.made-by a:hover {
+  border-bottom-style: solid;
+}
+
+.rail-foot .made-by {
+  font-size: 11px;
+  color: var(--ink-faint);
 }

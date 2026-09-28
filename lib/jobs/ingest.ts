@@ -49,8 +49,23 @@ const CURRENCY_BY_MARKET: Record<Market, string> = {
   GLOBAL: 'USD',
 }
 
-/** Riwayat yang ditarik saat instrumen belum punya satu candle pun. */
-const INITIAL_BACKFILL_DAYS = 365
+/**
+ * Riwayat yang ditarik saat instrumen belum punya satu candle pun.
+ *
+ * Lima tahun, bukan satu. Angka ini harus melewati jendela normalisasi
+ * terpanjang di `lib/features/compute.ts`, yaitu dua tahun riwayat instrumen
+ * itu sendiri — 730 candle untuk crypto yang berdagang tiap hari.
+ *
+ * Satu tahun terlihat cukup dan tidak: dengan 365 candle, jendela dua tahun
+ * hanya separuh terisi, sebagian besar z-score dan persentil keluar null, dan
+ * komite membaca instrumen yang datanya sebenarnya baik-baik saja sebagai
+ * "riwayat terlalu pendek" lalu abstain. Gejalanya muncul jauh dari sebabnya,
+ * di layar penilaian, bukan di log ingest.
+ *
+ * Lima tahun juga memberi ruang untuk backtest horizon panjang, dan mencakup
+ * setidaknya satu rezim pasar yang berbeda dari hari ini.
+ */
+const INITIAL_BACKFILL_DAYS = 1825
 
 /**
  * Riwayat harga ditabung sendiri sejak hari pertama. Sumber gratis membatasi

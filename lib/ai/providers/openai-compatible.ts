@@ -27,6 +27,8 @@ export interface OpenAiCompatibleConfig {
   envPrefix: string
   /** Header tambahan; OpenRouter meminta atribusi aplikasi. */
   extraHeaders?: Record<string, string>
+  /** Kolom tambahan di badan permintaan, untuk parameter khusus penyedia. */
+  extraBody?: Record<string, unknown>
 }
 
 export function createOpenAiCompatibleAdapter(config: OpenAiCompatibleConfig): LlmAdapter {
@@ -44,6 +46,7 @@ export function createOpenAiCompatibleAdapter(config: OpenAiCompatibleConfig): L
         messages: request.messages.map((m) => ({ role: m.role, content: m.content })),
         temperature: request.temperature ?? 0.4,
         max_tokens: request.maxOutputTokens ?? 1024,
+        ...config.extraBody,
       }
 
       if (request.json) {
@@ -127,8 +130,18 @@ export const openRouterAdapter = createOpenAiCompatibleAdapter({
   id: 'openrouter',
   name: 'OpenRouter',
   baseUrl: 'https://openrouter.ai/api/v1',
-  model: process.env.OPENROUTER_MODEL ?? 'deepseek/deepseek-v4-flash-0731:free',
+  // Model gratis. Yang lama (deepseek-v4-flash-0731:free) sudah dihapus
+  // OpenRouter, sehingga penyedia ini gagal di setiap panggilan. Pengganti ini
+  // model khusus keuangan, menjawab bahasa Indonesia dengan baik (~3 detik).
+  // Balasan kosong tetap ditolak adapter, dan registry pindah ke penyedia
+  // berikutnya.
+  model: process.env.OPENROUTER_MODEL ?? 'inclusionai/ling-3.0-flash-fin:free',
   envPrefix: 'OPENROUTER_API_KEY',
+  // Tanpa ini model menghabiskan hampir seluruh `max_tokens` untuk penalaran
+  // tersembunyi, dan jawabannya terpotong di tengah kalimat (diuji: 700 token
+  // habis, jawaban berhenti di kata ketiga belas). Dimatikan, ia menjawab
+  // utuh dalam ~140 token.
+  extraBody: { reasoning: { enabled: false } },
   extraHeaders: {
     'http-referer': process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000',
     'x-title': 'investasi',

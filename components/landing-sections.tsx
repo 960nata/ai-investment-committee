@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { MadeBy } from '@/components/credit'
 import { DonationFooterLink } from '@/components/donation-footer-link'
 import { PremiumFooterLink } from '@/components/premium-footer-link'
 import { LandingPulseGrid, type PulseAsset } from '@/components/landing-pulse-grid'
@@ -744,7 +745,9 @@ export function LandingDisclaimerFooter() {
           menjamin hasil di masa depan. Investasi di pasar modal mengandung risiko kehilangan
           sebagian atau seluruh modal. Keputusan investasi sepenuhnya menjadi tanggung jawab Anda.
         </p>
-        <p className="lp-copyright">© {new Date().getFullYear()} Komite Investasi AI</p>
+        <p className="lp-copyright">
+          © {new Date().getFullYear()} AI Investdesk · <MadeBy />
+        </p>
       </div>
     </footer>
   )

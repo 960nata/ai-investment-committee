@@ -79,17 +79,29 @@ export function PageEnter({
     const root = scope.current
     if (!root || reduce || !window.__motionReady) return
 
+    /**
+     * Gaya sisa animasi dibersihkan setelah selesai. `transform` dan `opacity`
+     * yang tertinggal membuat tiap panel jadi lapisan (stacking context)
+     * sendiri, sehingga dropdown di satu panel tertimpa panel di bawahnya.
+     */
+    const settle = (elements: HTMLElement[]) => {
+      for (const el of elements) {
+        el.style.removeProperty('transform')
+        el.style.removeProperty('opacity')
+      }
+    }
+
     const enter = (elements: HTMLElement[], delay = 0) => {
       if (elements.length === 0) return
-      if (variant === 'fade') {
-        animate(elements, { opacity: [0, 1] }, { duration: 0.32, ease: EASE, delay })
-        return
-      }
-      animate(
-        elements,
-        { opacity: [0, 1], transform: ['translateY(14px)', 'translateY(0px)'] },
-        { duration: 0.42, ease: EASE, delay: stagger(0.05, { startDelay: delay }) },
-      )
+      const controls =
+        variant === 'fade'
+          ? animate(elements, { opacity: [0, 1] }, { duration: 0.32, ease: EASE, delay })
+          : animate(
+              elements,
+              { opacity: [0, 1], transform: ['translateY(14px)', 'translateY(0px)'] },
+              { duration: 0.42, ease: EASE, delay: stagger(0.05, { startDelay: delay }) },
+            )
+      controls.then(() => settle(elements))
     }
 
     enter(Array.from(root.children).filter(animatable))

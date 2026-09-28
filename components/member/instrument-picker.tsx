@@ -4,10 +4,19 @@
  * Pemilih instrumen dengan pencarian.
  *
  * Daftar instrumen dikirim dari server sekali, lalu disaring di peramban.
- * Tujuh puluhan baris tidak butuh pencarian ke server di tiap ketukan.
+ * Ratusan baris tidak butuh pencarian ke server di tiap ketukan.
+ *
+ * Daftar pilihan dirender lewat portal ke `body` dengan posisi `fixed`.
+ * Sebelumnya ia tinggal di dalam panel: terpotong oleh `overflow: hidden`
+ * panel, dan tertimpa panel berikutnya yang punya lapisan (stacking context)
+ * sendiri. Di `body` tidak ada yang bisa menimpanya.
  */
 
-import { useId, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+
+/** Tinggi maksimal daftar; sama dengan `max-height` di CSS. */
+const LIST_MAX_HEIGHT = 280
 
 export interface PickerOption {
   id: number
@@ -35,6 +44,38 @@ export function InstrumentPicker({
   const [open, setOpen] = useState(false)
   const [cursor, setCursor] = useState(0)
   const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [place, setPlace] = useState<React.CSSProperties | null>(null)
+
+  /** Hitung posisi daftar dari posisi input; buka ke atas bila ruang di bawah sempit. */
+  const measure = useCallback(() => {
+    const input = inputRef.current
+    if (!input) return
+    const r = input.getBoundingClientRect()
+    const below = window.innerHeight - r.bottom
+    const openUp = below < LIST_MAX_HEIGHT + 12 && r.top > below
+    setPlace({
+      position: 'fixed',
+      left: r.left,
+      width: r.width,
+      ...(openUp ? { bottom: window.innerHeight - r.top + 4 } : { top: r.bottom + 4 }),
+    })
+  }, [])
+
+  useLayoutEffect(() => {
+    if (open) measure()
+  }, [open, measure])
+
+  // Ikuti input saat halaman atau panel digulir dan saat layar berubah ukuran.
+  useEffect(() => {
+    if (!open) return
+    window.addEventListener('scroll', measure, true)
+    window.addEventListener('resize', measure)
+    return () => {
+      window.removeEventListener('scroll', measure, true)
+      window.removeEventListener('resize', measure)
+    }
+  }, [open, measure])
 
   const selected = options.find((o) => o.id === value) ?? null
 
@@ -56,6 +97,7 @@ export function InstrumentPicker({
   return (
     <div className="picker">
       <input
+        ref={inputRef}
         className="input"
         role="combobox"
         aria-expanded={open}
@@ -91,32 +133,35 @@ export function InstrumentPicker({
           }
         }}
       />
-      {open && (
-        <div className="picker-list" id={listId} role="listbox">
-          {matches.length === 0 ? (
-            <div className="picker-option dim">Tidak ada yang cocok</div>
-          ) : (
-            matches.map((o, i) => (
-              <button
-                key={o.id}
-                type="button"
-                role="option"
-                aria-selected={i === cursor}
-                className="picker-option"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => {
-                  if (blurTimer.current) clearTimeout(blurTimer.current)
-                  choose(o)
-                }}
-              >
-                <span className="key">{o.symbol}</span>
-                <span>{o.name}</span>
-                <span className="dim">{o.assetClass}</span>
-              </button>
-            ))
-          )}
-        </div>
-      )}
+      {open &&
+        place &&
+        createPortal(
+          <div className="picker-list" id={listId} role="listbox" style={place}>
+            {matches.length === 0 ? (
+              <div className="picker-option dim">Tidak ada yang cocok</div>
+            ) : (
+              matches.map((o, i) => (
+                <button
+                  key={o.id}
+                  type="button"
+                  role="option"
+                  aria-selected={i === cursor}
+                  className="picker-option"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    if (blurTimer.current) clearTimeout(blurTimer.current)
+                    choose(o)
+                  }}
+                >
+                  <span className="key">{o.symbol}</span>
+                  <span>{o.name}</span>
+                  <span className="dim">{o.assetClass}</span>
+                </button>
+              ))
+            )}
+          </div>,
+          document.body,
+        )}
     </div>
   )
 }

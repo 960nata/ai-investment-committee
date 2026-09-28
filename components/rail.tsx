@@ -32,6 +32,7 @@ import {
   IconChat,
 } from './icons'
 import { useSidebar } from './sidebar-context'
+import { MadeBy } from './credit'
 
 interface RailLink {
   href: string
@@ -145,6 +146,9 @@ export function Rail() {
             <Link href="/admin" className="mono" style={{ color: 'var(--ink-faint)', fontSize: '11px', textDecoration: 'none' }}>
               &rarr; Portal Admin AI Investdesk
             </Link>
+            <div style={{ marginTop: 6 }}>
+              <MadeBy className="mono" />
+            </div>
           </div>
         </div>
       </aside>

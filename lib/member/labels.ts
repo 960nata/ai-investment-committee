@@ -11,3 +11,16 @@ export const ASSET_CLASS_LABEL: Record<string, string> = {
   komoditi: 'Komoditi',
   indeks: 'Indeks',
 }
+
+/**
+ * Tab penyaring kelas aset untuk pemilih instrumen (Bandingkan, Watchlist).
+ * `classes: null` berarti semua kelas.
+ */
+export const ASSET_TABS: { id: string; label: string; classes: string[] | null }[] = [
+  { id: 'semua', label: 'Semua', classes: null },
+  { id: 'kripto', label: 'Kripto', classes: ['crypto', 'memecoin'] },
+  { id: 'saham', label: 'Saham', classes: ['saham'] },
+  { id: 'komoditas', label: 'Komoditas', classes: ['komoditi'] },
+  { id: 'emas', label: 'Emas', classes: ['emas'] },
+  { id: 'indeks', label: 'Indeks', classes: ['indeks'] },
+]
