@@ -6332,6 +6332,27 @@ body.rail-lock {
   color: var(--amber);
 }
 
+/* 8b. Kartu isi generik
+ *
+ * Dipakai halaman Iklan, Tulis Warta, Pengumuman, Donasi, Premium, dan
+ * Pengguna. Kelasnya sudah lama dipakai tanpa pernah didefinisikan, sehingga
+ * isi kartu menempel ke tepinya tanpa padding. Jarak antar-kartu sengaja tidak
+ * diatur di sini: pembungkusnya yang memberi `gap`.
+ */
+.admin-card {
+  background: var(--surface-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 20px;
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .admin-card {
+    padding: 16px;
+  }
+}
+
 /* 9. Table Card */
 .admin-table-card {
   background: var(--surface-1);
@@ -6684,6 +6705,32 @@ body.rail-lock {
    menggambar serangan siber yang tidak pernah terjadi dari berkas konstanta,
    dan seluruh penggambarnya sudah dibuang bersama datanya.
    --------------------------------------------------------------------------- */
+
+/* Keadaan kosong atau galat di dalam kartu analitik. */
+.ga-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--ink-mute);
+}
+
+.ga-empty-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.ga-empty-text {
+  margin: 0;
+  max-width: 56ch;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--ink-mute);
+}
 
 .ga-range-nav {
   display: flex;

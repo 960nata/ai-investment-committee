@@ -209,7 +209,7 @@ export function NewsForm({ initialData, isEdit = false }: NewsFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '20px' }}>
       {error && (
         <div
           style={{
@@ -220,7 +220,6 @@ export function NewsForm({ initialData, isEdit = false }: NewsFormProps) {
             background: 'var(--halted-dim)',
             border: '1px solid var(--halted)',
             borderRadius: 'var(--radius-sm)',
-            marginBottom: 'var(--space-4)',
             fontSize: '13px',
           }}
         >
@@ -239,7 +238,6 @@ export function NewsForm({ initialData, isEdit = false }: NewsFormProps) {
             background: 'var(--measured-dim)',
             border: '1px solid var(--measured)',
             borderRadius: 'var(--radius-sm)',
-            marginBottom: 'var(--space-4)',
             fontSize: '13px',
           }}
         >
