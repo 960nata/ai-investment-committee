@@ -7,6 +7,7 @@ import { VisitBeacon } from "@/components/visit-beacon";
 import { SiteTranslator } from "@/components/site-translator";
 import { SITE_NAME } from "@/lib/brand";
 import "./globals.css";
+import "./mobile.css";
 
 const fontSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
