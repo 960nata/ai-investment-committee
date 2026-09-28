@@ -677,7 +677,9 @@ export function AccessFaqSection() {
         </div>
         <div className="lp-faq lp-reveal">
           {FAQ.map((item, i) => (
-            <details key={item.q} open={i === 0}>
+            // `name` yang sama menjadikannya akordeon eksklusif bawaan peramban:
+            // membuka satu pertanyaan menutup yang lain, tanpa JavaScript.
+            <details key={item.q} name="faq-akses" open={i === 0}>
               <summary>{item.q}</summary>
               <p>{item.a}</p>
             </details>
