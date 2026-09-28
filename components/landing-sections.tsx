@@ -425,7 +425,7 @@ export function LimitsSection({
     },
     {
       title: 'Bukan untuk day trading',
-      body: 'Datanya harian dan berjeda. Kalau butuh data detik-per-detik, platform ini bukan jawabannya.',
+      body: 'Grafiknya memang live, tapi skor dan putusan komite dihitung dari data harian. Kalau butuh sinyal detik-per-detik, platform ini bukan jawabannya.',
     },
   ]
 
@@ -499,7 +499,8 @@ export function LimitsSection({
             </ul>
           </div>
 
-          {chartSamples.length > 0 && <LandingMarketChart samples={chartSamples} />}
+          {/* Selalu tampil: datanya live dari bursa, deret harian basis data hanya cadangan. */}
+          <LandingMarketChart samples={chartSamples} />
         </div>
 
         <p className="lp-limits-close lp-reveal">

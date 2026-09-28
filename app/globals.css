@@ -14357,6 +14357,59 @@ body.rail-lock {
   padding: 0 6px;
 }
 
+.lp-market-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 10px;
+  padding: 2px 7px;
+  border: 1px solid rgba(79, 157, 142, 0.45);
+  border-radius: 999px;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  vertical-align: middle;
+  color: #4f9d8e;
+}
+
+.lp-market-live::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: lp-live-pulse 1.6s ease-in-out infinite;
+}
+
+.lp-market-live.closed {
+  border-color: rgba(255, 255, 255, 0.15);
+  color: var(--lp-faint, #8a8a8a);
+}
+
+.lp-market-live.closed::before {
+  animation: none;
+}
+
+@keyframes lp-live-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.7); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-market-live::before { animation: none; }
+}
+
+.lp-market-empty {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--lp-faint, #8a8a8a);
+}
+
 .lp-market-foot {
   display: flex;
   justify-content: space-between;

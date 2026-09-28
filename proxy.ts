@@ -79,6 +79,10 @@ const firebaseAuthOrigin = (() => {
   }
 })()
 
+/** Tujuan kiriman Google Analytics 4 (gtag memakai fetch/beacon ke sini). */
+const ANALYTICS_ORIGINS =
+  'https://*.google-analytics.com https://*.analytics.google.com https://www.google.com https://www.googletagmanager.com'
+
 const FIREBASE_API_ORIGINS =
   'https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com'
 
@@ -146,7 +150,10 @@ function contentSecurityPolicy(nonce: string): string {
     "font-src 'self'",
     // Bursa dipanggil langsung dari peramban untuk harga bergerak; fungsi
     // serverless tidak bisa memegang koneksi WebSocket yang hidup lama.
-    `connect-src 'self' https://api.binance.com wss://stream.binance.com ${FIREBASE_API_ORIGINS}`,
+    // Port 9443 disebut terang-terangan: sumber tanpa port hanya cocok dengan
+    // port bawaan (443), dan aliran harga Binance tersambung lewat :9443.
+    // Tanpa ini semua grafik "live" diam-diam membeku di harga pemuatan.
+    `connect-src 'self' https://api.binance.com wss://stream.binance.com wss://stream.binance.com:9443 ${FIREBASE_API_ORIGINS} ${ANALYTICS_ORIGINS}`,
     // Tantangan Turnstile di halaman daftar tampil sebagai bingkai dari
     // Cloudflare. Skripnya sendiri tidak perlu didaftarkan: ia dimuat oleh
     // bundel bernonce, dan 'strict-dynamic' sudah mempercayainya.
