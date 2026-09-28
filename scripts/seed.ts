@@ -61,6 +61,10 @@ const SCHEDULES: ScheduleSeed[] = [
   // berita: pagi setelah Wall Street tutup, siang saat jeda sesi IDX, dan sore
   // setelah IDX tutup. Satu artikel per putaran, dan editor AI boleh menolak.
   { jobName: 'warta-otomatis', hoursOfDay: [7, 12, 17], timezone: 'Asia/Jakarta', tradingDaysOnly: false, market: null, enabled: true, note: '07.00, 12.00, 17.00 WIB, satu warta dari berita terbaru' },
+  // Alert pengguna (Beta). Tiap jam, supaya alert ikut terpicu tak lama setelah
+  // ingest, skor, atau rapat komite pasar mana pun selesai. Hanya membaca
+  // basis data, jadi biayanya kecil.
+  { jobName: 'evaluasi-alert', hoursOfDay: EVERY_HOUR, timezone: 'UTC', tradingDaysOnly: false, market: null, enabled: true, note: 'tiap jam, alert harga, skor, dan putusan' },
 ]
 
 async function seedSchedules(): Promise<void> {

@@ -28,7 +28,9 @@ import { STATIC_DICTIONARY } from '@/lib/i18n/static-dictionary'
 
 const SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'CODE', 'PRE', 'KBD', 'TEXTAREA', 'svg'])
 const ATTRS = ['placeholder', 'title', 'aria-label', 'alt'] as const
+/** Sama dengan MAX_TEXTS dan MAX_REQUEST_CHARS di server. */
 const BATCH = 50
+const BATCH_CHARS = 12_000
 const STORE_LIMIT = 4000
 
 /** Teks tanpa huruf, atau satu token yang tampak seperti simbol/angka: tidak dikirim. */
@@ -218,15 +220,20 @@ export function SiteTranslator() {
       setBusy(true)
       for (const t of texts) inflight.add(t)
       try {
-        for (let i = 0; i < texts.length && !cancelled; i += BATCH) {
-          const chunk = texts.slice(i, i + BATCH)
+        for (let i = 0; i < texts.length && !cancelled; ) {
+          const chunk: string[] = []
+          let chars = 0
+          while (i < texts.length && chunk.length < BATCH && chars + texts[i].length <= BATCH_CHARS) {
+            chars += texts[i].length
+            chunk.push(texts[i++])
+          }
           const res = await fetch('/api/v1/i18n/translate', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ locale, texts: chunk }),
           })
           if (!res.ok) {
-            for (const t of texts.slice(i)) backoff(t)
+            for (const t of texts.slice(i - chunk.length)) backoff(t)
             break
           }
           const body = (await res.json()) as { translations: (string | null)[] }

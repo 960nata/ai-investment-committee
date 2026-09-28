@@ -28,3 +28,24 @@ export function formatChange(changePct: number | null): string {
   const sign = changePct >= 0 ? '+' : ''
   return `${sign}${changePct.toFixed(2).replace('.', ',')}%`
 }
+
+/**
+ * Harga dalam mata uang instrumennya sendiri. Rupiah tidak pernah berkoma, dan
+ * koin di bawah satu sen tetap memperlihatkan digit yang bermakna.
+ */
+export function formatPriceIn(value: number | null, currency: string): string {
+  if (value === null || !Number.isFinite(value)) return '—'
+  if (currency === 'IDR' || currency === 'JPY' || currency === 'KRW') {
+    return `${Math.round(value).toLocaleString('id-ID')} ${currency}`
+  }
+  const abs = Math.abs(value)
+  const [min, max] = abs === 0 ? [2, 2] : abs < 0.0001 ? [6, 8] : abs < 0.01 ? [4, 6] : abs < 10 ? [2, 4] : [2, 2]
+  return `${value.toLocaleString('id-ID', { minimumFractionDigits: min, maximumFractionDigits: max })} ${currency}`
+}
+
+/** Persen bertanda dengan koma desimal; kosong ditulis sebagai garis, bukan nol. */
+export function formatPct(value: number | null, digits = 2): string {
+  if (value === null || !Number.isFinite(value)) return '—'
+  const sign = value > 0 ? '+' : ''
+  return `${sign}${value.toFixed(digits).replace('.', ',')}%`
+}

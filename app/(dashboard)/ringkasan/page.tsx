@@ -40,6 +40,7 @@ import type { HorizonView } from '@/components/score-panel'
 import { isQStashConfigured } from '@/lib/queue/qstash'
 import { cache } from '@/lib/cache/redis'
 import { requireUser } from '@/lib/auth/user-auth'
+import { listWatchlistIds } from '@/lib/db/member-queries'
 import { CHART_HISTORY_YEARS } from '@/lib/format/chart-range'
 
 export const dynamic = 'force-dynamic'
@@ -65,7 +66,7 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
   let error: string | null = null
 
   try {
-    data = await load({ symbol, tab, includeAnalytics: isAdmin })
+    data = await load({ symbol, tab, includeAnalytics: isAdmin, userId: session.uid })
   } catch (err) {
     error = err instanceof Error ? err.message : String(err)
   }
@@ -186,6 +187,7 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
           initialInstrumentId={data.initialInstrumentId}
           initialCandles={data.initialCandles}
           initialTab={data.initialTab}
+          watchlistIds={data.watchlistIds}
         />
       )}
 
@@ -241,17 +243,21 @@ async function load({
   symbol,
   tab,
   includeAnalytics = false,
+  userId,
 }: {
   symbol?: string
   tab?: string
   includeAnalytics?: boolean
+  userId?: number
 } = {}) {
-  const [stats, health, instruments, scores, visitSummary] = await Promise.all([
+  const [stats, health, instruments, scores, visitSummary, watchlistIds] = await Promise.all([
     getDashboardStats(),
     listAdapterHealth(),
     listInstrumentQuotes(),
     listLatestScores(MODEL_VERSION),
     includeAnalytics ? getVisitSummary('30d').catch(() => null) : Promise.resolve(null),
+    // Watchlist pelengkap; kegagalannya tidak boleh menjatuhkan ringkasan.
+    userId !== undefined ? listWatchlistIds(userId).catch(() => [] as number[]) : Promise.resolve([] as number[]),
   ])
 
   // Skor dikelompokkan per instrumen dan diurutkan pendek, menengah, panjang —
@@ -349,6 +355,7 @@ async function load({
     queueConfigured: isQStashConfigured(),
     cacheAvailable: cache.isAvailable(),
     visitSummary,
+    watchlistIds,
   }
 }
 

@@ -117,15 +117,22 @@ export function NextAiLanding({
             <div className="nextai-pill">
               <span className="nextai-pill-dot">✦</span>
               <span className="nextai-pill-text">
-                Mesin Analisis Probabilistik Multi-Agen <span className="nextai-pill-tag">Zero Hallucination</span>
+                Analisis AI Multi-Agen <span className="nextai-pill-tag">Zero Hallucination</span>
               </span>
             </div>
           </div>
 
-          {/* Main Hero Headline (2 Baris) */}
+          {/* Main Hero Headline: 2 baris di desktop, 3 baris dengan pemenggalan tetap di mobile */}
           <h1 className="nextai-hero-title">
-            <span className="title-line">Keputusan Investasi Presisi Lewat</span>
-            <span className="title-line">Deliberasi Multi-Agen AI</span>
+            <span className="title-desktop">
+              <span className="title-line">Keputusan Investasi Presisi Lewat</span>
+              <span className="title-line">Deliberasi Multi-Agen AI</span>
+            </span>
+            <span className="title-mobile">
+              <span className="title-line">Keputusan Investasi</span>
+              <span className="title-line">Presisi Lewat Deliberasi</span>
+              <span className="title-line">Multi-Agen AI</span>
+            </span>
           </h1>
 
           {/* Subtitle */}

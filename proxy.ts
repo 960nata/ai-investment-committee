@@ -52,6 +52,36 @@ const isProduction = process.env.NODE_ENV === 'production'
 const MAP_TILE_ORIGIN =
   'https://server.arcgisonline.com https://services.arcgisonline.com https://*.basemaps.cartocdn.com'
 
+/**
+ * Asal-asal yang dibutuhkan Firebase Auth untuk masuk dengan Google.
+ *
+ * Alur popup bekerja begini: tombol membuka tab/jendela Google, lalu setelah
+ * akun dipilih, tab itu menutup diri dan menyerahkan hasilnya ke halaman asal
+ * lewat iframe tersembunyi dari `authDomain` (`<proyek>.firebaseapp.com`).
+ * Kalau iframe itu diblokir CSP, hasilnya tidak pernah sampai: di seluler
+ * pengguna kembali ke tab awal tanpa masuk, dan SDK hanya melapor
+ * `auth/popup-closed-by-user` — terlihat seperti pengguna membatalkan sendiri.
+ *
+ * Penukaran token berjalan lewat fetch ke dua API Google di bawah.
+ */
+const firebaseAuthOrigin = (() => {
+  const domain =
+    process.env.FIREBASE_AUTH_DOMAIN ||
+    process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ||
+    (process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
+      ? `${process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}.firebaseapp.com`
+      : '')
+  if (!domain) return null
+  try {
+    return new URL(domain.includes('://') ? domain : `https://${domain}`).origin
+  } catch {
+    return null
+  }
+})()
+
+const FIREBASE_API_ORIGINS =
+  'https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com'
+
 const imageOrigin = (() => {
   const raw = process.env.NEXT_PUBLIC_SUPABASE_URL
   if (!raw) return null
@@ -116,7 +146,12 @@ function contentSecurityPolicy(nonce: string): string {
     "font-src 'self'",
     // Bursa dipanggil langsung dari peramban untuk harga bergerak; fungsi
     // serverless tidak bisa memegang koneksi WebSocket yang hidup lama.
-    "connect-src 'self' https://api.binance.com wss://stream.binance.com",
+    `connect-src 'self' https://api.binance.com wss://stream.binance.com ${FIREBASE_API_ORIGINS}`,
+    // Tantangan Turnstile di halaman daftar tampil sebagai bingkai dari
+    // Cloudflare. Skripnya sendiri tidak perlu didaftarkan: ia dimuat oleh
+    // bundel bernonce, dan 'strict-dynamic' sudah mempercayainya.
+    // Iframe Firebase Auth menerima hasil popup Google — lihat `firebaseAuthOrigin`.
+    `frame-src 'self' https://challenges.cloudflare.com${firebaseAuthOrigin ? ` ${firebaseAuthOrigin}` : ''}`,
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
@@ -169,6 +204,12 @@ function ruleFor(pathname: string, method: string): PathPolicy {
   // jauh lebih sempit daripada pembacaan biasa.
   if (pathname.startsWith('/api/v1/auth/')) {
     return { scope: 'auth', rule: RULES.auth, strict: false }
+  }
+  // Tiap POST checkout membuat satu tagihan sungguhan di Tripay, jadi kuotanya
+  // sesempit endpoint masuk. Callback Tripay tidak termasuk: ia dijaga tanda
+  // tangan HMAC dan memakai kuota baca biasa.
+  if (pathname.startsWith('/api/v1/premium/') && method !== 'GET') {
+    return { scope: 'payment', rule: RULES.auth, strict: false }
   }
   // Tiap ketukan menulis satu baris ke Postgres. Kuotanya menjaga tabelnya,
   // bukan menjaga endpointnya.
@@ -228,6 +269,15 @@ const PROTECTED_PREFIXES = [
   '/berita',
   '/pipeline',
   '/backtest',
+  '/watchlist',
+  '/portofolio',
+  '/alert',
+  '/screener',
+  '/bandingkan',
+  '/tanya-komite',
+  '/rekam-jejak',
+  '/kepemilikan',
+  '/makro',
 ]
 
 function isProtectedPage(pathname: string): boolean {

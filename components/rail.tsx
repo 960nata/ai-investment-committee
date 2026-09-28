@@ -13,16 +13,60 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { IconFlow, IconGauge, IconPulse, IconRows, IconNews, IconClose, IconUser } from './icons'
+import {
+  IconFlow,
+  IconGauge,
+  IconPulse,
+  IconRows,
+  IconNews,
+  IconClose,
+  IconUser,
+  IconStar,
+  IconWallet,
+  IconBell,
+  IconFilter,
+  IconScales,
+  IconHistory,
+  IconGlobe,
+  IconUsers,
+  IconChat,
+} from './icons'
 import { useSidebar } from './sidebar-context'
 
-export const SECTIONS = [
+interface RailLink {
+  href: string
+  label: string
+  icon: (props: { size?: number }) => React.ReactNode
+  /** Fitur yang masih diuji; diberi penanda kecil di rel. */
+  beta?: boolean
+}
+
+export const SECTIONS: { label: string; links: RailLink[] }[] = [
   {
     label: 'Pasar',
     links: [
       { href: '/ringkasan', label: 'Ringkasan', icon: IconGauge },
       { href: '/instruments', label: 'Instrumen', icon: IconRows },
       { href: '/berita', label: 'Warta & Intelijen AI', icon: IconNews },
+    ],
+  },
+  {
+    label: 'Alat Investor',
+    links: [
+      { href: '/watchlist', label: 'Watchlist', icon: IconStar, beta: true },
+      { href: '/portofolio', label: 'Portofolio', icon: IconWallet, beta: true },
+      { href: '/alert', label: 'Alert', icon: IconBell, beta: true },
+      { href: '/screener', label: 'Screener', icon: IconFilter, beta: true },
+      { href: '/bandingkan', label: 'Bandingkan', icon: IconScales, beta: true },
+      { href: '/tanya-komite', label: 'Tanya Komite', icon: IconChat, beta: true },
+    ],
+  },
+  {
+    label: 'Riset',
+    links: [
+      { href: '/rekam-jejak', label: 'Rekam Jejak Komite', icon: IconHistory, beta: true },
+      { href: '/kepemilikan', label: 'Kepemilikan KSEI', icon: IconUsers, beta: true },
+      { href: '/makro', label: 'Makro', icon: IconGlobe, beta: true },
     ],
   },
   {
@@ -77,7 +121,7 @@ export function Rail() {
         {SECTIONS.map((section) => (
           <nav key={section.label} className="rail-group">
             <span className="rail-label">{section.label}</span>
-            {section.links.map(({ href, label, icon: Icon }) => (
+            {section.links.map(({ href, label, icon: Icon, beta }) => (
               <Link
                 key={href}
                 href={href}
@@ -87,6 +131,7 @@ export function Rail() {
               >
                 <Icon size={16} />
                 {label}
+                {beta && <span className="rail-beta">beta</span>}
               </Link>
             ))}
           </nav>

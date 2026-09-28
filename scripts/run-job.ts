@@ -22,6 +22,7 @@ import { runKseiJob } from '../lib/ownership/job'
 import { runMacroJob, macroAssumptions } from '../lib/macro/job'
 import { runAutoNewsJob } from '../lib/agents/auto-news'
 import { translateMissingNews } from '../lib/agents/news-translator'
+import { evaluateAlerts } from '../lib/member/alerts'
 import type { MarketCode } from '../lib/db/schema'
 
 const JOBS = [
@@ -43,6 +44,7 @@ const JOBS = [
   'ingest-macro',
   'warta-otomatis',
   'warta-terjemah',
+  'evaluasi-alert',
 ] as const
 
 type JobName = (typeof JOBS)[number]
@@ -140,6 +142,12 @@ async function main(): Promise<void> {
       for (const s of p.sources) console.log(`    sumber: ${s}`)
     }
     console.log(`  selesai dalam ${((Date.now() - started) / 1000).toFixed(1)} detik\n`)
+    return
+  }
+
+  if (job === 'evaluasi-alert') {
+    const r = await evaluateAlerts()
+    console.log(`\n${job} · ${r.checked} alert aktif, ${r.fired} terpicu, ${r.primed} dicatat putusan awalnya\n`)
     return
   }
 

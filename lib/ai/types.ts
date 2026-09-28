@@ -26,6 +26,12 @@ export interface LlmRequest {
   temperature?: number
   /** Minta penyedia mengembalikan JSON saja, bila ia mendukungnya. */
   json?: boolean
+  /**
+   * 'premium' mencoba model berbayar terkuat (PREMIUM_LLM_*) lebih dulu, lalu
+   * turun ke rantai biasa bila gagal atau belum dikonfigurasi. Pengguna
+   * Premium tidak boleh mendapat jawaban kosong hanya karena satu kunci mati.
+   */
+  tier?: 'standard' | 'premium'
 }
 
 export interface LlmResponse {

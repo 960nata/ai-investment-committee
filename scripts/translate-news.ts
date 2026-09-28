@@ -1,4 +1,6 @@
 /**
+/**
+/**
  * Lengkapi versi bahasa lain untuk warta yang sudah terbit.
  *
  *   npx tsx scripts/translate-news.ts            (maks 20 artikel)

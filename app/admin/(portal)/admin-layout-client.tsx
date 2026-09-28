@@ -17,6 +17,9 @@ import {
   IconDatabase,
   IconRadar,
   IconShield,
+  IconMegaphone,
+  IconHeart,
+  IconCrown,
 } from '@/components/icons'
 import { AdminLogoutButton } from './admin-logout-btn'
 
@@ -48,6 +51,8 @@ export function AdminLayoutClient({ children }: AdminLayoutClientProps) {
     moduleTitle = 'Pengaturan Slot Iklan'
   } else if (pathname.startsWith('/admin/users')) {
     moduleTitle = 'Manajemen Pengguna'
+  } else if (pathname.startsWith('/admin/pengumuman')) {
+    moduleTitle = 'Pengumuman Dashboard'
   }
 
   return (
@@ -201,12 +206,39 @@ export function AdminLayoutClient({ children }: AdminLayoutClientProps) {
             </Link>
 
             <Link
+              href="/admin/donasi"
+              className={`admin-nav-link ${pathname.startsWith('/admin/donasi') ? 'active' : ''}`}
+              onClick={() => setMobileOpen(false)}
+            >
+              <IconHeart size={15} />
+              <span>Halaman Donasi</span>
+            </Link>
+
+            <Link
+              href="/admin/premium"
+              className={`admin-nav-link ${pathname.startsWith('/admin/premium') ? 'active' : ''}`}
+              onClick={() => setMobileOpen(false)}
+            >
+              <IconCrown size={15} />
+              <span>Premium &amp; Harga</span>
+            </Link>
+
+            <Link
               href="/admin/users"
               className={`admin-nav-link ${pathname.startsWith('/admin/users') ? 'active' : ''}`}
               onClick={() => setMobileOpen(false)}
             >
               <IconUser size={15} />
               <span>Manajemen Pengguna</span>
+            </Link>
+
+            <Link
+              href="/admin/pengumuman"
+              className={`admin-nav-link ${pathname.startsWith('/admin/pengumuman') ? 'active' : ''}`}
+              onClick={() => setMobileOpen(false)}
+            >
+              <IconMegaphone size={15} />
+              <span>Pengumuman</span>
             </Link>
           </div>
 

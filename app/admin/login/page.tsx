@@ -338,21 +338,6 @@ export default function AdminLoginPage() {
               <IconArrowRight size={14} />
             </button>
 
-            {process.env.NODE_ENV !== 'production' && (
-              <div className="auth-demo-hint" style={{ background: 'rgba(0, 0, 0, 0.3)' }}>
-                <span className="mono" style={{ fontSize: '11px' }}>
-                  PIN Demo: <code style={{ color: 'var(--signal)' }}>komite-admin-2026</code>
-                </span>
-                <button
-                  type="button"
-                  className="btn btn-quiet mono"
-                  style={{ fontSize: '10px', padding: '3px 8px' }}
-                  onClick={() => setPin('komite-admin-2026')}
-                >
-                  Gunakan
-                </button>
-              </div>
-            )}
           </form>
         )}
 

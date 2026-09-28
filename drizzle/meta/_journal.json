@@ -71,6 +71,13 @@
       "when": 1790211663110,
       "tag": "0009_ownership_macro_reconciliation",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790526448952,
+      "tag": "0010_member_tools",
+      "breakpoints": true
     }
   ]
 }

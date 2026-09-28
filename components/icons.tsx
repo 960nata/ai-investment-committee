@@ -575,3 +575,109 @@ export function IconGoogle({ size = 18, className, style }: IconProps) {
 
 
 
+
+/** Bintang garis — instrumen yang dipantau. `filled` untuk keadaan terpilih. */
+export function IconStar(props: IconProps & { filled?: boolean }) {
+  const { filled, ...rest } = props
+  return (
+    <Svg {...rest}>
+      <path
+        d="m12 3.5 2.6 5.3 5.9.9-4.25 4.1 1 5.8L12 16.9l-5.25 2.7 1-5.8L3.5 9.7l5.9-.9Z"
+        fill={filled ? 'currentColor' : 'none'}
+      />
+    </Svg>
+  )
+}
+
+/** Lonceng — alert dan notifikasi. */
+export function IconBell(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15Z" />
+      <path d="M10 20.5a2 2 0 0 0 4 0" />
+    </Svg>
+  )
+}
+
+/** Dompet — portofolio. */
+export function IconWallet(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect x="3" y="6" width="18" height="13" rx="1.5" />
+      <path d="M3 9.5h18M16 14h2" />
+      <path d="M6 6V4.5h11V6" />
+    </Svg>
+  )
+}
+
+/** Corong penyaring — screener. */
+export function IconFilter(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M3.5 5h17l-6.5 8v5.5l-4 1.5v-7Z" />
+    </Svg>
+  )
+}
+
+/** Jam dengan panah mundur — rekam jejak. */
+export function IconHistory(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M4 12a8 8 0 1 0 2.4-5.7" />
+      <path d="M4 4v3.5h3.5" />
+      <path d="M12 8v4.5l3 1.5" />
+    </Svg>
+  )
+}
+
+/** Dua sosok — komposisi pemegang saham. */
+export function IconUsers(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <circle cx="9" cy="8.5" r="3" />
+      <path d="M3.5 19a5.5 5.5 0 0 1 11 0" />
+      <path d="M15.5 5.8a3 3 0 0 1 0 5.4M17 14.2a5.5 5.5 0 0 1 3.5 4.8" />
+    </Svg>
+  )
+}
+
+/** Pengeras suara — pengumuman. */
+export function IconMegaphone(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M4 10v4h3l8 4.5v-13L7 10Z" />
+      <path d="M7 14v4.5h2.5V15M18 9.5a3.5 3.5 0 0 1 0 5" />
+    </Svg>
+  )
+}
+
+/** Hati — dukungan dan donasi. */
+export function IconHeart(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M12 19.5s-7.5-4.4-7.5-10A4.2 4.2 0 0 1 12 7a4.2 4.2 0 0 1 7.5 2.5c0 5.6-7.5 10-7.5 10Z" />
+    </Svg>
+  )
+}
+
+/** Kode QR — pembayaran QRIS. */
+export function IconQr(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect x="4" y="4" width="6" height="6" rx="0.5" />
+      <rect x="14" y="4" width="6" height="6" rx="0.5" />
+      <rect x="4" y="14" width="6" height="6" rx="0.5" />
+      <path d="M14 14h2.5v2.5H14ZM18 18h2v2h-2ZM17.5 14H20M14 18.5V20" />
+    </Svg>
+  )
+}
+
+/** Mahkota — Premium. */
+export function IconCrown(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M4 17.5 3 8l5 4 4-6.5 4 6.5 5-4-1 9.5Z" />
+      <path d="M4.5 20.5h15" />
+    </Svg>
+  )
+}

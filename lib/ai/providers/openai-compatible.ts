@@ -151,6 +151,26 @@ export const mistralAdapter = createOpenAiCompatibleAdapter({
   envPrefix: 'MISTRAL_API_KEY',
 })
 
+/**
+ * Model terkuat untuk pengguna Premium. Berbayar per token, jadi tidak ikut
+ * rantai biasa — hanya dipanggil untuk permintaan bertingkat 'premium'.
+ *
+ * Bawaannya lewat OpenRouter supaya satu kunci cukup untuk memilih model
+ * terbaik mana pun; ganti PREMIUM_LLM_BASE_URL untuk penyedia lain yang
+ * berformat OpenAI.
+ */
+export const premiumAdapter = createOpenAiCompatibleAdapter({
+  id: 'premium',
+  name: 'Premium',
+  baseUrl: process.env.PREMIUM_LLM_BASE_URL ?? 'https://openrouter.ai/api/v1',
+  model: process.env.PREMIUM_LLM_MODEL ?? 'anthropic/claude-sonnet-5',
+  envPrefix: 'PREMIUM_LLM_API_KEY',
+  extraHeaders: {
+    'http-referer': process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000',
+    'x-title': 'investasi',
+  },
+})
+
 export const nvidiaAdapter = createOpenAiCompatibleAdapter({
   id: 'nvidia',
   name: 'NVIDIA NIM',

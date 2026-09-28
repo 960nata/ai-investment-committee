@@ -10,6 +10,7 @@ import {
   IconCandles,
   IconCheck,
   IconClose,
+  IconCrown,
 } from '@/components/icons'
 import {
   compressImageToWebP,
@@ -26,6 +27,8 @@ interface ProfileClientProps {
     avatarUrl?: string | null
     createdAt?: string | Date
     lastLoginAt?: string | Date | null
+    /** ISO; diisi hanya bila Premium masih berlaku. */
+    premiumUntil?: string | null
   }
 }
 
@@ -245,6 +248,14 @@ export function ProfileClient({ initialUser }: ProfileClientProps) {
                 {isSuperAdmin ? <IconLock size={11} /> : <IconUser size={11} />}
                 {isSuperAdmin ? 'ADMINISTRATOR' : 'ANALIS KOMITE'}
               </span>
+              {initialUser.premiumUntil && (
+                <span
+                  className="badge-premium mono"
+                  title={`Premium aktif sampai ${new Date(initialUser.premiumUntil).toLocaleDateString('id-ID')}`}
+                >
+                  <IconCrown size={11} /> PREMIUM
+                </span>
+              )}
             </div>
             <p className="profile-display-email mono">{initialUser.email}</p>
             <div className="profile-meta-tags mono">

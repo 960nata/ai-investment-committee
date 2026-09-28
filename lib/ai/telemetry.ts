@@ -16,7 +16,7 @@
  */
 
 import { cache } from '@/lib/cache/redis'
-import { LLM_ADAPTERS } from './adapters'
+import { ALL_LLM_ADAPTERS } from './adapters'
 import { collectKeys, poolStatus } from './keyring'
 
 export interface LlmCallEvent {
@@ -371,7 +371,7 @@ export async function getAiTokensDashboardData(range: TimeRange = '24h'): Promis
     }
   })
 
-  const adapterById = new Map(LLM_ADAPTERS.map((a) => [a.id, a]))
+  const adapterById = new Map(ALL_LLM_ADAPTERS.map((a) => [a.id, a]))
   const providerName = (id: string) => adapterById.get(id)?.name ?? id
 
   const keys: KeyAnalyticsItem[] = []
@@ -421,7 +421,7 @@ export async function getAiTokensDashboardData(range: TimeRange = '24h'): Promis
   let coolingKeysCount = 0
   const seenKeys = new Set<string>()
 
-  for (const adapter of LLM_ADAPTERS) {
+  for (const adapter of ALL_LLM_ADAPTERS) {
     const pool = collectKeys(adapter.envPrefix)
     if (pool.length === 0) continue
 

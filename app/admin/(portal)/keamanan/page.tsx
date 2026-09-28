@@ -32,7 +32,7 @@ import {
   shieldIsPersistent,
   type SecurityEvent,
 } from '@/lib/http/blocklist'
-import { budgetStatus } from '@/lib/http/budget'
+import { budgetStatus, translateBudgetStatus } from '@/lib/http/budget'
 import { SIGNAL_LABELS } from '@/lib/http/shield'
 
 export const dynamic = 'force-dynamic'
@@ -74,10 +74,11 @@ function countByReason(events: SecurityEvent[]): Array<[string, number]> {
 export default async function AdminSecurityPage() {
   const persistent = shieldIsPersistent()
 
-  const [events, history, budget] = await Promise.all([
+  const [events, history, budget, translate] = await Promise.all([
     recentEvents(50),
     blockHistory(14),
     budgetStatus(),
+    translateBudgetStatus(),
   ])
 
   const today = history.at(-1)?.total ?? 0
@@ -89,6 +90,15 @@ export default async function AdminSecurityPage() {
     budget.publicCeiling > 0
       ? Math.min(100, Math.round((budget.publicUsed / budget.publicCeiling) * 100))
       : 0
+
+  // Kantong tamu yang penuh lebih dulu adalah tanda paling awal ada yang
+  // memakai penerjemah sebagai layanan gratis.
+  const translatePct =
+    translate.guestCeiling > 0
+      ? Math.min(100, Math.round((translate.guestUsed / translate.guestCeiling) * 100))
+      : 0
+  const compact = (n: number) =>
+    n >= 1000 ? `${(n / 1000).toFixed(n >= 10_000 ? 0 : 1)}rb` : String(n)
 
   return (
     <div className="admin-page-content" suppressHydrationWarning>
@@ -227,9 +237,15 @@ export default async function AdminSecurityPage() {
             {budget.publicUsed}
             <span style={{ fontSize: '0.45em', opacity: 0.55 }}> / {budget.publicCeiling}</span>
           </div>
-          <div className="admin-stat-meta mono">
+          <div className="admin-stat-meta mono" style={{ flexWrap: 'wrap' }}>
             <span className={`admin-stat-badge ${budgetPct >= 80 ? 'active' : 'safe'}`}>
               {budgetPct}% terpakai
+            </span>
+            <span
+              className={`admin-stat-badge ${translatePct >= 80 ? 'active' : 'safe'}`}
+              title={`Terjemahan hari ini: ${translate.used} dari ${translate.ceiling} karakter; kantong tamu ${translate.guestUsed} dari ${translate.guestCeiling}.`}
+            >
+              Terjemahan tamu {compact(translate.guestUsed)}/{compact(translate.guestCeiling)} kar
             </span>
           </div>
         </article>

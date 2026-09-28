@@ -17,21 +17,21 @@ import { sql } from 'drizzle-orm'
 import { db } from '@/lib/db/client'
 import { complete } from '@/lib/ai/registry'
 import { LOCALE_INFO, type Locale } from '@/lib/i18n/locales'
+import { reserveTranslateChars } from '@/lib/http/budget'
 
 import { STATIC_DICTIONARY } from './static-dictionary'
 
-/** Batas per permintaan — endpoint ini publik. */
-export const MAX_TEXTS = 150
-export const MAX_TEXT_LENGTH = 1000
-
 /**
- * Pagu kalimat baru per hari untuk seluruh situs. Cache yang sudah terisi
- * tidak menghitung; yang dihitung hanya kalimat yang harus dikirim ke model.
- * Situs ini punya beberapa ribu kalimat unik, jadi pagu ini cukup untuk mengisi
- * seluruh cache dalam sehari tanpa membuka jalan bagi orang yang mengirim teks
- * acak untuk menghabiskan kuota.
+ * Batas per permintaan — endpoint ini publik.
+ *
+ * Peramban mengirim paling banyak lima puluh teks sekali jalan, jadi batas
+ * jumlah mengikutinya. Batas total karakter yang menahan satu permintaan agar
+ * tidak berisi lima puluh paragraf penuh sekaligus; pagu harian yang sebenarnya
+ * ada di `reserveTranslateChars`.
  */
-const DAILY_NEW_TEXT_CEILING = Number(process.env.UI_TRANSLATE_DAILY_CEILING) || 4000
+export const MAX_TEXTS = 50
+export const MAX_TEXT_LENGTH = 1000
+export const MAX_REQUEST_CHARS = 12_000
 
 /** Berapa kalimat dikirim ke model dalam satu panggilan (35 untuk reliabilitas tinggi respon JSON). */
 const BATCH_SIZE = 35
@@ -55,13 +55,6 @@ async function ensureTable(): Promise<void> {
 }
 
 const hashOf = (text: string) => createHash('sha1').update(text).digest('hex')
-
-async function newTextsToday(): Promise<number> {
-  const rows = await db.execute<{ n: number }>(sql`
-    select count(*)::int as n from ui_translation where created_at >= date_trunc('day', now())
-  `)
-  return Number((rows as unknown as { n: number }[])[0]?.n ?? 0)
-}
 
 /** Minta model menerjemahkan satu kelompok kalimat. Null bila balasannya tidak bisa dipercaya. */
 async function translateBatch(texts: string[], locale: Locale): Promise<string[] | null> {
@@ -159,7 +152,18 @@ export interface TranslateResult {
   capped: boolean
 }
 
-export async function translateUiTexts(texts: string[], locale: Locale): Promise<TranslateResult> {
+export interface TranslateCaller {
+  /** Sidik alamat pemanggil (`callerHash`), bukan alamat mentah. */
+  ipHash: string
+  /** Diisi bila pemanggil sedang masuk; memindahkannya ke kantong anggota. */
+  userId?: number
+}
+
+export async function translateUiTexts(
+  texts: string[],
+  locale: Locale,
+  caller: TranslateCaller,
+): Promise<TranslateResult> {
   await ensureTable()
 
   const unique = [...new Set(texts)]
@@ -196,20 +200,30 @@ export async function translateUiTexts(texts: string[], locale: Locale): Promise
   let capped = false
   let translatedCount = 0
 
+  // Pagu dipesan sebelum model dipanggil, dan kalimat yang tidak muat
+  // dilewati utuh — memotong kalimat di tengah hanya menghasilkan terjemahan
+  // yang salah.
   if (missing.length > 0) {
-    const room = DAILY_NEW_TEXT_CEILING - (await newTextsToday())
-    if (room <= 0) {
-      capped = true
-      missing = []
-    } else if (missing.length > room) {
-      capped = true
-      missing = missing.slice(0, room)
-    }
-  }
+    const wanted = missing.reduce((sum, t) => sum + t.length, 0)
+    const allowance = await reserveTranslateChars(wanted, caller)
 
-  for (let i = 0; i < missing.length; i += BATCH_SIZE) {
-    const done = await translateAndStore(missing.slice(i, i + BATCH_SIZE), locale, cached)
-    translatedCount += done
+    let room = allowance.granted
+    const fitting = missing.filter((t) => {
+      if (t.length > room) return false
+      room -= t.length
+      return true
+    })
+    capped = fitting.length < missing.length
+    missing = fitting
+
+    for (let i = 0; i < missing.length; i += BATCH_SIZE) {
+      translatedCount += await translateAndStore(missing.slice(i, i + BATCH_SIZE), locale, cached)
+    }
+
+    // Yang tidak muat dan yang gagal diterjemahkan tidak membelanjakan apa pun
+    // yang layak dihitung, jadi pagunya dikembalikan.
+    const spent = missing.reduce((sum, t) => sum + (cached.has(hashOf(t)) ? t.length : 0), 0)
+    await allowance.release(allowance.granted - spent)
   }
 
   return {

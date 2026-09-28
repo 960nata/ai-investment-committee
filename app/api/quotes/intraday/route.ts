@@ -96,7 +96,7 @@ async function fetchBinanceIntraday(symbol: string): Promise<IntradayCandle[]> {
 async function fetchYahooIntraday(symbol: string): Promise<IntradayCandle[]> {
   try {
     const res = await fetchWithTimeout(
-      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=5m`,
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=5d&interval=5m`,
       {
         label: `Yahoo Intraday (${symbol})`,
         headers: { 'User-Agent': YAHOO_USER_AGENT },
@@ -131,7 +131,11 @@ async function fetchYahooIntraday(symbol: string): Promise<IntradayCandle[]> {
         volume: v ?? 0,
       })
     }
-    return candles
+    // range=1d kosong saat bursa tutup (akhir pekan, libur), jadi diambil 5 hari
+    // lalu dipotong ke 24 jam terakhir sebelum candle terakhir: sesi terakhir.
+    const last = candles[candles.length - 1]
+    if (!last) return candles
+    return candles.filter((c) => c.time > last.time - 86_400)
   } catch (err) {
     console.warn('[Intraday] Yahoo gagal:', err instanceof Error ? err.message : err)
     return []

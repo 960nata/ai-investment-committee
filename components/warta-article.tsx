@@ -169,7 +169,7 @@ export async function WartaArticle({ slug, locale }: { slug: string; locale: Loc
         lang={info.htmlLang}
         data-native-locale={locale}
       >
-        <div className="landing-section-container" style={{ maxWidth: 860 }}>
+        <div className="landing-section-container" style={{ maxWidth: 1200 }}>
           <div className="warta-toolbar">
             <Link href={localePath(locale, '/warta')} className="warta-back mono">
               <span>&larr;</span>
@@ -180,7 +180,9 @@ export async function WartaArticle({ slug, locale }: { slug: string; locale: Loc
             )}
           </div>
 
-          <article className="panel" style={{ padding: 'var(--space-5)' }}>
+          {/* Artikel di kiri, tiga warta terkait di kolom kanan. */}
+          <div className="warta-layout">
+          <article className="panel" style={{ padding: 'var(--space-5)', minWidth: 0 }}>
             <AdSlot slot={headerAd} />
 
             <header className="article-header">
@@ -339,34 +341,38 @@ export async function WartaArticle({ slug, locale }: { slug: string; locale: Loc
           </article>
 
           {related.length > 0 && (
-            <div style={{ marginTop: 'var(--space-6)' }}>
-              <div className="landing-section-head">
-                <h2 className="landing-section-title">{ui.related}</h2>
+            <aside className="warta-aside">
+              <div className="sidebar-widget">
+                <div className="sidebar-widget-head">
+                  <span className="sidebar-widget-title">{ui.related}</span>
+                </div>
+                <div className="warta-related-list">
+                  {related.map((item) => (
+                    <Link
+                      key={item.id}
+                      href={localePath(locale, `/warta/${item.slug}`)}
+                      className="warta-related-item"
+                    >
+                      {item.featuredImage?.url && (
+                        <div className="warta-related-img">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={item.featuredImage.url} alt={item.featuredImage.alt ?? item.title} />
+                        </div>
+                      )}
+                      <div className="sidebar-recent-meta">
+                        <span>{item.category.replace(/-/g, ' ').toUpperCase()}</span>
+                        <span>·</span>
+                        <span>{date(item.publishedAt, false)}</span>
+                      </div>
+                      <h3 className="warta-related-title">{item.title}</h3>
+                      <span className="news-read-link">{ui.readMore} &rarr;</span>
+                    </Link>
+                  ))}
+                </div>
               </div>
-              <div className="landing-news-grid">
-                {related.map((item) => (
-                  <article key={item.id} className="landing-news-card">
-                    <div className="news-card-meta">
-                      <span className="tag mono news-card-cat">{item.category}</span>
-                      <span className="mono news-card-impact">
-                        {ui.impact}: {item.impactScore}/10
-                      </span>
-                    </div>
-                    <h3 className="news-card-title">
-                      <Link href={localePath(locale, `/warta/${item.slug}`)}>{item.title}</Link>
-                    </h3>
-                    <p className="news-card-summary">{item.summary}</p>
-                    <div className="news-card-footer">
-                      <span className="mono news-card-date">{date(item.publishedAt, false)}</span>
-                      <Link href={localePath(locale, `/warta/${item.slug}`)} className="news-read-link">
-                        {ui.readMore} &rarr;
-                      </Link>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </div>
+            </aside>
           )}
+          </div>
         </div>
       </section>
 

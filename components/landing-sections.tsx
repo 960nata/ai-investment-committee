@@ -1,4 +1,6 @@
 import Link from 'next/link'
+import { DonationFooterLink } from '@/components/donation-footer-link'
+import { PremiumFooterLink } from '@/components/premium-footer-link'
 import { LandingPulseGrid, type PulseAsset } from '@/components/landing-pulse-grid'
 import type { LatestScore } from '@/lib/db/queries'
 import type { MarketNewsRow } from '@/lib/db/schema'
@@ -729,6 +731,8 @@ export function LandingDisclaimerFooter() {
             <Link href="/warta">Warta</Link>
             <Link href="/metodologi">Metodologi</Link>
             <Link href="/panduan">Panduan</Link>
+            <PremiumFooterLink />
+            <DonationFooterLink />
           </nav>
         </div>
         <p className="lp-disclaimer">

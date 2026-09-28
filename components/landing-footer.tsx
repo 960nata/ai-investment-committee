@@ -13,6 +13,8 @@
 
 import Link from 'next/link'
 import { IconPulse } from '@/components/icons'
+import { DonationFooterLink } from '@/components/donation-footer-link'
+import { PremiumFooterLink } from '@/components/premium-footer-link'
 
 export function LandingFooter() {
   return (
@@ -61,6 +63,8 @@ export function LandingFooter() {
             <Link href="/#cara-baca">Cara Membaca Putusan</Link>
             <Link href="/login">Masuk ke Akun (Pengguna)</Link>
             <Link href="/daftar">Daftar Akun Baru</Link>
+            <PremiumFooterLink />
+            <DonationFooterLink />
             <Link href="/admin/login" style={{ color: 'var(--signal)' }}>Portal Administrator</Link>
           </div>
         </div>

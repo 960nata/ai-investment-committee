@@ -7,6 +7,7 @@ import {
   USER_SESSION_COOKIE,
 } from '@/lib/auth/session'
 import { upsertAppUser, markUserLogin, getAppUserByEmail } from '@/lib/db/news-queries'
+import { countryFromRequest } from '@/lib/analytics/geo'
 
 export const dynamic = 'force-dynamic'
 
@@ -100,7 +101,7 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const { idToken, googleIdToken, name: fallbackName, email: fallbackEmail, photoUrl: fallbackPhoto } = parsed.data
+  const { idToken, googleIdToken, name: fallbackName, photoUrl: fallbackPhoto } = parsed.data
   const apiKey = process.env.FIREBASE_API_KEY || ''
 
   let verified: { email: string; name: string; avatarUrl?: string | null } | null = null
@@ -120,15 +121,9 @@ export async function POST(req: NextRequest) {
     verified = await verifyGoogleToken(idToken)
   }
 
-  // 4. Jika verifikasi token online ditolak tapi email cocok dengan profil
-  if (!verified && fallbackEmail) {
-    // Sebagai fallback aman jika server Google/Firebase sedang throttle
-    verified = {
-      email: fallbackEmail.toLowerCase(),
-      name: fallbackName || fallbackEmail.split('@')[0],
-      avatarUrl: fallbackPhoto || null,
-    }
-  }
+  // Tidak ada jalur cadangan yang mempercayai surel kiriman peramban. Surel
+  // yang tidak terverifikasi token berarti siapa pun bisa masuk sebagai siapa
+  // pun — termasuk sebagai admin — cukup dengan mengetikkan alamatnya.
 
   if (!verified || !verified.email) {
     return NextResponse.json(
@@ -148,8 +143,13 @@ export async function POST(req: NextRequest) {
 
     const initialAvatar = existing?.avatarUrl || verified.avatarUrl || fallbackPhoto || null
 
+    // Negara asal hanya dicari untuk akun yang belum punya; login berikutnya
+    // tidak perlu menelusuri IP lagi.
+    const country = existing?.country ? null : await countryFromRequest(req)
+
     const user = await upsertAppUser({
       email: verified.email,
+      country,
       name: verified.name || fallbackName || 'Pengguna Google',
       role: existing?.role ?? 'user',
       avatarUrl: initialAvatar,

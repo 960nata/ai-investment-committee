@@ -8,7 +8,7 @@
  * server. Yang di sini soal kesopanan antarmuka; yang di sana soal keamanan.
  */
 
-import { Suspense, useMemo, useState } from 'react'
+import { Suspense, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -19,6 +19,11 @@ import {
   IconCheck,
 } from '@/components/icons'
 import { GoogleSignInButton } from '@/components/google-sign-in-button'
+import {
+  TURNSTILE_SITE_KEY,
+  TurnstileWidget,
+  type TurnstileHandle,
+} from '@/components/turnstile-widget'
 
 export default function DaftarPage() {
   return (
@@ -45,6 +50,8 @@ function RegisterForm() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
+  const turnstile = useRef<TurnstileHandle>(null)
 
   // Daftar syarat yang sama persis dengan yang diberlakukan server.
   const rules = useMemo(
@@ -57,7 +64,9 @@ function RegisterForm() {
   )
 
   const passwordOk = rules.every((rule) => rule.met)
-  const canSubmit = name.trim().length >= 2 && email.includes('@') && passwordOk && !loading
+  const challengeOk = !TURNSTILE_SITE_KEY || Boolean(turnstileToken)
+  const canSubmit =
+    name.trim().length >= 2 && email.includes('@') && passwordOk && challengeOk && !loading
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
@@ -68,13 +77,16 @@ function RegisterForm() {
       const res = await fetch('/api/v1/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ name, email, password, turnstileToken }),
       })
 
       const data = await res.json()
       if (!res.ok || !data.ok) {
         setError(data.error || 'Pendaftaran gagal.')
         setLoading(false)
+        // Token Turnstile hanya sekali pakai, jadi percobaan berikutnya butuh
+        // token baru.
+        turnstile.current?.reset()
         return
       }
 
@@ -85,6 +97,7 @@ function RegisterForm() {
     } catch {
       setError('Gagal menghubungi server pendaftaran.')
       setLoading(false)
+      turnstile.current?.reset()
     }
   }
 
@@ -189,6 +202,8 @@ function RegisterForm() {
               ))}
             </ul>
           </div>
+
+          <TurnstileWidget ref={turnstile} action="register" onToken={setTurnstileToken} />
 
           <button type="submit" disabled={!canSubmit} className="btn btn-primary auth-submit">
             <IconGauge size={14} />

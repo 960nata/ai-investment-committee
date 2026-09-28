@@ -802,6 +802,13 @@ export const appUser = pgTable(
     // sandi, dan akun tanpa kata sandi memang tidak bisa dipakai masuk sendiri.
     passwordHash: varchar('password_hash', { length: 255 }),
     avatarUrl: text('avatar_url'),
+    // Premium aktif selama nilai ini di masa depan. Kosong = akun gratis.
+    // Diperpanjang dari nilai terbesar antara sekarang dan nilai lama, jadi
+    // membeli lagi sebelum habis tidak menghanguskan sisa hari.
+    premiumUntil: timestamp('premium_until', { withTimezone: true }),
+    // Kode negara ISO-3166 dari IP saat akun pertama kali dibuat. Hanya kodenya
+    // yang disimpan, bukan alamat IP-nya — lihat lib/analytics/geo.ts.
+    country: varchar('country', { length: 4 }),
     isActive: boolean('is_active').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
@@ -877,3 +884,226 @@ export const adSettings = pgTable(
 export type AdSettingsRow = typeof adSettings.$inferSelect
 export type NewAdSettings = typeof adSettings.$inferInsert
 
+
+// ---------------------------------------------------------------------------
+// Halaman donasi (bawaan tersembunyi)
+// ---------------------------------------------------------------------------
+
+/**
+ * Pengaturan halaman /donasi. Selalu tepat satu baris, id = 1.
+ *
+ * Metode donasi disimpan sebagai satu larik JSONB, bukan tabel sendiri: yang
+ * mengubahnya hanya admin, selalu sekaligus lewat satu tombol simpan, dan
+ * urutannya bagian dari isinya. Bentuk tiap butir divalidasi
+ * `DonationMethodSchema` di `lib/donation/providers.ts` sebelum ditulis.
+ */
+export const donationSettings = pgTable('donation_settings', {
+  id: integer('id').primaryKey(),
+  isEnabled: boolean('is_enabled').notNull().default(false),
+  title: varchar('title', { length: 120 }).notNull(),
+  message: text('message').notNull(),
+  methods: jsonb('methods').notNull().default([]),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export type DonationSettingsRow = typeof donationSettings.$inferSelect
+
+// ---------------------------------------------------------------------------
+// Alat investor (Beta): pengumuman, watchlist, portofolio, alert, notifikasi
+// ---------------------------------------------------------------------------
+//
+// Tabel di bawah juga dibuat lazy lewat `ensureMemberTables()` di
+// `lib/db/member-queries.ts`, dengan DDL `IF NOT EXISTS` yang sama bentuknya
+// dengan migrasi 0010. Dua jalur itu aman berdampingan karena keduanya
+// idempoten.
+
+/**
+ * Pengumuman dari admin untuk semua pengguna dashboard.
+ *
+ * `tone` hanya tiga, supaya warnanya tetap berarti: `info` untuk kabar biasa,
+ * `beta` untuk fitur yang masih diuji, `penting` untuk hal yang menuntut
+ * tindakan. Kalau semua pengumuman "penting", tidak ada yang penting.
+ */
+export const announcement = pgTable(
+  'announcement',
+  {
+    id: serial('id').primaryKey(),
+    title: varchar('title', { length: 160 }).notNull(),
+    body: text('body').notNull(),
+    tone: varchar('tone', { length: 16 }).notNull().default('info'),
+    linkUrl: text('link_url'),
+    linkLabel: varchar('link_label', { length: 64 }),
+    isActive: boolean('is_active').notNull().default(true),
+    startsAt: timestamp('starts_at', { withTimezone: true }).notNull().defaultNow(),
+    /** Kosong berarti tampil sampai dimatikan admin. */
+    endsAt: timestamp('ends_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('announcement_active_idx').on(t.isActive, t.startsAt)],
+)
+
+export type AnnouncementRow = typeof announcement.$inferSelect
+
+/** Pengumuman yang sudah ditutup seorang pengguna, supaya tidak muncul lagi. */
+export const announcementDismissal = pgTable(
+  'announcement_dismissal',
+  {
+    userId: integer('user_id')
+      .notNull()
+      .references(() => appUser.id, { onDelete: 'cascade' }),
+    announcementId: integer('announcement_id')
+      .notNull()
+      .references(() => announcement.id, { onDelete: 'cascade' }),
+    dismissedAt: timestamp('dismissed_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.announcementId] })],
+)
+
+export const watchlistItem = pgTable(
+  'watchlist_item',
+  {
+    userId: integer('user_id')
+      .notNull()
+      .references(() => appUser.id, { onDelete: 'cascade' }),
+    instrumentId: integer('instrument_id')
+      .notNull()
+      .references(() => instrument.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.instrumentId] })],
+)
+
+/**
+ * Posisi yang dicatat pengguna sendiri. Bukan rekening sungguhan — tidak ada
+ * uang yang bergerak, dan harga belinya apa pun yang diketik pengguna.
+ */
+export const portfolioPosition = pgTable(
+  'portfolio_position',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => appUser.id, { onDelete: 'cascade' }),
+    instrumentId: integer('instrument_id')
+      .notNull()
+      .references(() => instrument.id, { onDelete: 'cascade' }),
+    /** Dalam satuan instrumen (lembar, koin, troy ounce), bukan lot. */
+    quantity: numeric('quantity', { precision: 24, scale: 8 }).notNull(),
+    avgPrice: numeric('avg_price', { precision: 24, scale: 8 }).notNull(),
+    openedAt: date('opened_at'),
+    note: text('note'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('portfolio_position_user_idx').on(t.userId)],
+)
+
+/**
+ * Aturan alert.
+ *
+ * `kind`: `harga_di_atas` | `harga_di_bawah` | `skor_di_atas` | `skor_di_bawah`
+ * | `putusan_berubah`. Alert harga dan skor sekali-picu: setelah terpicu ia
+ * dimatikan, supaya harga yang bertahan di atas ambang tidak mengirim
+ * notifikasi tiap jam. Alert putusan tetap hidup dan mengingat putusan terakhir
+ * yang sudah dilaporkan.
+ */
+export const priceAlert = pgTable(
+  'price_alert',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => appUser.id, { onDelete: 'cascade' }),
+    instrumentId: integer('instrument_id')
+      .notNull()
+      .references(() => instrument.id, { onDelete: 'cascade' }),
+    kind: varchar('kind', { length: 24 }).notNull(),
+    threshold: numeric('threshold', { precision: 24, scale: 8 }),
+    horizon: horizonEnum('horizon'),
+    lastVerdict: varchar('last_verdict', { length: 16 }),
+    isActive: boolean('is_active').notNull().default(true),
+    triggeredAt: timestamp('triggered_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('price_alert_user_idx').on(t.userId),
+    index('price_alert_active_idx').on(t.isActive),
+  ],
+)
+
+export type PriceAlertRow = typeof priceAlert.$inferSelect
+
+export const userNotification = pgTable(
+  'user_notification',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => appUser.id, { onDelete: 'cascade' }),
+    title: varchar('title', { length: 200 }).notNull(),
+    body: text('body').notNull(),
+    linkUrl: text('link_url'),
+    readAt: timestamp('read_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('user_notification_user_idx').on(t.userId, t.createdAt)],
+)
+
+export type UserNotificationRow = typeof userNotification.$inferSelect
+
+// ---------------------------------------------------------------------------
+// Premium (bawaan tersembunyi) dan pesanan Tripay
+// ---------------------------------------------------------------------------
+
+/**
+ * Pengaturan halaman /premium. Selalu tepat satu baris, id = 1.
+ *
+ * Paket, poin keuntungan, dan batas per tingkat disimpan sebagai JSONB dengan
+ * alasan yang sama seperti `donation_settings`: yang mengubahnya hanya admin,
+ * sekaligus lewat satu tombol simpan. Bentuknya divalidasi
+ * `PremiumSettingsSchema` di `lib/premium/plans.ts` sebelum ditulis.
+ */
+export const premiumSettings = pgTable('premium_settings', {
+  id: integer('id').primaryKey(),
+  isEnabled: boolean('is_enabled').notNull().default(false),
+  title: varchar('title', { length: 120 }).notNull(),
+  message: text('message').notNull(),
+  benefits: jsonb('benefits').notNull().default([]),
+  plans: jsonb('plans').notNull().default([]),
+  limits: jsonb('limits').notNull().default({}),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export type PremiumSettingsRow = typeof premiumSettings.$inferSelect
+
+/**
+ * Satu baris per tagihan. Paket, durasi, dan nominal disalin saat pesanan
+ * dibuat: admin boleh mengubah harga besok, tetapi pembeli hari ini tetap
+ * mendapat persis yang ia bayar.
+ */
+export const premiumOrder = pgTable(
+  'premium_order',
+  {
+    id: serial('id').primaryKey(),
+    merchantRef: varchar('merchant_ref', { length: 64 }).notNull(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => appUser.id, { onDelete: 'cascade' }),
+    planId: varchar('plan_id', { length: 40 }).notNull(),
+    planLabel: varchar('plan_label', { length: 60 }).notNull(),
+    days: integer('days').notNull(),
+    amount: integer('amount').notNull(),
+    method: varchar('method', { length: 32 }).notNull(),
+    // 'UNPAID' | 'PAID' | 'EXPIRED' | 'FAILED' | 'REFUND' | 'GRANTED'
+    status: varchar('status', { length: 16 }).notNull().default('UNPAID'),
+    tripayReference: varchar('tripay_reference', { length: 64 }),
+    checkoutUrl: text('checkout_url'),
+    paidAt: timestamp('paid_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('premium_order_ref_uq').on(t.merchantRef),
+    index('premium_order_user_idx').on(t.userId, t.createdAt),
+  ],
+)
+
+export type PremiumOrderRow = typeof premiumOrder.$inferSelect

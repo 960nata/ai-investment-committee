@@ -30,6 +30,7 @@ import { runMacroJob } from '@/lib/macro/job'
 import { runAutoNewsJob } from '@/lib/agents/auto-news'
 import { translateMissingNews } from '@/lib/agents/news-translator'
 import { publishJob } from '@/lib/queue/qstash'
+import { evaluateAlerts } from '@/lib/member/alerts'
 
 export const dynamic = 'force-dynamic'
 
@@ -60,6 +61,7 @@ const HANDLERS: Record<string, (payload: JobPayload) => Promise<BatchResult>> = 
   'komite-review': reviewCommittee,
   'warta-otomatis': autoNewsBatch,
   'warta-terjemah': translateNewsBatch,
+  'evaluasi-alert': alertBatch,
 }
 
 interface BatchResult {
@@ -351,6 +353,23 @@ async function macroBatch(): Promise<BatchResult> {
     quarantined: 0,
     errors: r.errors,
     extra: { macroRows: r.rowsWritten },
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Alert pengguna
+// ---------------------------------------------------------------------------
+
+/** Seluruh alert aktif dinilai terhadap penutupan, skor, dan putusan terbaru. */
+async function alertBatch(): Promise<BatchResult> {
+  const r = await evaluateAlerts()
+  return {
+    itemsProcessed: r.checked,
+    itemsFailed: 0,
+    candlesWritten: 0,
+    quarantined: 0,
+    errors: [],
+    extra: { alertsFired: r.fired, alertsPrimed: r.primed },
   }
 }
 

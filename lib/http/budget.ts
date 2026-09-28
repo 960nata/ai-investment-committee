@@ -162,9 +162,12 @@ function secondsUntilReset(): number {
  */
 export async function reserveLlmBudget(
   channel: SpendChannel,
-  options: { userId?: number; units?: number } = {},
+  options: { userId?: number; units?: number; perUserLimit?: number } = {},
 ): Promise<BudgetVerdict> {
   const units = options.units ?? 1
+  // Batas per akun dari pengaturan Premium (gratis vs Premium) bila diberikan;
+  // selain itu dari env seperti sebelumnya.
+  const perUserLimit = options.perUserLimit ?? perUserCeiling()
   const total = ceiling()
   const limit = channel === 'public' ? Math.floor(total * PUBLIC_SHARE) : total
   const resetSeconds = secondsUntilReset()
@@ -179,7 +182,7 @@ export async function reserveLlmBudget(
     }
 
     const fallbackLimit = Math.max(5, Math.floor(limit / 4))
-    const fallbackUser = Math.max(3, Math.floor(perUserCeiling() / 4))
+    const fallbackUser = Math.max(3, Math.floor(perUserLimit / 4))
     const { used, userCount } = localSpend(channel, units, options.userId)
 
     if (options.userId !== undefined && userCount > fallbackUser) {
@@ -212,7 +215,7 @@ export async function reserveLlmBudget(
       const count = await redis.incr(key)
       if (count === 1) await redis.expire(key, resetSeconds)
 
-      const perUser = perUserCeiling()
+      const perUser = perUserLimit
       if (count > perUser) {
         return {
           allowed: false,
@@ -343,6 +346,227 @@ export async function budgetStatus(): Promise<BudgetStatus> {
     }
   } catch (err) {
     console.error('[Budget] gagal membaca keadaan pagu:', err)
+    return base
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Pagu terjemahan antarmuka
+// ---------------------------------------------------------------------------
+
+/*
+ * Endpoint terjemahan terbuka untuk tamu, dan teksnya datang dari peramban —
+ * tidak ada cara bagi server untuk tahu apakah sebuah kalimat memang tampil di
+ * halaman atau dikarang pemanggil. Yang bisa dijamin hanyalah berapa banyak
+ * yang boleh dibelanjakan untuknya.
+ *
+ * Satuannya karakter, bukan kalimat. Pagu per kalimat bisa dikuras dengan
+ * mengirim kalimat sepanjang batas maksimum; pagu per karakter tidak peduli
+ * bagaimana teksnya dipotong.
+ *
+ * Tiga kantong, supaya satu penyalahguna tidak bisa menghabiskan milik orang
+ * lain:
+ *   - tiap alamat tamu punya jatahnya sendiri;
+ *   - seluruh tamu bersama-sama hanya boleh memakai sebagian pagu harian;
+ *   - tiap akun punya jatahnya sendiri, di luar kantong tamu.
+ * Bot tanpa akun paling jauh menghabiskan kantong tamu — anggota tetap mendapat
+ * terjemahan hari itu.
+ */
+
+function envInt(name: string, fallback: number): number {
+  const raw = Number(process.env[name])
+  return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : fallback
+}
+
+const translateLimits = () => ({
+  total: envInt('UI_TRANSLATE_DAILY_CHARS', 400_000),
+  guestShare: 0.4,
+  perIp: envInt('UI_TRANSLATE_DAILY_PER_IP', 30_000),
+  perUser: envInt('UI_TRANSLATE_DAILY_PER_USER', 60_000),
+})
+
+interface Bucket {
+  key: string
+  limit: number
+}
+
+function translateBuckets(caller: { ipHash: string; userId?: number }): Bucket[] {
+  const limits = translateLimits()
+  const buckets: Bucket[] = [{ key: todayKey('tr:all'), limit: limits.total }]
+
+  if (caller.userId !== undefined) {
+    buckets.push({ key: todayKey(`tr:user:${caller.userId}`), limit: limits.perUser })
+  } else {
+    buckets.push({ key: todayKey('tr:guest'), limit: Math.floor(limits.total * limits.guestShare) })
+    buckets.push({ key: todayKey(`tr:ip:${caller.ipHash}`), limit: limits.perIp })
+  }
+  return buckets
+}
+
+/** Penghitung cadangan tanpa Redis; lihat catatan `localCounter` di atas. */
+const localBuckets = { day: '', counts: new Map<string, number>() }
+
+function localBucketCounts(): Map<string, number> {
+  const today = new Date().toISOString().slice(0, 10)
+  if (localBuckets.day !== today) {
+    localBuckets.day = today
+    localBuckets.counts.clear()
+  }
+  return localBuckets.counts
+}
+
+function localAdd(buckets: Bucket[], units: number): number[] {
+  const counts = localBucketCounts()
+  return buckets.map(({ key }) => {
+    const next = (counts.get(key) ?? 0) + units
+    counts.set(key, Math.max(0, next))
+    return next
+  })
+}
+
+/**
+ * Pesan sebanyak mungkin dari `units` di seluruh kantong sekaligus.
+ *
+ * Tiap kantong dinaikkan lebih dulu dengan INCRBY — atomik, jadi permintaan
+ * yang datang bersamaan tidak bisa sama-sama membaca "masih ada ruang" lalu
+ * sama-sama melampauinya. Yang diberikan adalah ruang tersempit di antara
+ * kantong-kantong itu, dan kelebihannya dikembalikan ke semuanya.
+ *
+ * Permintaan yang bersamaan bisa saling melihat pesanan sementara milik yang
+ * lain dan menerima sedikit lebih kecil daripada yang sebenarnya tersedia.
+ * Itu sengaja: kesalahan ke arah hemat.
+ */
+async function reserveAcross(
+  buckets: Bucket[],
+  units: number,
+): Promise<{ granted: number; degraded: boolean }> {
+  if (units <= 0) return { granted: 0, degraded: false }
+
+  const resetSeconds = secondsUntilReset()
+  const grantFrom = (after: number[], limits: number[]) =>
+    Math.max(
+      0,
+      Math.min(units, ...after.map((value, i) => limits[i] - (value - units))),
+    )
+
+  const redis = redisClient()
+  if (redis) {
+    try {
+      const pipeline = redis.pipeline()
+      for (const { key } of buckets) pipeline.incrby(key, units)
+      const after = (await pipeline.exec()) as number[]
+
+      const granted = grantFrom(after, buckets.map((b) => b.limit))
+      const excess = units - granted
+
+      const followUp = redis.pipeline()
+      buckets.forEach(({ key }, i) => {
+        if (after[i] === units) followUp.expire(key, resetSeconds)
+        if (excess > 0) followUp.decrby(key, excess)
+      })
+      if (excess > 0 || after.some((value) => value === units)) await followUp.exec()
+
+      return { granted, degraded: false }
+    } catch (err) {
+      console.error('[Budget] pagu terjemahan tidak terjangkau:', err)
+    }
+  }
+
+  // Tanpa Redis tiap instance menghitung sendiri, jadi pagunya dipotong
+  // seperempat — alasan yang sama dengan pagu rapat di atas.
+  const limits = buckets.map((b) => Math.max(1_000, Math.floor(b.limit / 4)))
+  const after = localAdd(buckets, units)
+  const granted = grantFrom(after, limits)
+  if (units - granted > 0) localAdd(buckets, -(units - granted))
+  return { granted, degraded: true }
+}
+
+async function releaseAcross(buckets: Bucket[], units: number, degraded: boolean): Promise<void> {
+  if (units <= 0) return
+
+  const redis = redisClient()
+  if (redis && !degraded) {
+    try {
+      const pipeline = redis.pipeline()
+      for (const { key } of buckets) pipeline.decrby(key, units)
+      await pipeline.exec()
+      return
+    } catch (err) {
+      console.error('[Budget] gagal mengembalikan pagu terjemahan:', err)
+    }
+  }
+  localAdd(buckets, -units)
+}
+
+export interface TranslateAllowance {
+  /** Karakter yang boleh dikirim ke model. */
+  granted: number
+  /** Kembalikan karakter yang tidak jadi dipakai. */
+  release(units: number): Promise<void>
+}
+
+/**
+ * Pesan pagu karakter untuk teks yang belum ada di cache.
+ *
+ * `ipHash` sudah berupa sidik, bukan alamat mentah, supaya alamat pengunjung
+ * tidak pernah tersimpan sebagai kunci Redis.
+ */
+export async function reserveTranslateChars(
+  units: number,
+  caller: { ipHash: string; userId?: number },
+): Promise<TranslateAllowance> {
+  const buckets = translateBuckets(caller)
+  const { granted, degraded } = await reserveAcross(buckets, units)
+  return {
+    granted,
+    release: (unused) => releaseAcross(buckets, Math.min(unused, granted), degraded),
+  }
+}
+
+export interface TranslateBudgetStatus {
+  used: number
+  ceiling: number
+  guestUsed: number
+  guestCeiling: number
+  tracked: boolean
+}
+
+/** Keadaan pagu terjemahan hari ini, untuk layar admin. */
+export async function translateBudgetStatus(): Promise<TranslateBudgetStatus> {
+  const limits = translateLimits()
+  const base: TranslateBudgetStatus = {
+    used: 0,
+    ceiling: limits.total,
+    guestUsed: 0,
+    guestCeiling: Math.floor(limits.total * limits.guestShare),
+    tracked: false,
+  }
+
+  const redis = redisClient()
+  if (!redis) {
+    const counts = localBucketCounts()
+    return {
+      ...base,
+      used: counts.get(todayKey('tr:all')) ?? 0,
+      guestUsed: counts.get(todayKey('tr:guest')) ?? 0,
+    }
+  }
+
+  try {
+    const [used, guestUsed] = (await redis
+      .pipeline()
+      .get(todayKey('tr:all'))
+      .get(todayKey('tr:guest'))
+      .exec()) as (number | string | null)[]
+
+    return {
+      ...base,
+      used: Number(used ?? 0) || 0,
+      guestUsed: Number(guestUsed ?? 0) || 0,
+      tracked: true,
+    }
+  } catch (err) {
+    console.error('[Budget] gagal membaca pagu terjemahan:', err)
     return base
   }
 }

@@ -14,6 +14,7 @@ import {
   mistralAdapter,
   nvidiaAdapter,
   openRouterAdapter,
+  premiumAdapter,
 } from './providers/openai-compatible'
 import type { LlmAdapter } from './types'
 
@@ -25,3 +26,12 @@ export const LLM_ADAPTERS: LlmAdapter[] = [
   mistralAdapter,
   nvidiaAdapter,
 ]
+
+/**
+ * Model berbayar untuk permintaan bertingkat 'premium'. Dipisah dari rantai di
+ * atas supaya permintaan biasa tidak pernah membelanjakan kunci berbayar.
+ */
+export const PREMIUM_LLM_ADAPTERS: LlmAdapter[] = [premiumAdapter]
+
+/** Seluruh adaptor, untuk telemetri dan dashboard admin. */
+export const ALL_LLM_ADAPTERS: LlmAdapter[] = [...LLM_ADAPTERS, ...PREMIUM_LLM_ADAPTERS]

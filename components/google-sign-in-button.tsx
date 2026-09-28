@@ -55,6 +55,23 @@ async function prepareAuth(): Promise<PreparedAuth> {
   }
 }
 
+/**
+ * Peramban bawaan aplikasi (WhatsApp, Instagram, Facebook, LINE, TikTok, dsb.).
+ * Google menolak login dari WebView seperti ini (`disallowed_useragent`), dan
+ * tab popup-nya tidak bisa menyerahkan hasil kembali ke halaman.
+ */
+function isInAppBrowser(): boolean {
+  if (typeof navigator === 'undefined') return false
+  const ua = navigator.userAgent || ''
+  return /FBAN|FBAV|FB_IAB|Instagram|Line\/|WhatsApp|musical_ly|TikTok|Twitter|Snapchat|; wv\)/i.test(ua)
+}
+
+/**
+ * Popup yang ditutup setelah selama ini hampir pasti bukan pembatalan: pengguna
+ * sudah sempat memilih akun, tetapi hasilnya tidak sampai ke halaman ini.
+ */
+const LIKELY_COMPLETED_MS = 4000
+
 interface GoogleSignInButtonProps {
   label?: string
   nextPath?: string
@@ -94,7 +111,16 @@ export function GoogleSignInButton({
 
   async function handleGoogleLogin() {
     reportError(null)
+
+    if (isInAppBrowser()) {
+      reportError(
+        'Login Google tidak bisa dari browser di dalam aplikasi (WhatsApp, Instagram, dll.). Buka situs ini di Chrome atau Safari lewat menu ⋮ / "Buka di browser", lalu coba lagi.',
+      )
+      return
+    }
+
     setLoading(true)
+    const startedAt = Date.now()
 
     try {
       let ready = readyAuth.current
@@ -162,7 +188,14 @@ export function GoogleSignInButton({
         errCode === 'auth/popup-closed-by-user' ||
         errCode === 'auth/cancelled-popup-request'
       ) {
-        // Pengguna sengaja menutup jendela popup Google — tidak perlu error mencolok
+        // Ditutup cepat berarti pengguna memang membatalkan — tidak perlu pesan.
+        // Ditutup setelah lama berarti akun sudah dipilih tetapi hasilnya tidak
+        // sampai; diam di sini membuat kegagalan terlihat seperti pembatalan.
+        if (Date.now() - startedAt >= LIKELY_COMPLETED_MS) {
+          reportError(
+            'Login Google belum selesai. Kalau Anda sudah memilih akun, coba ketuk tombolnya sekali lagi. Bila tetap gagal, pastikan memakai Chrome atau Safari (bukan mode penyamaran yang memblokir cookie pihak ketiga).',
+          )
+        }
         return
       }
 

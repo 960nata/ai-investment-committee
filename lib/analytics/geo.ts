@@ -211,6 +211,23 @@ export async function lookupGeo(ip: string): Promise<VisitorGeo> {
   }
 }
 
+/**
+ * Kode negara pemanggil, atau null kalau tidak bisa diketahui.
+ *
+ * Header tepi jaringan dipakai lebih dulu; penelusuran luar hanya dijalankan
+ * kalau header itu kosong.
+ */
+export async function countryFromRequest(request: Request): Promise<string | null> {
+  const edge = geoFromHeaders(request)
+  if (edge.country) return edge.country.toUpperCase()
+
+  const ip = clientIp(request)
+  if (!ip) return null
+
+  const geo = await lookupGeo(ip)
+  return geo.country ? geo.country.toUpperCase() : null
+}
+
 /** Kelas perangkat kasar dari agen peramban. Cukup untuk membelah tiga. */
 export function deviceClass(userAgent: string | null): string {
   if (!userAgent) return 'unknown'

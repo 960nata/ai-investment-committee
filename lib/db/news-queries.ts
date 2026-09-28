@@ -22,6 +22,19 @@ import { SOURCE_LOCALE, TRANSLATED_LOCALES, type Locale } from '@/lib/i18n/local
 let tablesInitialized = false
 
 /**
+ * Kolom yang ditambahkan sesudah tabelnya telanjur ada di produksi.
+ *
+ * DDL besar di bawah dilewati begitu market_news sudah ada, jadi kolom baru
+ * tidak boleh hanya ditaruh di sana — basis data lama tidak akan pernah
+ * menjalankannya. Pernyataan ini murah dan idempoten, cukup sekali per proses.
+ */
+async function ensureLateColumns(): Promise<void> {
+  await db.execute(sql`
+    ALTER TABLE app_user ADD COLUMN IF NOT EXISTS country VARCHAR(4);
+  `)
+}
+
+/**
  * Pastikan tabel market_news, ad_settings, dan app_user ada di Postgres.
  * Berjalan sekali secara lazy tanpa memblokir runtime aplikasi.
  */
@@ -34,6 +47,7 @@ export async function ensureNewsTable(): Promise<void> {
       SELECT to_regclass('market_news') IS NOT NULL AS exists;
     `)
     if (res[0]?.exists) {
+      await ensureLateColumns()
       tablesInitialized = true
       return
     }
@@ -126,15 +140,14 @@ export async function ensureNewsTable(): Promise<void> {
       ('footer_banner', 'Footer Anchor Banner', 'Slot banner penutup sebelum navigasi kaki artikel', FALSE)
     ON CONFLICT (slot_name) DO NOTHING;
 
-    -- Seed akun demo admin dan demo user ke database
+    -- Seed akun admin utama. Akun demo tidak lagi dibuat.
     INSERT INTO app_user (email, name, role, is_active)
     VALUES
-      ('admin@komite.id', 'Kepala Komite (Super Admin)', 'admin', TRUE),
-      ('analis.demo@komite.id', 'Analis Kuantitatif (Demo User)', 'user', TRUE),
-      ('strateg.demo@komite.id', 'Strateg Portofolio (Demo User)', 'user', TRUE),
-      ('risiko.demo@komite.id', 'Pengawas Risiko (Demo User)', 'user', TRUE)
+      ('admin@komite.id', 'Kepala Komite (Super Admin)', 'admin', TRUE)
     ON CONFLICT (email) DO NOTHING;
   `)
+
+  await ensureLateColumns()
 
   tablesInitialized = true
 }
@@ -379,6 +392,7 @@ const PUBLIC_USER_COLUMNS = {
   name: appUser.name,
   role: appUser.role,
   avatarUrl: appUser.avatarUrl,
+  country: appUser.country,
   isActive: appUser.isActive,
   createdAt: appUser.createdAt,
   lastLoginAt: appUser.lastLoginAt,
@@ -428,6 +442,7 @@ export async function registerAppUser(input: {
   email: string
   name: string
   passwordHash: string
+  country?: string | null
 }): Promise<{ ok: true; user: PublicAppUser } | { ok: false; reason: 'taken' }> {
   await ensureNewsTable()
 
@@ -441,6 +456,7 @@ export async function registerAppUser(input: {
       role: 'user',
       isActive: true,
       passwordHash: input.passwordHash,
+      country: input.country ?? null,
       lastLoginAt: new Date(),
     })
     .onConflictDoUpdate({
@@ -448,6 +464,7 @@ export async function registerAppUser(input: {
       set: {
         name: input.name,
         passwordHash: input.passwordHash,
+        country: sql`COALESCE(${appUser.country}, excluded.country)`,
         lastLoginAt: new Date(),
       },
       // Hanya baris undangan — yang belum punya kata sandi — yang boleh terisi.
@@ -488,6 +505,9 @@ export async function upsertAppUser(user: NewAppUser): Promise<PublicAppUser> {
       target: appUser.email,
       set: {
         name: user.name,
+        // Negara asal ditetapkan sekali, saat pertama kali diketahui, dan tidak
+        // ditimpa oleh login dari tempat lain sesudahnya.
+        country: sql`COALESCE(${appUser.country}, excluded.country)`,
         lastLoginAt: new Date(),
       },
     })

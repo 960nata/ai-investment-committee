@@ -25,6 +25,7 @@ import { AssetIcon } from './asset-icons'
 import { Blank } from './ui'
 import { ScorePanel, type HorizonView } from './score-panel'
 import { CommitteeBoardroom } from './committee-boardroom'
+import { WatchToggle } from './member/watch-toggle'
 import type { TabGroup } from '@/lib/db/schema'
 
 interface LiveQuoteData {
@@ -56,6 +57,8 @@ interface Props {
   initialCandles: Candle[]
   /** Tab yang diminta lewat alamat, misalnya dari menu atau pita harga. */
   initialTab?: string | null
+  /** Instrumen di watchlist pengguna, untuk keadaan awal tombol Pantau. */
+  watchlistIds?: number[]
 }
 
 export function InstrumentExplorer({
@@ -65,6 +68,7 @@ export function InstrumentExplorer({
   initialInstrumentId,
   initialCandles,
   initialTab: requestedTab,
+  watchlistIds = [],
 }: Props) {
   const initial = instruments.find((i) => i.id === initialInstrumentId)
 
@@ -81,7 +85,7 @@ export function InstrumentExplorer({
   const [region, setRegion] = useState<RegionFilter>('semua')
   const [selectedId, setSelectedId] = useState(initialInstrumentId)
   const [candles, setCandles] = useState(initialCandles)
-  const [range, setRange] = useState<ChartRangeId>('1Y')
+  const [range, setRange] = useState<ChartRangeId>('1D')
   const [showBoardroom, setShowBoardroom] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
@@ -91,6 +95,7 @@ export function InstrumentExplorer({
   const [livePrice, setLivePrice] = useState<number | null>(null)
   const [tickDirection, setTickDirection] = useState<'up' | 'down' | null>(null)
   const [isLiveMotion, setIsLiveMotion] = useState(true)
+  const [watched, setWatched] = useState(() => new Set(watchlistIds))
 
   const isIntraday = range === '1D'
 
@@ -447,6 +452,19 @@ export function InstrumentExplorer({
                 <RegionFlag region={selected.region} size={12} />
               )}
               {selected.name}
+              <WatchToggle
+                key={selected.id}
+                instrumentId={selected.id}
+                initialOn={watched.has(selected.id)}
+                onChange={(on) =>
+                  setWatched((prev) => {
+                    const next = new Set(prev)
+                    if (on) next.add(selected.id)
+                    else next.delete(selected.id)
+                    return next
+                  })
+                }
+              />
             </span>
           )}
           {(() => {

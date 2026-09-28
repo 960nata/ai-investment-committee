@@ -10,7 +10,7 @@
  * latensinya paling rendah; yang di bawah adalah jaring pengaman berbayar.
  */
 
-import { LLM_ADAPTERS } from './adapters'
+import { LLM_ADAPTERS, PREMIUM_LLM_ADAPTERS } from './adapters'
 import { collectKeys, nextKey, penalise, poolStatus, type PooledKey } from './keyring'
 import { recordLlmCall } from './telemetry'
 import { LlmError, type LlmAdapter, type LlmRequest, type LlmResponse } from './types'
@@ -33,6 +33,17 @@ interface ProviderEntry {
  */
 
 let entries: ProviderEntry[] | null = null
+let premiumEntries: ProviderEntry[] | null = null
+
+/** Kunci berbayar yang terpasang. Diam saja bila kosong: Premium memang opsional. */
+function getPremiumEntries(): ProviderEntry[] {
+  if (premiumEntries) return premiumEntries
+  premiumEntries = PREMIUM_LLM_ADAPTERS.map((adapter) => ({
+    adapter,
+    pool: collectKeys(adapter.envPrefix),
+  })).filter((entry) => entry.pool.length > 0)
+  return premiumEntries
+}
 
 function getEntries(): ProviderEntry[] {
   if (entries) return entries
@@ -56,6 +67,7 @@ function getEntries(): ProviderEntry[] {
 /** Dipakai pengujian dan saat env berubah di mode pengembangan. */
 export function resetRegistry(): void {
   entries = null
+  premiumEntries = null
 }
 
 export interface AttemptLog {
@@ -89,8 +101,10 @@ export class AllProvidersFailedError extends Error {
  */
 export async function complete(request: LlmRequest): Promise<LlmResponse> {
   const attempts: AttemptLog[] = []
+  const chain =
+    request.tier === 'premium' ? [...getPremiumEntries(), ...getEntries()] : getEntries()
 
-  for (const entry of getEntries()) {
+  for (const entry of chain) {
     const { adapter, pool } = entry
     const tries = Math.min(MAX_KEYS_PER_PROVIDER, pool.length)
 

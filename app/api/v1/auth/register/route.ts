@@ -15,6 +15,9 @@ import {
   USER_SESSION_COOKIE,
 } from '@/lib/auth/session'
 import { registerAppUser } from '@/lib/db/news-queries'
+import { countryFromRequest } from '@/lib/analytics/geo'
+import { verifyTurnstile } from '@/lib/auth/turnstile'
+import { callerIp } from '@/lib/http/blocklist'
 
 export const dynamic = 'force-dynamic'
 
@@ -47,11 +50,24 @@ export async function POST(req: NextRequest) {
 
   const { name, email, password } = parsed.data
 
+  const challenge = await verifyTurnstile(
+    (body as { turnstileToken?: unknown }).turnstileToken,
+    callerIp(req),
+    'register',
+  )
+  if (!challenge.ok) {
+    return NextResponse.json(
+      { ok: false, error: 'Verifikasi keamanan gagal. Muat ulang halaman lalu coba lagi.' },
+      { status: 403 },
+    )
+  }
+
   try {
     const result = await registerAppUser({
       email,
       name,
       passwordHash: await hashPassword(password),
+      country: await countryFromRequest(req),
     })
 
     if (!result.ok) {

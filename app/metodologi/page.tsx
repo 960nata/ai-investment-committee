@@ -14,6 +14,9 @@ import { STALE_AFTER_MINUTES } from '@/lib/db/queries'
 import { VERDICT_LABEL, VERDICT_MEANING, type VerdictValue } from '@/lib/format/verdict'
 import { LandingDisclaimerFooter, WORKFLOW } from '@/components/landing-sections'
 
+// Isinya statis, tetapi kaki halamannya ikut sakelar halaman donasi.
+export const revalidate = 60
+
 export const metadata: Metadata = {
   title: 'Metodologi',
   description:
