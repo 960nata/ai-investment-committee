@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { LandingNav } from '@/components/landing-nav'
+import { listInstrumentQuotes } from '@/lib/db/queries'
 import { LandingFooter } from '@/components/landing-footer'
 import { IconArrowRight, IconHeart, IconQr } from '@/components/icons'
 import { getCurrentUser } from '@/lib/auth/user-auth'
@@ -65,11 +66,13 @@ export default async function DonationPage({
 }: {
   searchParams: Promise<{ pratinjau?: string }>
 }) {
-  const [{ pratinjau }, settings, user, isAdmin] = await Promise.all([
+  const [{ pratinjau }, settings, user, isAdmin, instruments] = await Promise.all([
     searchParams,
     getDonationSettings().catch(() => null),
     getCurrentUser(),
     verifyAdminSession().catch(() => false),
+    // Pita harga di header. Pelengkap — kegagalannya tidak boleh menjatuhkan halaman.
+    listInstrumentQuotes().catch(() => []),
   ])
 
   const preview = !settings?.isEnabled && pratinjau === '1' && isAdmin
@@ -88,7 +91,7 @@ export default async function DonationPage({
 
   return (
     <div className="landing-shell">
-      <LandingNav isAdmin={isAdmin} user={user} />
+      <LandingNav isAdmin={isAdmin} user={user} instruments={instruments} />
 
       <main className="donate-page">
         {preview && (

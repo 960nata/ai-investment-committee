@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { LandingNav } from '@/components/landing-nav'
+import { listInstrumentQuotes } from '@/lib/db/queries'
 import { LandingFooter } from '@/components/landing-footer'
 import { IconCheck, IconCrown } from '@/components/icons'
 import { getCurrentUser } from '@/lib/auth/user-auth'
@@ -43,11 +44,13 @@ export default async function PremiumPage({
 }: {
   searchParams: Promise<{ pratinjau?: string; ref?: string }>
 }) {
-  const [{ pratinjau, ref }, settings, user, isAdmin] = await Promise.all([
+  const [{ pratinjau, ref }, settings, user, isAdmin, instruments] = await Promise.all([
     searchParams,
     getPremiumSettings().catch(() => null),
     getCurrentUser(),
     verifyAdminSession().catch(() => false),
+    // Pita harga di header. Pelengkap — kegagalannya tidak boleh menjatuhkan halaman.
+    listInstrumentQuotes().catch(() => []),
   ])
 
   const preview = !settings?.isEnabled && pratinjau === '1' && isAdmin
@@ -66,7 +69,7 @@ export default async function PremiumPage({
 
   return (
     <div className="landing-shell">
-      <LandingNav isAdmin={isAdmin} user={user} />
+      <LandingNav isAdmin={isAdmin} user={user} instruments={instruments} />
 
       <main className="donate-page">
         {preview && (

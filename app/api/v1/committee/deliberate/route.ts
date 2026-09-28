@@ -35,21 +35,12 @@ import { getCurrentUser } from '@/lib/auth/user-auth'
 import { refundLlmBudget, reserveLlmBudget } from '@/lib/http/budget'
 import { badRequest, failure, NO_STORE, unauthorized } from '@/lib/http/errors'
 import type { MarketCode } from '@/lib/db/schema'
+import { SYMBOL_PATTERN } from '@/lib/format/market'
 
 export const dynamic = 'force-dynamic'
 
 /** Pasar yang dikenal. Apa pun di luar ini tidak pernah sampai ke kueri. */
 const MARKETS: readonly MarketCode[] = ['CRYPTO', 'IDX', 'US', 'GLOBAL']
-
-/**
- * Bentuk simbol yang diterima.
- *
- * Bukan sekadar kerapian: simbol ikut menyusun kunci sesi dan kunci cache, dan
- * nilai sepanjang sepuluh ribu karakter akan menumbuhkan kedua-duanya tanpa
- * batas. Huruf, angka, titik, dan strip sudah mencakup tiap simbol di ketiga
- * pasar yang didukung.
- */
-const SYMBOL_PATTERN = /^[A-Za-z0-9.\-]{1,20}$/
 
 function readTarget(input: { market?: unknown; symbol?: unknown }):
   | { ok: true; market: MarketCode; symbol: string }

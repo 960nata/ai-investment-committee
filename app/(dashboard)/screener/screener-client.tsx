@@ -57,10 +57,11 @@ export function ScreenerClient({ rows, watchlistIds }: { rows: MarketRow[]; watc
     return out
   }, [rows, query, assetClass, horizon, minScore, verdict, move, scoredOnly, sort, desc])
 
-  function header(key: SortKey, label: string, num = true) {
+  function header(key: SortKey, label: React.ReactNode, num = true, extraClass = '') {
     const active = sort === key
+    const className = [num ? 'num' : '', extraClass].filter(Boolean).join(' ') || undefined
     return (
-      <th className={num ? 'num' : undefined}>
+      <th className={className}>
         <button
           type="button"
           onClick={() => {
@@ -177,14 +178,19 @@ export function ScreenerClient({ rows, watchlistIds }: { rows: MarketRow[]; watc
             <thead>
               <tr>
                 {header('symbol', 'Simbol', false)}
-                <th>Nama</th>
-                <th>Kelas</th>
-                <th className="num">Penutupan</th>
-                {header('change', 'Harian')}
-                {header('score', `Skor ${horizon}`)}
-                <th>Keyakinan skor</th>
+                <th className="hide-sm">Nama</th>
+                <th className="hide-sm">Kelas</th>
+                <th className="num hide-sm">Penutupan</th>
+                {header('change', 'Harian', true, 'hide-sm')}
+                {header(
+                  'score',
+                  <>
+                    Skor<span className="hide-sm"> {horizon}</span>
+                  </>,
+                )}
+                <th className="hide-sm">Keyakinan skor</th>
                 <th>Putusan komite</th>
-                {header('confidence', 'Keyakinan komite')}
+                {header('confidence', 'Keyakinan komite', true, 'hide-sm')}
                 <th />
               </tr>
             </thead>
@@ -193,21 +199,24 @@ export function ScreenerClient({ rows, watchlistIds }: { rows: MarketRow[]; watc
                 <tr key={r.id}>
                   <td className="key">
                     <Link href={`/ringkasan?symbol=${encodeURIComponent(r.symbol)}`}>{r.symbol}</Link>
+                    <div className="show-sm cell-sub">
+                      {r.name} · <ChangeText value={r.changePct} />
+                    </div>
                   </td>
-                  <td>{r.name}</td>
-                  <td className="dim">{ASSET_CLASS_LABEL[r.assetClass] ?? r.assetClass}</td>
-                  <td className="num">{formatPriceIn(r.lastClose, r.currency)}</td>
-                  <td className="num">
+                  <td className="hide-sm">{r.name}</td>
+                  <td className="dim hide-sm">{ASSET_CLASS_LABEL[r.assetClass] ?? r.assetClass}</td>
+                  <td className="num hide-sm">{formatPriceIn(r.lastClose, r.currency)}</td>
+                  <td className="num hide-sm">
                     <ChangeText value={r.changePct} />
                   </td>
                   <td className="num">
                     <ScoreText value={r.scores[horizon]?.score} />
                   </td>
-                  <td className="dim">{r.scores[horizon]?.confidence ?? '—'}</td>
+                  <td className="dim hide-sm">{r.scores[horizon]?.confidence ?? '—'}</td>
                   <td>
                     <VerdictTag verdict={r.verdict?.verdict} />
                   </td>
-                  <td className="num">{r.verdict?.confidence != null ? `${r.verdict.confidence}/100` : '—'}</td>
+                  <td className="num hide-sm">{r.verdict?.confidence != null ? `${r.verdict.confidence}/100` : '—'}</td>
                   <td>
                     <WatchToggle instrumentId={r.id} initialOn={watch.has(r.id)} compact />
                   </td>

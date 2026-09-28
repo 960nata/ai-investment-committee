@@ -164,31 +164,38 @@ export default async function TrackRecordPage({ searchParams }: { searchParams: 
                 <table className="grid">
                   <thead>
                     <tr>
-                      <th>Tanggal</th>
+                      <th className="hide-sm">Tanggal</th>
                       <th>Simbol</th>
                       <th>Putusan</th>
-                      <th className="num">Keyakinan</th>
-                      <th className="num">Harga saat itu</th>
-                      <th className="num">Harga terakhir</th>
-                      <th className="num">Sejak putusan</th>
+                      <th className="num hide-sm">Keyakinan</th>
+                      <th className="num hide-sm">Harga saat itu</th>
+                      <th className="num hide-sm">Harga terakhir</th>
+                      <th className="num hide-sm">Sejak putusan</th>
                       <th>Hasil</th>
-                      <th>Alasan</th>
+                      <th className="hide-sm">Alasan</th>
                     </tr>
                   </thead>
                   <tbody>
                     {shown.slice(0, 150).map((r) => (
                       <tr key={r.sessionId}>
-                        <td className="dim" style={{ whiteSpace: 'nowrap' }}>{r.asOf ?? r.finishedAt.slice(0, 10)}</td>
+                        <td className="dim hide-sm" style={{ whiteSpace: 'nowrap' }}>{r.asOf ?? r.finishedAt.slice(0, 10)}</td>
                         <td className="key">
                           <Link href={`/ringkasan?symbol=${encodeURIComponent(r.symbol)}`}>{r.symbol}</Link>
+                          <div className="show-sm cell-sub">{r.asOf ?? r.finishedAt.slice(0, 10)}</div>
                         </td>
                         <td>
                           <VerdictTag verdict={r.verdict} />
+                          <div
+                            className="show-sm cell-sub"
+                            style={{ color: r.movePct == null ? undefined : r.movePct >= 0 ? 'var(--measured)' : 'var(--halted)' }}
+                          >
+                            {formatPct(r.movePct)} sejak putusan
+                          </div>
                         </td>
-                        <td className="num">{r.confidence != null ? `${r.confidence}/100` : '—'}</td>
-                        <td className="num">{formatPriceIn(r.priceAtDecision, r.currency)}</td>
-                        <td className="num">{formatPriceIn(r.priceNow, r.currency)}</td>
-                        <td className="num" style={{ color: r.movePct == null ? undefined : r.movePct >= 0 ? 'var(--measured)' : 'var(--halted)' }}>
+                        <td className="num hide-sm">{r.confidence != null ? `${r.confidence}/100` : '—'}</td>
+                        <td className="num hide-sm">{formatPriceIn(r.priceAtDecision, r.currency)}</td>
+                        <td className="num hide-sm">{formatPriceIn(r.priceNow, r.currency)}</td>
+                        <td className="num hide-sm" style={{ color: r.movePct == null ? undefined : r.movePct >= 0 ? 'var(--measured)' : 'var(--halted)' }}>
                           {formatPct(r.movePct)}
                         </td>
                         <td>
@@ -202,7 +209,7 @@ export default async function TrackRecordPage({ searchParams }: { searchParams: 
                             <Tag>—</Tag>
                           )}
                         </td>
-                        <td className="wrap" title={r.rationale ?? undefined}>
+                        <td className="wrap hide-sm" title={r.rationale ?? undefined}>
                           {(r.rationale ?? '').slice(0, 140)}
                           {(r.rationale ?? '').length > 140 ? '…' : ''}
                         </td>

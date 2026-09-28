@@ -97,7 +97,7 @@ export function AdminLayoutClient({ children }: AdminLayoutClientProps) {
             title="Beralih ke Terminal Analisis Pengguna"
           >
             <IconGauge size={13} />
-            <span>Terminal User</span>
+            <span className="admin-switch-label">Terminal User</span>
           </Link>
 
           {/* Tombol Logout Admin */}

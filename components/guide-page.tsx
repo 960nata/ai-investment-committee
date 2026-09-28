@@ -1,7 +1,9 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
 import { GuideDeck } from '@/components/guide-deck'
-import { LanguageSwitch } from '@/components/language-switch'
+import { LandingNav } from '@/components/landing-nav'
+import { getCurrentUser } from '@/lib/auth/user-auth'
+import { verifyAdminSession } from '@/lib/auth/admin-auth'
+import { listInstrumentQuotes } from '@/lib/db/queries'
 import { GUIDE } from '@/lib/i18n/guide'
 import {
   LOCALES,
@@ -15,8 +17,11 @@ import { SITE_NAME } from '@/lib/brand'
 /*
  * Halaman panduan pengguna — kerangka server untuk dek slide.
  *
- * Dipakai /panduan (Indonesia) dan /[lang]/panduan. Isinya statis, jadi
- * halamannya bisa dirender sekali dan disajikan dari cache.
+ * Dipakai /panduan (Indonesia) dan /[lang]/panduan. Isi dek-nya statis, tetapi
+ * headernya header situs yang sama dengan beranda dan warta — menu, sesi
+ * pengguna, pilihan bahasa, dan pita harga — supaya pembaca panduan tidak
+ * terdampar di halaman tanpa jalan ke bagian lain situs. Karena header membaca
+ * sesi, halaman ini dirender per permintaan.
  */
 
 const PATH = '/panduan'
@@ -42,27 +47,23 @@ export function guideMetadata(locale: Locale): Metadata {
   }
 }
 
-export function GuidePage({ locale }: { locale: Locale }) {
+export async function GuidePage({ locale }: { locale: Locale }) {
   const g = GUIDE[locale]
+  const [user, isAdmin, instruments] = await Promise.all([
+    getCurrentUser(),
+    verifyAdminSession().catch(() => false),
+    // Pita harga di header. Pelengkap — kegagalannya tidak boleh menjatuhkan panduan.
+    listInstrumentQuotes().catch(() => []),
+  ])
+
   return (
     <div className="gd-shell" lang={LOCALE_INFO[locale].htmlLang} data-native-locale={locale}>
-      <header className="gd-bar">
-        <Link href="/" className="gd-brand">
-          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-            <path
-              d="M12 2C12 7.5 7.5 12 2 12C7.5 12 12 16.5 12 22C12 16.5 16.5 12 22 12C16.5 12 12 7.5 12 2Z"
-              fill="#fa862a"
-            />
-          </svg>
-          AI Investdesk
-        </Link>
-        <LanguageSwitch current={locale} path={PATH} available={LOCALES} label={g.deckLabel} />
-      </header>
+      <LandingNav instruments={instruments} user={user} isAdmin={isAdmin} languages={LOCALES} />
 
       <main className="gd-main">
         <h1 className="gd-sr">{g.metaTitle}</h1>
         {/* Terminal butuh akun, jadi tombolnya mengantar ke pendaftaran. */}
-        <GuideDeck locale={locale} terminalHref="/daftar" />
+        <GuideDeck locale={locale} terminalHref={user ? '/ringkasan' : '/daftar'} />
       </main>
     </div>
   )

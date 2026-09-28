@@ -25,7 +25,13 @@ export function ScoreText({ value }: { value: number | undefined | null }) {
 }
 
 export function VerdictTag({ verdict }: { verdict: string | null | undefined }) {
-  if (!verdict) return <span className="dim">belum ada rapat</span>
+  // Garis, bukan kalimat: kolom putusan di ponsel tidak muat "belum ada rapat".
+  if (!verdict)
+    return (
+      <span className="dim" title="Belum ada rapat komite untuk instrumen ini">
+        —
+      </span>
+    )
   const tone = verdictTone(verdict)
   return <Tag tone={tone === 'neutral' ? 'neutral' : tone}>{verdictLabel(verdict)}</Tag>
 }

@@ -85,7 +85,7 @@ export function Topbar({
       {isAdmin && (
         <Link
           href="/admin"
-          className="btn btn-quiet mono"
+          className="btn btn-quiet mono topbar-admin"
           style={{
             padding: '3px 8px',
             fontSize: '11px',
@@ -99,7 +99,7 @@ export function Topbar({
           title="Buka Dashboard Admin"
         >
           <IconLock size={12} />
-          <span>Dashboard Admin</span>
+          <span className="topbar-admin-label">Dashboard Admin</span>
         </Link>
       )}
 

@@ -75,12 +75,12 @@ export default async function WatchlistPage() {
                 <thead>
                   <tr>
                     <th>Simbol</th>
-                    <th>Nama</th>
+                    <th className="hide-sm">Nama</th>
                     <th className="num">Penutupan</th>
                     <th className="num">Harian</th>
-                    <th className="num">Skor pendek</th>
-                    <th className="num">Menengah</th>
-                    <th className="num">Panjang</th>
+                    <th className="num hide-sm">Skor pendek</th>
+                    <th className="num">Skor menengah</th>
+                    <th className="num hide-sm">Panjang</th>
                     <th>Putusan komite</th>
                     <th />
                   </tr>
@@ -90,15 +90,16 @@ export default async function WatchlistPage() {
                     <tr key={r.id}>
                       <td className="key">
                         <Link href={`/ringkasan?symbol=${encodeURIComponent(r.symbol)}`}>{r.symbol}</Link>
+                        <div className="show-sm cell-sub">{r.name}</div>
                       </td>
-                      <td>{r.name}</td>
+                      <td className="hide-sm">{r.name}</td>
                       <td className="num">{formatPriceIn(r.lastClose, r.currency)}</td>
                       <td className="num">
                         <ChangeText value={r.changePct} />
                       </td>
-                      <td className="num"><ScoreText value={r.scores.pendek?.score} /></td>
+                      <td className="num hide-sm"><ScoreText value={r.scores.pendek?.score} /></td>
                       <td className="num"><ScoreText value={r.scores.menengah?.score} /></td>
-                      <td className="num"><ScoreText value={r.scores.panjang?.score} /></td>
+                      <td className="num hide-sm"><ScoreText value={r.scores.panjang?.score} /></td>
                       <td>
                         <VerdictTag verdict={r.verdict?.verdict} />
                       </td>

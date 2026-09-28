@@ -9,11 +9,27 @@ interface Option extends PickerOption {
   market: string
 }
 
+interface Source {
+  n: number
+  title: string
+  source: string
+  url: string
+  publishedAt: string
+  internal: boolean
+}
+
 interface Message {
   role: 'user' | 'assistant'
   content: string
   meta?: string
   error?: boolean
+  sources?: Source[]
+}
+
+/** Tautan sumber hanya boleh ke halaman sendiri atau http(s); selainnya tidak ditautkan. */
+function safeHref(url: string): string | null {
+  if (url.startsWith('/') && !url.startsWith('//')) return url
+  return /^https?:\/\//i.test(url) ? url : null
 }
 
 const SUGGESTIONS = [
@@ -70,7 +86,15 @@ export function AskClient({ options, initialId }: { options: Option[]; initialId
         setMessages((m) => [...m, { role: 'assistant', content: message, error: true }])
         return
       }
-      setMessages((m) => [...m, { role: 'assistant', content: body.answer, meta: body.model ? `dijawab ${body.model}` : undefined }])
+      setMessages((m) => [
+        ...m,
+        {
+          role: 'assistant',
+          content: body.answer,
+          meta: body.model ? `dijawab ${body.model}` : undefined,
+          sources: Array.isArray(body.sources) ? body.sources : [],
+        },
+      ])
     } catch {
       setMessages((m) => [...m, { role: 'assistant', content: 'Koneksi terputus. Coba lagi.', error: true }])
     } finally {
@@ -117,6 +141,39 @@ export function AskClient({ options, initialId }: { options: Option[]; initialId
           {messages.map((m, i) => (
             <div key={i} className={`chat-msg ${m.role}`} style={m.error ? { borderColor: 'var(--halted)' } : undefined}>
               {m.content}
+              {m.sources && m.sources.length > 0 && (
+                <div className="chat-sources">
+                  <div className="chat-sources-label">Sumber berita</div>
+                  <ol>
+                    {m.sources.map((s) => {
+                      const href = safeHref(s.url)
+                      const date = new Date(s.publishedAt).toLocaleDateString('id-ID', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                      })
+                      return (
+                        <li key={s.n} value={s.n}>
+                          {href ? (
+                            <a
+                              href={href}
+                              {...(s.internal ? {} : { target: '_blank', rel: 'noopener noreferrer' })}
+                            >
+                              {s.title}
+                            </a>
+                          ) : (
+                            s.title
+                          )}
+                          <span className="chat-source-meta">
+                            {' '}
+                            · {s.source} · {date}
+                          </span>
+                        </li>
+                      )
+                    })}
+                  </ol>
+                </div>
+              )}
               {m.meta && <div className="chat-meta">{m.meta}</div>}
             </div>
           ))}

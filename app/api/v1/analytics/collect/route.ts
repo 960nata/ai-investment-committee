@@ -12,7 +12,7 @@
  * membuat sidik ber-garam, lalu dilupakan — lihat `lib/analytics/geo.ts`.
  */
 
-import { NextRequest, NextResponse } from 'next/server'
+import { after, NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import {
   clientIp,
@@ -22,8 +22,15 @@ import {
   lookupGeo,
 } from '@/lib/analytics/geo'
 import { recordVisit } from '@/lib/db/visit-queries'
+import { maybeRunAutoNews } from '@/lib/news/auto-tick'
 
 export const dynamic = 'force-dynamic'
+/**
+ * Beacon ini juga memicu warta otomatis lewat `after()` (lihat
+ * lib/news/auto-tick.ts), dan `after()` hanya boleh berjalan selama batas
+ * waktu route-nya. Menulis satu warta butuh beberapa panggilan model.
+ */
+export const maxDuration = 300
 
 const BeaconSchema = z.object({
   // Hanya jalur relatif. Halaman yang mengaku beralamat di situs lain tidak
@@ -56,6 +63,13 @@ export async function POST(req: NextRequest) {
   if (device === 'bot') {
     return NextResponse.json({ ok: true, skipped: 'bot' })
   }
+
+  // Setelah jawaban terkirim: pengunjung tidak pernah menunggu warta ditulis.
+  after(() =>
+    maybeRunAutoNews().catch((err) =>
+      console.error('[analytics/collect] warta otomatis:', err instanceof Error ? err.message : err),
+    ),
+  )
 
   try {
     const ip = clientIp(req)

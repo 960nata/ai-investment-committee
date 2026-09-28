@@ -49,3 +49,14 @@ export function formatPct(value: number | null, digits = 2): string {
   const sign = value > 0 ? '+' : ''
   return `${sign}${value.toFixed(digits).replace('.', ',')}%`
 }
+
+/**
+ * Bentuk simbol yang diterima endpoint komite.
+ *
+ * Tetap ketat karena simbol ikut menyusun kunci sesi dan kunci cache, tetapi
+ * harus mencakup semua bentuk yang benar-benar ada di basis data: saham
+ * (`BBCA.JK`), kripto (`BTCUSDT`), indeks Yahoo yang berawalan `^` (`^JKSE`,
+ * `^SET.BK`), dan kontrak berjangka yang berakhiran `=F` (`GC=F`, `BZ=F`).
+ * Pola lama tanpa `^` dan `=` menolak seluruh indeks, emas, dan komoditas.
+ */
+export const SYMBOL_PATTERN = /^\^?[A-Za-z0-9][A-Za-z0-9.\-]{0,18}(=F)?$/

@@ -19154,6 +19154,26 @@ body.rail-lock {
 .chat-msg.assistant { justify-self: start; background: var(--surface-0); }
 .chat-meta { margin-top: var(--space-2); font-family: var(--mono); font-size: var(--t-micro); color: var(--ink-faint); }
 
+.chat-sources {
+  margin-top: var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--line);
+  white-space: normal;
+}
+
+.chat-sources-label {
+  font-family: var(--mono);
+  font-size: var(--t-micro);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.chat-sources ol { margin: 6px 0 0; padding-left: 22px; display: grid; gap: 4px; }
+.chat-sources li { font-size: var(--t-small); line-height: 1.45; color: var(--ink-soft); }
+.chat-sources a { color: var(--signal); text-decoration: underline; text-underline-offset: 2px; }
+.chat-source-meta { color: var(--ink-faint); font-family: var(--mono); font-size: var(--t-micro); }
+
 .chip-row { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 
 .chip {
@@ -19169,6 +19189,107 @@ body.rail-lock {
 .btn-row { display: inline-flex; gap: var(--space-2); flex-wrap: wrap; }
 
 .btn-danger:hover:not(:disabled) { border-color: var(--halted); color: var(--halted); }
+
+/* ---------------------------------------------------------------------------
+   Bar atas di layar ponsel
+
+   Sebelumnya tiap bagian bar atas punya lebar tetap dan tidak ada yang boleh
+   mengecil, sehingga di layar 390px menu bahasa dan avatar terdorong ~110px
+   keluar layar — seluruh halaman dashboard jadi bisa digeser ke samping dan
+   isinya terlihat terpotong. Di sini hanya logo yang boleh menyusut; tombol
+   yang bisa diwakili ikon kehilangan labelnya.
+   --------------------------------------------------------------------------- */
+/* Tabel Bandingkan: label baris menempel di kiri saat nilai digeser ke samping. */
+.compare-grid .compare-label {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--surface-1);
+  white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+  .compare-grid .compare-label {
+    min-width: 96px;
+    max-width: 112px;
+    white-space: normal;
+    font-size: 11px;
+    line-height: 1.35;
+    box-shadow: 1px 0 0 var(--line);
+  }
+  .compare-grid td,
+  .compare-grid th { font-size: 12px; padding-left: 8px; padding-right: 8px; }
+  /* Label status di sel sempit boleh dua baris daripada terpotong. */
+  .grid td .tag { white-space: normal; text-align: center; }
+  /* Tanggal di bawah simbol tidak perlu terpotong jadi tiga baris. */
+  .grid .key .cell-sub { white-space: nowrap; }
+}
+
+/* Kolom tabel yang disembunyikan di ponsel, dan keterangan yang hanya muncul di sana. */
+.show-sm { display: none; }
+.cell-sub {
+  margin-top: 2px;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--ink-mute);
+  white-space: normal;
+}
+
+@media (max-width: 600px) {
+  .hide-sm { display: none !important; }
+  .show-sm { display: block; }
+
+  .grid th,
+  .grid td {
+    padding-left: var(--space-3);
+    padding-right: var(--space-3);
+  }
+
+  /* Kepala panel boleh turun baris; sebelumnya harga di kepala grafik
+     terpotong di tepi kanan panel. */
+  .panel-head {
+    flex-wrap: wrap;
+    row-gap: var(--space-2);
+  }
+
+  .admin-switch-label,
+  .admin-logout-label { display: none; }
+  .admin-topbar-right { gap: 6px; }
+  .admin-switch-btn { padding: 5px 8px; }
+
+  .topbar-brand {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .topbar-brand .mark-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .topbar-brand .mark-phase {
+    display: none;
+  }
+  .topbar-action {
+    display: none;
+  }
+  .topbar-admin {
+    flex: none;
+    padding: 5px 7px !important;
+  }
+  .topbar-admin-label {
+    display: none;
+  }
+  .topbar .lang-menu-code,
+  .topbar .lang-menu-chevron {
+    display: none;
+  }
+  .topbar-session {
+    gap: var(--space-1);
+  }
+}
 
 .pair {
   display: grid;

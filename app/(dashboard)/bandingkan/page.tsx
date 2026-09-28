@@ -120,10 +120,10 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
             </Blank>
           ) : (
             <div className="scroll-x">
-              <table className="grid">
+              <table className="grid compare-grid">
                 <thead>
                   <tr>
-                    <th />
+                    <th className="compare-label" />
                     {columns.map((c) => (
                       <th key={c.row.id} className="num">
                         <Link href={`/ringkasan?symbol=${encodeURIComponent(c.row.symbol)}`} style={{ color: 'var(--ink)' }}>
@@ -135,7 +135,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
                 </thead>
                 <tbody>
                   <tr>
-                    <td className="dim">Nama</td>
+                    <td className="dim compare-label">Nama</td>
                     {columns.map((c) => (
                       <td key={c.row.id} className="num" style={{ color: 'var(--ink-soft)' }}>
                         {c.row.name}
@@ -145,7 +145,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
                   </tr>
                   {lines.map((line) => (
                     <tr key={line.label}>
-                      <td className="dim" style={{ whiteSpace: 'nowrap' }}>{line.label}</td>
+                      <td className="dim compare-label">{line.label}</td>
                       {columns.map((c) => (
                         <td key={c.row.id} className="num">
                           {line.render(c)}

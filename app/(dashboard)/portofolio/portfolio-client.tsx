@@ -290,12 +290,12 @@ export function PortfolioClient({
               <thead>
                 <tr>
                   <th>Simbol</th>
-                  <th className="num">Jumlah</th>
-                  <th className="num">Rata-rata</th>
-                  <th className="num">Penutupan</th>
+                  <th className="num hide-sm">Jumlah</th>
+                  <th className="num hide-sm">Rata-rata</th>
+                  <th className="num hide-sm">Penutupan</th>
                   <th className="num">Nilai</th>
                   <th className="num">Untung/rugi</th>
-                  <th className="num">Skor menengah</th>
+                  <th className="num hide-sm">Skor menengah</th>
                   <th>Putusan komite</th>
                   <th />
                 </tr>
@@ -313,14 +313,14 @@ export function PortfolioClient({
                         )}
                         {r.note && <div className="dim" style={{ fontFamily: 'var(--sans)', fontWeight: 400, fontSize: 11 }}>{r.note}</div>}
                       </td>
-                      <td className="num">{r.quantity.toLocaleString('id-ID', { maximumFractionDigits: 8 })}</td>
-                      <td className="num">{formatPriceIn(r.avgPrice, cur)}</td>
-                      <td className="num">{formatPriceIn(r.instrument?.lastClose ?? null, cur)}</td>
+                      <td className="num hide-sm">{r.quantity.toLocaleString('id-ID', { maximumFractionDigits: 8 })}</td>
+                      <td className="num hide-sm">{formatPriceIn(r.avgPrice, cur)}</td>
+                      <td className="num hide-sm">{formatPriceIn(r.instrument?.lastClose ?? null, cur)}</td>
                       <td className="num">{formatPriceIn(r.value, cur)}</td>
                       <td className="num" style={{ color: r.pnl === null ? undefined : r.pnl >= 0 ? 'var(--measured)' : 'var(--halted)' }}>
                         {r.pnl === null ? '—' : `${formatPriceIn(r.pnl, cur)} (${formatPct(r.pnlPct)})`}
                       </td>
-                      <td className="num">
+                      <td className="num hide-sm">
                         <ScoreText value={r.instrument?.scores.menengah?.score} />
                       </td>
                       <td>

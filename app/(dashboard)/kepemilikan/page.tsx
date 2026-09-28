@@ -130,7 +130,7 @@ export default async function OwnershipPage({ searchParams }: { searchParams: Pr
                   <th>Jenis investor</th>
                   <th className="num">Lokal</th>
                   <th className="num">Asing</th>
-                  <th style={{ width: '40%' }}>Porsi dari total</th>
+                  <th className="hide-sm" style={{ width: '40%' }}>Porsi dari total</th>
                 </tr>
               </thead>
               <tbody>
@@ -143,7 +143,7 @@ export default async function OwnershipPage({ searchParams }: { searchParams: Pr
                       <td>{TYPE_LABEL[t]}</td>
                       <td className="num">{total ? pct((l / total) * 100) : '—'}</td>
                       <td className="num">{total ? pct((f / total) * 100) : '—'}</td>
-                      <td>
+                      <td className="hide-sm">
                         <div className="bar">
                           <span style={{ width: `${total ? (l / total) * 100 : 0}%`, background: 'var(--measured)' }} />
                           <span style={{ width: `${total ? (f / total) * 100 : 0}%`, background: 'var(--signal)' }} />
@@ -156,7 +156,7 @@ export default async function OwnershipPage({ searchParams }: { searchParams: Pr
             </table>
           </div>
           <div className="panel-body">
-            <div className="legend" style={{ marginTop: 0 }}>
+            <div className="legend hide-sm" style={{ marginTop: 0 }}>
               <span><i style={{ background: 'var(--measured)' }} />lokal</span>
               <span><i style={{ background: 'var(--signal)' }} />asing</span>
             </div>

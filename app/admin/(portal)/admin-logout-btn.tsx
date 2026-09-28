@@ -31,7 +31,7 @@ export function AdminLogoutButton() {
       title="Keluar dari sesi Admin"
     >
       <IconClose size={12} />
-      <span>{loading ? 'Keluar...' : 'Keluar'}</span>
+      <span className="admin-logout-label">{loading ? 'Keluar...' : 'Keluar'}</span>
     </button>
   )
 }
