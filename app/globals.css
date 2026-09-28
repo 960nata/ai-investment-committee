@@ -19718,3 +19718,19 @@ body.rail-lock {
 @media (max-width: 520px) {
   .premium-pay { justify-self: stretch; }
 }
+
+/* ---------------------------------------------------------------------------
+   Pembungkus transisi halaman (components/motion-kit.tsx)
+
+   `display: contents` membuat pembungkusnya tidak ada dalam tata letak: anak-
+   anaknya tetap berperilaku seolah anak langsung dari induknya, jadi grid,
+   flex, dan selektor anak yang sudah ada tidak berubah.
+   --------------------------------------------------------------------------- */
+.page-enter {
+  display: contents;
+}
+
+/* Pita pengumuman kosong tidak boleh menyisakan jarak di atas halaman. */
+.notice-strip:empty {
+  display: none;
+}

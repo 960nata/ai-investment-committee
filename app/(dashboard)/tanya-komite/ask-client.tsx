@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { motion } from 'motion/react'
 import { IconChat } from '@/components/icons'
 import { Blank } from '@/components/ui'
 import { InstrumentPicker, type PickerOption } from '@/components/member/instrument-picker'
@@ -139,7 +140,14 @@ export function AskClient({ options, initialId }: { options: Option[]; initialId
       ) : (
         <div className="chat-log" ref={logRef} aria-live="polite">
           {messages.map((m, i) => (
-            <div key={i} className={`chat-msg ${m.role}`} style={m.error ? { borderColor: 'var(--halted)' } : undefined}>
+            <motion.div
+              key={i}
+              className={`chat-msg ${m.role}`}
+              style={m.error ? { borderColor: 'var(--halted)' } : undefined}
+              initial={{ opacity: 0, y: 10, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+            >
               {m.content}
               {m.sources && m.sources.length > 0 && (
                 <div className="chat-sources">
@@ -175,9 +183,18 @@ export function AskClient({ options, initialId }: { options: Option[]; initialId
                 </div>
               )}
               {m.meta && <div className="chat-meta">{m.meta}</div>}
-            </div>
+            </motion.div>
           ))}
-          {busy && <div className="chat-msg assistant">Menyusun jawaban dari data…</div>}
+          {busy && (
+            <motion.div
+              className="chat-msg assistant chat-typing"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0.45, 1, 0.45] }}
+              transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
+            >
+              Menyusun jawaban dari data…
+            </motion.div>
+          )}
         </div>
       )}
 

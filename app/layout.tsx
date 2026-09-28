@@ -4,6 +4,7 @@ import { Plus_Jakarta_Sans } from "next/font/google";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import { getMeasurementId } from "@/lib/analytics/ga4";
 import { VisitBeacon } from "@/components/visit-beacon";
+import { MotionProvider } from "@/components/motion-kit";
 import { SiteTranslator } from "@/components/site-translator";
 import { SITE_NAME } from "@/lib/brand";
 import "./globals.css";
@@ -38,7 +39,7 @@ export default function RootLayout({
   return (
     <html lang="id" suppressHydrationWarning className={fontSans.className}>
       <body suppressHydrationWarning className={fontSans.className}>
-        {children}
+        <MotionProvider>{children}</MotionProvider>
         {/*
          * `useSearchParams` di dalam VisitBeacon membuat seluruh pohon di
          * atasnya keluar dari prarender statis kalau batasnya tidak dipasang.

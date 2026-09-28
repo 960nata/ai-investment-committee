@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { motion } from 'motion/react'
 import { IconStar } from '../icons'
 
 /**
@@ -64,7 +65,16 @@ export function WatchToggle({
       aria-pressed={on}
       title={on ? 'Hapus dari watchlist' : 'Tambahkan ke watchlist'}
     >
-      <IconStar size={12} filled={on} />
+      {/* Kunci berganti setiap status berubah, jadi bintangnya "meletup" sekali. */}
+      <motion.span
+        key={on ? 'on' : 'off'}
+        style={{ display: 'inline-flex' }}
+        initial={{ scale: on ? 0.4 : 1 }}
+        animate={{ scale: 1 }}
+        transition={{ type: 'spring', stiffness: 520, damping: 14 }}
+      >
+        <IconStar size={12} filled={on} />
+      </motion.span>
       {!compact && (on ? 'Dipantau' : 'Pantau')}
     </button>
   )

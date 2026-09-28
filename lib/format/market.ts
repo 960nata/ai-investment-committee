@@ -14,7 +14,8 @@
  */
 export function formatTickerPrice(value: number | null, assetClass: string): string {
   if (value === null || !Number.isFinite(value)) return '—'
-  const prefix = assetClass === 'saham' ? 'Rp' : '$'
+  // Indeks adalah angka poin, bukan harga dalam mata uang: IHSG tidak ber-"$".
+  const prefix = assetClass === 'saham' ? 'Rp' : assetClass === 'indeks' ? '' : '$'
   const digits = value >= 1000 ? 0 : value >= 1 ? 2 : 4
   return (
     prefix +

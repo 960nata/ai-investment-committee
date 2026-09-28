@@ -23,6 +23,7 @@ import {
 } from '@/components/icons'
 import { AssetIcon } from '@/components/asset-icons'
 import { MarketMarquee, type MarqueeTicker } from '@/components/market-marquee'
+import { useLiveTickerFallback } from '@/components/live-ticker-fallback'
 import type { InstrumentQuote } from '@/lib/db/queries'
 import { LanguageMenu } from '@/components/language-menu'
 import type { Locale } from '@/lib/i18n/locales'
@@ -303,6 +304,11 @@ export function LandingNav({
 
     return woven
   }, [instruments, topAssets])
+
+  // Pita tidak boleh hilang hanya karena basis data tidak terbaca (env
+  // produksi kosong, koneksi putus): harga diambil langsung dari bursa.
+  const liveFallback = useLiveTickerFallback(marqueeTickers.length === 0)
+  const tickerItems = marqueeTickers.length > 0 ? marqueeTickers : liveFallback
 
   /** Jumlah aset nyata per kelas, dipakai menu supaya angkanya bukan karangan. */
   const assetCounts = useMemo(() => {
@@ -883,7 +889,7 @@ export function LandingNav({
 
             {/* Pita Harga Berjalan Otomatis: Kripto, Saham, Emas, Komoditi, Indeks */}
             <div className="subnav-ticker-group">
-              <MarketMarquee items={marqueeTickers} />
+              <MarketMarquee items={tickerItems} />
             </div>
           </div>
         </div>
