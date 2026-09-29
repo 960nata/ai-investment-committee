@@ -1,0 +1,34 @@
+# Pemicu dispatcher tiap jam.
+#
+# Tier Hobby Vercel hanya mengizinkan cron harian (lihat vercel.json), padahal
+# jadwal di tabel job_schedule berjalan per jam: ingest IDX jam 17 WIB, skor US
+# jam 07 WIB, kripto tiap jam. Dipanggil sekali sehari, hampir semua job tidak
+# pernah jatuh tempo. Dispatcher idempoten per jam kalender, jadi terpanggil
+# dua kali (di sini dan dari Vercel) tetap satu kali pengiriman.
+#
+# Butuh dua secret repositori: APP_URL (mis. https://domain-anda.com) dan
+# CRON_SECRET (sama dengan yang di Vercel). Tanpa keduanya, langkahnya dilewati.
+name: dispatcher
+
+on:
+  schedule:
+    - cron: '5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Panggil /api/cron/dispatcher
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$APP_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "APP_URL atau CRON_SECRET belum diset di secret repositori — dilewati."
+            exit 0
+          fi
+          curl -fsS --max-time 300 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "${APP_URL%/}/api/cron/dispatcher"
