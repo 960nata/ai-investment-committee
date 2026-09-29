@@ -15560,10 +15560,10 @@ body.rail-lock {
   }
 }
 
-/* Di ponsel, logo + kotak cari + Masuk + tombol menu tidak muat dalam 390px,
-   dan tombol menunya terpotong di tepi layar. Pencarian tetap ada di dalam
-   laci menu, jadi kotak di header yang dikorbankan. */
-@media (max-width: 480px) {
+/* Begitu tombol menu muncul (≤900px, lihat .landing-hamburger-btn), pencarian
+   cukup lewat laci menu — tombol cari di header disembunyikan supaya header
+   ponsel tidak sesak. ⌘K dan / tetap membuka palet yang sama. */
+@media (max-width: 900px) {
   .landing-search-trigger {
     display: none;
   }
