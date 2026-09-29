@@ -61,6 +61,10 @@ export async function runFundamentalJob(input: {
 
   const tickers = await fetchTickerMap()
   const rows: FundamentalInput[] = []
+  // Emiten yang EDGAR tidak bisa layani: penerbit asing yang melapor lewat 20-F
+  // (BABA, TSM) tidak punya 10-Q, dan sebagian emiten gagal diurai. Mereka
+  // diambil dari Yahoo sesudah putaran EDGAR, bukan dibiarkan kosong.
+  const needYahoo: string[] = []
 
   for (const symbol of input.symbols) {
     try {
@@ -72,8 +76,7 @@ export async function runFundamentalJob(input: {
 
       const cik = tickers.get(symbol.toUpperCase())
       if (!cik) {
-        result.skipped.push({ symbol, reason: 'tidak ada di daftar emiten SEC' })
-        result.itemsProcessed++
+        needYahoo.push(symbol)
         continue
       }
 
@@ -146,8 +149,10 @@ export async function runFundamentalJob(input: {
       // Ditulis per emiten, bukan sekali di akhir. Satu tulisan besar di ujung
       // berarti seluruh hasil unduhan hilang bila tulisan itu gagal — dan itu
       // yang terjadi saat kolam koneksi Supabase habis di tengah job.
+      const quarters = rows.filter((r) => r.periodType === 'kuartal').length
       result.rowsWritten += await upsertFundamentals(rows.splice(0))
-      result.itemsProcessed++
+      if (quarters < 4) needYahoo.push(symbol)
+      else result.itemsProcessed++
       await new Promise((resolve) => setTimeout(resolve, DELAY_MS))
     } catch (err) {
       // Baris emiten ini yang sempat terkumpul dibuang, supaya tidak ikut
@@ -162,6 +167,7 @@ export async function runFundamentalJob(input: {
 
   // Sisa baris dari emiten yang gagal di tengah jalan tidak ditulis: datanya
   // setengah jadi. Yang sudah berhasil sudah tertulis di dalam loop.
+  if (needYahoo.length > 0) await runYahooFundamentalJob(needYahoo, 'US', result)
   return result
 }
 
