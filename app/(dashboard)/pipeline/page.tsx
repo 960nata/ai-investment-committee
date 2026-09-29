@@ -256,8 +256,8 @@ export default async function PipelinePage() {
           >
             {data.fundamentals.length === 0 ? (
               <Blank icon={<IconDatabase size={22} />} title="Belum ada laporan keuangan">
-                Jalankan <code>npm run job fundamental-us</code> untuk menariknya dari SEC
-                EDGAR. Tanpa ini, bobot valuasi dan pertumbuhan di horizon panjang kosong.
+                Jalankan <code>npm run job fundamental-us</code> (SEC), <code>fundamental-idx</code>, atau <code>fundamental-global</code> (Yahoo) untuk menariknya.
+                Tanpa ini, bobot valuasi dan pertumbuhan di horizon panjang kosong.
               </Blank>
             ) : (
               <table className="grid">

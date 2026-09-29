@@ -98,6 +98,7 @@ export const SOURCE_RANK: Record<string, number> = {
   eodhd: 3,
   fmp: 3,
   finnhub: 4,
+  'yahoo-finance': 4,
 }
 
 const rank = (source: string) => SOURCE_RANK[source] ?? 9

@@ -56,6 +56,8 @@ const HANDLERS: Record<string, (payload: JobPayload) => Promise<BatchResult>> = 
   'score-us': scoreBatch,
   'score-global': scoreBatch,
   'fundamental-us': fundamentalBatch,
+  'fundamental-idx': fundamentalBatch,
+  'fundamental-global': fundamentalBatch,
   'ingest-ksei-monthly': kseiBatch,
   'ingest-macro': macroBatch,
   'komite-review': reviewCommittee,

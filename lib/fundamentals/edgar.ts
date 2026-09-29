@@ -343,7 +343,11 @@ export function sanityCheck(row: CanonicalPeriod): string | null {
   const ekuitas = items.ekuitas
 
   if (aset !== undefined && liabilitas !== undefined && ekuitas !== undefined && aset > 0) {
-    const selisih = Math.abs(aset - (liabilitas + ekuitas)) / aset
+    // Kepentingan nonpengendali ikut dihitung bila sumbernya menyebutnya.
+    // Ekuitas di sini ekuitas induk; tanpa itu konglomerat dengan anak usaha
+    // besar (ASII, UNTR) selalu tampak meleset belasan persen.
+    const nonpengendali = items.kepentingan_nonpengendali ?? 0
+    const selisih = Math.abs(aset - (liabilitas + ekuitas + nonpengendali)) / aset
     if (selisih > 0.02) {
       return `identitas neraca meleset ${(selisih * 100).toFixed(1)}%`
     }

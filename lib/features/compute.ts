@@ -43,7 +43,7 @@ import {
   type Series,
 } from './indicators'
 import { FEATURES, normalisedFeatureNames } from './registry'
-import { computeFundamentalFeatures, type FundamentalPeriod } from './fundamentals'
+import { computeFundamentalFeatures, priceToReportFactor, type FundamentalPeriod } from './fundamentals'
 import { ownershipSeries, type OwnershipPointLite } from '@/lib/ownership/features'
 
 /**
@@ -110,6 +110,11 @@ export interface ComputeInput {
    * 1 April adalah melihat masa depan.
    */
   fundamentals?: FundamentalPeriod[]
+  /**
+   * Mata uang harga. Bursa London mengutip dalam pence (`GBp`), bukan pound.
+   * Dibandingkan dengan mata uang laporan sebelum rasio berbasis harga dihitung.
+   */
+  priceCurrency?: string
   /**
    * Posisi kepemilikan KSEI, hanya untuk saham IDX. Dipilih per tanggal menurut
    * `availableAt`, dengan alasan yang sama seperti `reportedAt` di atas.
@@ -273,7 +278,7 @@ export function computeFeatures(input: ComputeInput): ComputeResult {
 
   if (input.fundamentals && input.fundamentals.length > 0) {
     for (const [name, serie] of Object.entries(
-      fundamentalSeries(date, close, input.fundamentals),
+      fundamentalSeries(date, close, input.fundamentals, input.priceCurrency),
     )) {
       raw[name] = serie
     }
@@ -362,6 +367,7 @@ function fundamentalSeries(
   dates: readonly string[],
   close: Series,
   periods: FundamentalPeriod[],
+  priceCurrency?: string,
 ): Record<string, MaybeSeries> {
   const sorted = [...periods].sort((a, b) => b.reportedAt.localeCompare(a.reportedAt))
   const out: Record<string, MaybeSeries> = {}
@@ -370,6 +376,8 @@ function fundamentalSeries(
   // bukan tiap hari. Rasio yang sama dihitung ratusan kali kalau tidak.
   let cursor = sorted.length
   let cached: Record<string, number | null> | null = null
+  const factor = priceToReportFactor(priceCurrency, sorted[0]?.currency)
+  const priceAt = (i: number) => (factor === null ? null : close[i] * factor)
 
   for (let i = 0; i < dates.length; i++) {
     const available = sorted.filter((p) => p.reportedAt <= dates[i])
@@ -379,11 +387,11 @@ function fundamentalSeries(
       cached =
         available.length === 0
           ? null
-          : (computeFundamentalFeatures(available, close[i])?.values ?? null)
+          : (computeFundamentalFeatures(available, priceAt(i))?.values ?? null)
     } else if (cached !== null && available.length > 0) {
       // Harga berubah tiap hari meski laporannya tetap, jadi rasio yang memakai
       // harga wajib dihitung ulang. Sisanya diambil dari hasil sebelumnya.
-      cached = computeFundamentalFeatures(available, close[i])?.values ?? null
+      cached = computeFundamentalFeatures(available, priceAt(i))?.values ?? null
     }
 
     if (cached === null) continue

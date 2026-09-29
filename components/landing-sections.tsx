@@ -473,8 +473,8 @@ export function LimitsSection({
                   <span>tinggi, sedang, atau rendah</span>
                 </p>
                 <p className="lp-limits-why">
-                  Sebagian besar karena data laporan keuangan belum ditarik. Ditampilkan apa
-                  adanya, bukan diisi angka asal.
+                  Sebagian besar komoditas, indeks, dan memecoin: data arus dana dan sentimen
+                  untuk jenis aset ini belum ada. Ditampilkan apa adanya, bukan diisi angka asal.
                 </p>
               </div>
             )}

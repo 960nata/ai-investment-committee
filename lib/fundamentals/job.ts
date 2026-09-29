@@ -15,6 +15,7 @@ import { getInstrumentBySymbol, quarantineRow, upsertFundamentals, type Fundamen
 import type { MarketCode } from '@/lib/db/schema'
 import { fetchCompanyFacts, fetchTickerMap, parseCompanyFacts, sanityCheck } from './edgar'
 import { crossPeriodIssues } from './quality'
+import { fetchYahooFundamentals, fiscalYearEndMonthOf, YAHOO_SOURCE_ID } from './yahoo'
 
 /** Jeda antar-instrumen. SEC menyarankan tidak lebih dari sepuluh per detik. */
 const DELAY_MS = 400
@@ -50,8 +51,12 @@ export async function runFundamentalJob(input: {
     errors: [],
   }
 
+  // EDGAR hanya melayani emiten yang melapor ke SEC. Bursa lain lewat Yahoo.
+  if (input.market === 'IDX' || input.market === 'GLOBAL') {
+    return runYahooFundamentalJob(input.symbols, input.market, result)
+  }
   if (input.market !== 'US') {
-    throw new Error(`EDGAR hanya melayani pasar US, bukan ${input.market}`)
+    throw new Error(`Pasar ${input.market} tidak punya laporan keuangan`)
   }
 
   const tickers = await fetchTickerMap()
@@ -157,5 +162,90 @@ export async function runFundamentalJob(input: {
 
   // Sisa baris dari emiten yang gagal di tengah jalan tidak ditulis: datanya
   // setengah jadi. Yang sudah berhasil sudah tertulis di dalam loop.
+  return result
+}
+
+/** Jeda antar-emiten ke Yahoo. Tanpa kunci API, jadi sopan saja. */
+const YAHOO_DELAY_MS = 500
+
+/**
+ * Jalur Yahoo untuk saham IDX dan global. Pemeriksaan kualitasnya sama dengan
+ * EDGAR: identitas neraca, margin yang mustahil, dan lompatan pendapatan
+ * lintas tahun dikarantina, bukan ditulis.
+ */
+async function runYahooFundamentalJob(
+  symbols: string[],
+  market: MarketCode,
+  result: FundamentalJobResult,
+): Promise<FundamentalJobResult> {
+  for (const symbol of symbols) {
+    try {
+      const instrument = await getInstrumentBySymbol(market, symbol)
+      if (!instrument) {
+        result.skipped.push({ symbol, reason: 'instrumen belum terdaftar' })
+        continue
+      }
+      if (instrument.assetClass !== 'saham') {
+        result.skipped.push({ symbol, reason: 'bukan saham' })
+        continue
+      }
+
+      const parsed = await fetchYahooFundamentals(symbol)
+      if (parsed.length === 0) {
+        result.skipped.push({ symbol, reason: 'Yahoo tidak punya laporan keuangan' })
+        result.itemsProcessed++
+        continue
+      }
+
+      const fiscalYearEndMonth = fiscalYearEndMonthOf(parsed)
+      const holdPeriods = new Map<string, string>()
+      for (const issue of crossPeriodIssues(parsed)) {
+        if (issue.reason.startsWith('pendapatan')) holdPeriods.set(issue.period, issue.reason)
+        else result.warnings.push(`${symbol} ${issue.period}: ${issue.reason}`)
+      }
+
+      const rows: FundamentalInput[] = []
+      for (const row of parsed) {
+        const problem = sanityCheck(row) ?? holdPeriods.get(row.period) ?? null
+        if (problem) {
+          await quarantineRow({
+            instrumentId: instrument.id,
+            sourceId: YAHOO_SOURCE_ID,
+            payload: { symbol, period: row.period, items: row.items },
+            reason: problem,
+          })
+          result.quarantined++
+          continue
+        }
+        rows.push({
+          instrumentId: instrument.id,
+          period: row.period,
+          sourceAccession: row.sourceAccession,
+          periodType: row.periodType,
+          periodEnd: row.periodEnd,
+          reportedAt: row.reportedAt,
+          fiscalYear: row.fiscalYear,
+          fiscalPeriod: row.fiscalPeriod,
+          currency: row.currency,
+          // Yahoo selalu dalam satuan penuh.
+          unitScale: 1,
+          fiscalYearEndMonth,
+          items: row.items,
+          missingItems: row.missingItems,
+          completeness: row.completeness,
+          sourceId: YAHOO_SOURCE_ID,
+        })
+      }
+
+      result.rowsWritten += await upsertFundamentals(rows)
+      result.itemsProcessed++
+      await new Promise((resolve) => setTimeout(resolve, YAHOO_DELAY_MS))
+    } catch (err) {
+      const message = describeError(err)
+      console.error(`[Fundamental] ${symbol} gagal:`, message)
+      result.errors.push(`${symbol}: ${message}`)
+      result.itemsFailed++
+    }
+  }
   return result
 }

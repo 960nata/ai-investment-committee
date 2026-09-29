@@ -16,6 +16,8 @@ export interface FundamentalPeriod {
   periodType: 'kuartal' | 'tahunan'
   periodEnd: string
   reportedAt: string
+  /** Mata uang laporan. Tidak selalu sama dengan mata uang harga. */
+  currency?: string
   items: Record<string, number>
 }
 
@@ -68,7 +70,8 @@ function ratio(a: number | null, b: number | null): number | null {
  */
 export function computeFundamentalFeatures(
   periods: FundamentalPeriod[],
-  price: number,
+  /** Harga dalam mata uang laporan; null bila tidak bisa disetarakan. */
+  price: number | null,
 ): FundamentalSnapshot | null {
   if (periods.length === 0) return null
 
@@ -90,7 +93,7 @@ export function computeFundamentalFeatures(
   const penyusutanTtm = ttm(periods, 'penyusutan')
   const dividenTtm = ttm(periods, 'dividen_dibayar')
 
-  const kapitalisasi = shares === null ? null : price * shares
+  const kapitalisasi = shares === null || price === null ? null : price * shares
   const ev =
     kapitalisasi === null || kas === null ? null : kapitalisasi + utang - kas
   const ebitda = labaOperasiTtm === null ? null : labaOperasiTtm + (penyusutanTtm ?? 0)
@@ -157,6 +160,21 @@ export function computeFundamentalFeatures(
   v.piotroski = piotroski(periods, { labaBersihTtm, cfoTtm, totalAset })
 
   return { asOfReported: periods[0].reportedAt, values: round(v) }
+}
+
+/**
+ * Pengali dari harga ke mata uang laporan, atau null bila tak bisa disetarakan.
+ *
+ * ADRO melapor dalam dolar tetapi diperdagangkan dalam rupiah; SHEL.L melapor
+ * dalam dolar tetapi diperdagangkan dalam pence. Mengalikan harga rupiah dengan
+ * jumlah saham lalu membaginya dengan laba dolar menghasilkan PER yang meleset
+ * enam belas ribu kali. Tanpa kurs historis, rasio berbasis harga dikosongkan —
+ * ROE, margin, dan rasio neraca lain tidak memakai harga dan tetap terhitung.
+ */
+export function priceToReportFactor(priceCurrency: string | undefined, reportCurrency: string | undefined): number | null {
+  if (!priceCurrency || !reportCurrency || priceCurrency === reportCurrency) return 1
+  if (priceCurrency === 'GBp' && reportCurrency === 'GBP') return 0.01
+  return null
 }
 
 function growthYoY(periods: FundamentalPeriod[], item: string): number | null {

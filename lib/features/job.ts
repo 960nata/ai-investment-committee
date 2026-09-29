@@ -184,7 +184,11 @@ export async function runFeatureJob(input: FeatureJobInput): Promise<FeatureJobR
       // sama sekali, supaya tidak ada kueri yang pasti kosong di tiap instrumen.
       const ownership = market === 'IDX' ? await getOwnershipAsOf(instrument.id, to) : undefined
 
-      const computed = computeFeatures({ market, series, benchmarkClose, fundamentals, ownership })
+      // Yahoo mengutip saham London dalam pence, sedangkan instrumennya
+      // dicatat GBP. Laporan keuangannya dalam pound.
+      const priceCurrency = instrument.symbol.endsWith('.L') && instrument.currency === 'GBP' ? 'GBp' : instrument.currency
+
+      const computed = computeFeatures({ market, series, benchmarkClose, fundamentals, ownership, priceCurrency })
 
       const dense = isoDaysAgo(DENSE_WINDOW_DAYS)
       const selected = computed.rows.filter((row, index) => {

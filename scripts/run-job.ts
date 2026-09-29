@@ -39,6 +39,8 @@ const JOBS = [
   'score-us',
   'score-global',
   'fundamental-us',
+  'fundamental-idx',
+  'fundamental-global',
   'normalise-cross-section',
   'ingest-ksei-monthly',
   'ingest-macro',

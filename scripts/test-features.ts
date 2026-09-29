@@ -39,6 +39,9 @@ import { parseKsei, unzipSingleEntry, kseiAvailableAt } from '../lib/ownership/k
 import { computeOwnershipFeatures, ownershipSeries, type OwnershipPointLite } from '../lib/ownership/features'
 import { crossPeriodIssues, reconcileValues, reconcileItems } from '../lib/fundamentals/quality'
 import { capTerminalGrowth } from '../lib/macro/sources'
+import { parseYahooTimeseries } from '../lib/fundamentals/yahoo'
+import { priceToReportFactor, computeFundamentalFeatures } from '../lib/features/fundamentals'
+import { sanityCheck } from '../lib/fundamentals/edgar'
 
 // ---------------------------------------------------------------------------
 // Kerangka uji minimal
@@ -892,6 +895,69 @@ test('pertumbuhan terminal dibatasi PDB nominal', () => {
   assert(!ok.capped && ok.value === 0.04, 'di bawah batas tidak diubah')
   const noData = capTerminalGrowth(0.1, null)
   assert(noData.capped && noData.value === 0.03, 'tanpa data PDB, batasnya 3% yang konservatif')
+})
+
+// ---------------------------------------------------------------------------
+// Laporan keuangan Yahoo (saham IDX dan global)
+
+function yahooSeries(type: string, points: [string, number, string?][]) {
+  return {
+    meta: { type: [type] },
+    [type]: points.map(([asOfDate, raw, currencyCode = 'IDR']) => ({ asOfDate, currencyCode, reportedValue: { raw } })),
+  }
+}
+
+test('parser Yahoo: kuartal, tahunan, dan arus kas keluar jadi nilai mutlak', () => {
+  const periods = parseYahooTimeseries([
+    yahooSeries('quarterlyTotalRevenue', [['2026-06-30', 100]]),
+    yahooSeries('quarterlyCapitalExpenditure', [['2026-06-30', -30]]),
+    yahooSeries('annualTotalRevenue', [['2025-12-31', 380]]),
+  ])
+  const q = periods.find((p) => p.periodType === 'kuartal')!
+  assert(q.period === '2026-Q2', `kuartal Juni tahun buku Desember = Q2, dapat ${q.period}`)
+  assert(q.items.pendapatan === 100 && q.items.belanja_modal === 30, 'belanja modal negatif Yahoo disimpan positif')
+  assert(q.reportedAt === '2026-08-29', `kuartal terbit dianggap 60 hari sesudahnya, dapat ${q.reportedAt}`)
+  const fy = periods.find((p) => p.periodType === 'tahunan')!
+  assert(fy.period === '2025-FY' && fy.reportedAt === '2026-03-31', `tahunan terbit 90 hari sesudahnya, dapat ${fy.reportedAt}`)
+})
+
+test('parser Yahoo: tahun buku Maret (Jepang) menomori kuartal dengan benar', () => {
+  const periods = parseYahooTimeseries([
+    yahooSeries('annualTotalRevenue', [['2026-03-31', 400, 'JPY']]),
+    yahooSeries('quarterlyTotalRevenue', [['2026-06-30', 100, 'JPY'], ['2026-03-31', 100, 'JPY']]),
+  ])
+  const labels = periods.filter((p) => p.periodType === 'kuartal').map((p) => p.period).sort()
+  assert(labels.join(',') === '2026-Q4,2027-Q1', `Jun 2026 = FY2027 Q1, Mar 2026 = FY2026 Q4; dapat ${labels}`)
+})
+
+test('parser Yahoo: bank dikenali dari datanya, bukan dari nama', () => {
+  const periods = parseYahooTimeseries([
+    yahooSeries('quarterlyNetInterestIncome', [['2026-06-30', 50]]),
+    yahooSeries('quarterlyTotalRevenue', [['2026-06-30', 80]]),
+  ])
+  assert(!periods[0].missingItems.includes('aset_lancar'), 'bank tidak ditagih aset lancar')
+})
+
+test('identitas neraca memperhitungkan kepentingan nonpengendali', () => {
+  const row = {
+    period: '2026-Q2', periodType: 'kuartal' as const, periodEnd: '2026-06-30', reportedAt: '2026-08-29',
+    fiscalYear: 2026, fiscalPeriod: 'Q2', currency: 'IDR', sourceAccession: 'x', missingItems: [], completeness: 1,
+    items: { total_aset: 100, total_liabilitas: 50, ekuitas: 35, kepentingan_nonpengendali: 15 },
+  }
+  assert(sanityCheck(row) === null, 'aset = liabilitas + ekuitas induk + nonpengendali')
+})
+
+test('rasio berbasis harga kosong bila mata uang harga dan laporan berbeda', () => {
+  assert(priceToReportFactor('IDR', 'IDR') === 1, 'sama: apa adanya')
+  assert(priceToReportFactor('GBp', 'GBP') === 0.01, 'pence ke pound')
+  assert(priceToReportFactor('IDR', 'USD') === null, 'rupiah vs dolar tidak disetarakan')
+  const periods = ['2026-06-30', '2026-03-31', '2025-12-31', '2025-09-30'].map((periodEnd) => ({
+    period: periodEnd, periodType: 'kuartal' as const, periodEnd, reportedAt: periodEnd,
+    items: { laba_bersih: 10, ekuitas: 100, saham_beredar: 10 },
+  }))
+  const v = computeFundamentalFeatures(periods, null)!.values
+  assert(v.per === null && v.pbv === null, 'tanpa harga setara, PER dan PBV kosong')
+  assert(v.roe !== null, 'ROE tidak memakai harga, tetap terhitung')
 })
 
 // ---------------------------------------------------------------------------
