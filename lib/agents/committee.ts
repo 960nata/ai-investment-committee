@@ -48,7 +48,8 @@ export { parseVerdict, type CommitteeVerdict }
  * peran berubah: putusan lama hanya dipakai ulang bila versinya sama, jadi
  * perbaikan prompt langsung berlaku tanpa menunggu candle baru.
  */
-export const COMMITTEE_VERSION = '2026-09-27.2'
+// 2026-09-29.1: blok fakta memuat fundamental, kepemilikan KSEI, dan skor sistem.
+export const COMMITTEE_VERSION = '2026-09-29.1'
 
 
 export interface CommitteeResult {

@@ -102,8 +102,46 @@ export interface MarketFacts {
   monthly: PeriodCandle[]
   /** Candle tahunan sepanjang riwayat yang dianalisis. */
   yearly: PeriodCandle[]
+  /**
+   * Fitur non-harga pada tanggal fitur terakhir: laporan keuangan dan
+   * kepemilikan KSEI. Sudah point-in-time — dihitung dari laporan yang terbit
+   * pada tanggal itu, bukan dari periode yang sudah lewat. `null` bila jenis
+   * asetnya memang tidak punya (kripto, indeks, komoditas).
+   */
+  fundamentals?: { asOf: string; values: Record<string, number | null> } | null
+  /** Skor sistem per horizon, dengan label keyakinan yang dihitung mesin skor. */
+  systemScores?: { horizon: string; asOf: string; score: number; confidence: string }[]
   warnings: string[]
 }
+
+/** Fitur fundamental dan kepemilikan yang dibacakan ke komite, dengan cara membacanya. */
+export const FUNDAMENTAL_FACTS: { key: string; label: string; unit: 'x' | 'pct' | 'pct-raw' | 'raw' }[] = [
+  { key: 'per', label: 'PER', unit: 'x' },
+  { key: 'pbv', label: 'PBV', unit: 'x' },
+  { key: 'psr', label: 'PSR', unit: 'x' },
+  { key: 'ev_ebitda', label: 'EV/EBITDA', unit: 'x' },
+  { key: 'earnings_yield', label: 'Earnings yield', unit: 'pct' },
+  { key: 'fcf_yield', label: 'FCF yield', unit: 'pct' },
+  { key: 'dividend_yield', label: 'Dividend yield', unit: 'pct' },
+  { key: 'roe', label: 'ROE', unit: 'pct' },
+  { key: 'roa', label: 'ROA', unit: 'pct' },
+  { key: 'margin_kotor', label: 'Margin kotor', unit: 'pct' },
+  { key: 'margin_operasi', label: 'Margin operasi', unit: 'pct' },
+  { key: 'margin_bersih', label: 'Margin bersih', unit: 'pct' },
+  { key: 'der', label: 'DER (liabilitas/ekuitas)', unit: 'x' },
+  { key: 'current_ratio', label: 'Current ratio', unit: 'x' },
+  { key: 'pertumbuhan_pendapatan_yoy', label: 'Pertumbuhan pendapatan YoY', unit: 'pct' },
+  { key: 'pertumbuhan_laba_yoy', label: 'Pertumbuhan laba YoY', unit: 'pct' },
+  { key: 'pertumbuhan_pendapatan_3t', label: 'CAGR pendapatan 3 tahun', unit: 'pct' },
+  { key: 'perubahan_saham_yoy', label: 'Perubahan saham beredar YoY', unit: 'pct' },
+  { key: 'piotroski', label: 'Piotroski F-Score (0–9)', unit: 'raw' },
+  { key: 'altman_z', label: "Altman Z''", unit: 'raw' },
+  { key: 'asing_pct', label: 'Kepemilikan asing (KSEI)', unit: 'pct-raw' },
+  { key: 'asing_chg_1b', label: 'Perubahan porsi asing 1 bulan', unit: 'pct-raw' },
+  { key: 'asing_chg_3b', label: 'Perubahan porsi asing 3 bulan', unit: 'pct-raw' },
+  { key: 'institusi_pct', label: 'Kepemilikan institusi (KSEI)', unit: 'pct-raw' },
+  { key: 'institusi_chg_3b', label: 'Perubahan porsi institusi 3 bulan', unit: 'pct-raw' },
+]
 
 /** Dipisah dari I/O supaya bisa diuji dengan deret buatan. */
 export function buildFacts(
@@ -445,6 +483,28 @@ export function factsToPrompt(facts: MarketFacts, detail: 'full' | 'summary' = '
     }
   }
 
+  if (facts.fundamentals !== undefined) {
+    const f = facts.fundamentals
+    if (f === null) {
+      lines.push(``, `FUNDAMENTAL: tidak berlaku — jenis aset ini tidak menerbitkan laporan keuangan.`)
+    } else {
+      const show = (v: number, unit: (typeof FUNDAMENTAL_FACTS)[number]['unit']) =>
+        unit === 'x' ? `${round2(v)}x` : unit === 'pct' ? `${round2(v * 100)}%` : unit === 'pct-raw' ? `${round2(v)}%` : `${round2(v)}`
+      const present = FUNDAMENTAL_FACTS.filter((d) => f.values[d.key] != null)
+      const absent = FUNDAMENTAL_FACTS.filter((d) => f.values[d.key] == null)
+      lines.push(``, `FUNDAMENTAL & KEPEMILIKAN (laporan yang sudah terbit per ${f.asOf}):`)
+      for (const d of present) lines.push(`${d.label}: ${show(f.values[d.key]!, d.unit)}`)
+      if (absent.length > 0) lines.push(`Tidak tersedia: ${absent.map((d) => d.label).join(', ')}`)
+    }
+  }
+
+  if (facts.systemScores && facts.systemScores.length > 0) {
+    lines.push(``, `SKOR SISTEM (−10 sampai +10, belum dikalibrasi):`)
+    for (const sc of facts.systemScores) {
+      lines.push(`Horizon ${sc.horizon}: ${round2(sc.score)} — keyakinan ${sc.confidence} (per ${sc.asOf})`)
+    }
+  }
+
   if (detail === 'full') {
     candleTable('CANDLE TAHUNAN', facts.yearly)
     candleTable(`CANDLE BULANAN ${PROMPT_MONTHS} TERAKHIR`, facts.monthly.slice(-PROMPT_MONTHS))
@@ -458,4 +518,8 @@ export function factsToPrompt(facts: MarketFacts, detail: 'full' | 'summary' = '
   )
 
   return lines.join('\n')
+}
+
+function round2(v: number): number {
+  return Math.round(v * 100) / 100
 }

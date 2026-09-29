@@ -36,8 +36,19 @@ export interface FundamentalSnapshot {
  */
 function ttm(periods: FundamentalPeriod[], item: string): number | null {
   const quarters = periods.filter((p) => p.periodType === 'kuartal' && p.items[item] !== undefined)
-  if (quarters.length < 4) return null
-  return quarters.slice(0, 4).reduce((sum, p) => sum + p.items[item], 0)
+  if (quarters.length >= 4) return quarters.slice(0, 4).reduce((sum, p) => sum + p.items[item], 0)
+  // Cadangan: laporan tahunan terakhir yang sudah terbit. Sumber seperti Yahoo
+  // hanya menyimpan lima kuartal, dan dividen emiten IDX sering hanya muncul
+  // di arus kas tahunan. Angka setahun penuh yang sedikit lebih tua lebih
+  // jujur daripada "tidak tersedia" untuk pos yang jelas ada.
+  return annualValues(periods, item)[0] ?? null
+}
+
+/** Nilai tahunan satu pos, terbaru dulu. */
+function annualValues(periods: FundamentalPeriod[], item: string): number[] {
+  return periods
+    .filter((p) => p.periodType === 'tahunan' && p.items[item] !== undefined)
+    .map((p) => p.items[item])
 }
 
 /** Nilai neraca terakhir. Pos sesaat tidak dijumlah, cukup diambil yang terbaru. */
@@ -177,18 +188,39 @@ export function priceToReportFactor(priceCurrency: string | undefined, reportCur
   return null
 }
 
+function quarterlyTtm(periods: FundamentalPeriod[], item: string, skip: number): number | null {
+  const quarters = periods.filter((p) => p.periodType === 'kuartal' && p.items[item] !== undefined)
+  if (quarters.length < skip + 4) return null
+  return quarters.slice(skip, skip + 4).reduce((sum, p) => sum + p.items[item], 0)
+}
+
+/**
+ * Pertumbuhan setahun: empat kuartal terakhir terhadap empat sebelumnya, atau —
+ * bila riwayat kuartalnya kurang dari delapan — dua laporan tahunan terakhir.
+ */
 function growthYoY(periods: FundamentalPeriod[], item: string): number | null {
-  const now = ttm(periods, item)
-  const older = ttm(periods.slice(4), item)
+  let now = quarterlyTtm(periods, item, 0)
+  let older = quarterlyTtm(periods, item, 4)
+  if (now === null || older === null) {
+    const annual = annualValues(periods, item)
+    now = annual[0] ?? null
+    older = annual[1] ?? null
+  }
   if (now === null || older === null || older === 0) return null
   return (now - older) / Math.abs(older)
 }
 
 function cagr(periods: FundamentalPeriod[], item: string, quarters: number): number | null {
-  const now = ttm(periods, item)
-  const then = ttm(periods.slice(quarters), item)
+  let now = quarterlyTtm(periods, item, 0)
+  let then = quarterlyTtm(periods, item, quarters)
+  const years = quarters / 4
+  if (now === null || then === null) {
+    const annual = annualValues(periods, item)
+    now = annual[0] ?? null
+    then = annual[years] ?? null
+  }
   if (now === null || then === null || then <= 0 || now <= 0) return null
-  return Math.pow(now / then, 4 / quarters) - 1
+  return Math.pow(now / then, 1 / years) - 1
 }
 
 /**

@@ -15,9 +15,11 @@
  * bisa diuji tanpa koneksi apa pun.
  */
 
-import { getCandles, getInstrumentBySymbol } from '@/lib/db/queries'
+import { getCandles, getInstrumentBySymbol, getLatestFeature, getLatestScoresForSymbol } from '@/lib/db/queries'
 import type { MarketCode } from '@/lib/db/schema'
-import { MIN_CANDLES, buildFacts, type MarketFacts, type PricePoint } from './facts'
+import { FEATURE_SET_VERSION } from '@/lib/features/compute'
+import { fundamentalsApply, MODEL_VERSION } from '@/lib/scoring/weights'
+import { FUNDAMENTAL_FACTS, MIN_CANDLES, buildFacts, type MarketFacts, type PricePoint } from './facts'
 
 export * from './facts'
 
@@ -75,7 +77,37 @@ export async function gatherFacts(
     low: Number(r.low),
   }))
 
-  return buildFacts(instrument, series, now)
+  const facts = buildFacts(instrument, series, now)
+
+  // Fakta non-harga. Pelengkap: kegagalannya tidak boleh membatalkan rapat,
+  // cukup tercatat sebagai peringatan supaya komite tahu apa yang tidak ada.
+  const [feature, scores] = await Promise.all([
+    getLatestFeature(instrument.id, FEATURE_SET_VERSION).catch(() => null),
+    getLatestScoresForSymbol(symbol, MODEL_VERSION).catch(() => null),
+  ])
+
+  if (!fundamentalsApply(instrument.assetClass)) {
+    facts.fundamentals = null
+  } else if (feature) {
+    const values = Object.fromEntries(
+      FUNDAMENTAL_FACTS.map((d) => [d.key, (feature.values as Record<string, number | null>)[d.key] ?? null]),
+    )
+    facts.fundamentals = { asOf: feature.date, values }
+    if (Object.values(values).every((v) => v === null)) {
+      facts.warnings.push('Laporan keuangan belum tersedia untuk emiten ini.')
+    }
+  } else {
+    facts.warnings.push('Fitur fundamental belum dihitung untuk emiten ini.')
+  }
+
+  facts.systemScores = (scores?.scores ?? []).map((s) => ({
+    horizon: s.horizon,
+    asOf: s.date,
+    score: s.score,
+    confidence: s.confidence,
+  }))
+
+  return facts
 }
 
 function isoDate(date: Date): string {
