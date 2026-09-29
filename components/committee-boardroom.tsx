@@ -18,8 +18,8 @@ import {
   IconRefresh,
 } from './icons'
 import { verdictLabel, verdictTone } from '@/lib/format/verdict'
-import { CommitteeSessionStage, type StageFact } from './committee-session-stage'
-import type { AgentId } from './landing-protocol'
+import { CommitteeSessionStage } from './committee-session-stage'
+import { cleanRationale, findVal, isPos, parseKetua, parseLabeledSections, toStageView } from '@/lib/agents/session-view'
 
 interface Turn {
   agent: string
@@ -180,28 +180,7 @@ export function CommitteeBoardroom({ symbol, market, name, onClose }: Props) {
   }
 
   // Parse detail dari giliran Ketua untuk safeguarded items
-  const parsedKetua = useMemo(() => {
-    const ketuaTurn = turns.find((t) => t.agent === 'ketua')
-    if (!ketuaTurn?.content) return null
-
-    try {
-      return JSON.parse(ketuaTurn.content)
-    } catch {
-      const lines = ketuaTurn.content.split('\n')
-      const res: Record<string, string> = {}
-      for (const line of lines) {
-        const parts = line.split(':')
-        if (parts.length > 1) {
-          const k = parts[0].toLowerCase().trim()
-          const v = parts.slice(1).join(':').trim()
-          if (k.includes('risiko') || k.includes('risk')) res.key_risk = v
-          if (k.includes('batal') || k.includes('invalidation')) res.invalidation = v
-          if (k.includes('alasan') || k.includes('rationale')) res.rationale = v
-        }
-      }
-      return res
-    }
-  }, [turns])
+  const parsedKetua = useMemo(() => parseKetua(turns.find((t) => t.agent === 'ketua')?.content), [turns])
 
   function handleShare() {
     if (!session) return
@@ -237,24 +216,7 @@ export function CommitteeBoardroom({ symbol, market, name, onClose }: Props) {
   const verdict = session?.verdict
   const confidence = session?.confidence ?? 0
 
-  const turnAnalis = turns.find((t) => t.agent === 'analis')
-  const turnStrateg = turns.find((t) => t.agent === 'strateg')
-  const turnRisiko = turns.find((t) => t.agent === 'risiko')
-
-  const rationale = cleanRationale((parsedKetua?.rationale as string | undefined) ?? session?.rationale ?? null)
-  const invalidation = (parsedKetua?.invalidation as string | undefined) || undefined
-  const bullThesis = turnStrateg ? strategThesis(turnStrateg.content) : undefined
-  const bearRisk =
-    (parsedKetua?.key_risk as string | undefined) || (turnRisiko ? risikoWorstCase(turnRisiko.content) : undefined)
-  const keyFacts = useMemo(() => (turnAnalis ? analisFacts(turnAnalis.content) : []), [turnAnalis])
-  const analisLine = turnAnalis
-    ? keyFacts.length > 0
-      ? keyFacts.map((f) => `${f.label} ${f.value}`).join(' · ') + '.'
-      : firstSentences(turnAnalis.content)
-    : undefined
-  const latencyByAgent = Object.fromEntries(
-    turns.filter((t) => t.latencyMs).map((t) => [t.agent, t.latencyMs as number]),
-  ) as Partial<Record<AgentId, number>>
+  const stage = useMemo(() => toStageView(turns, session?.rationale ?? null), [turns, session?.rationale])
 
   return (
     <section className="boardroom-panel panel" style={{ marginTop: 'var(--space-4)' }}>
@@ -382,15 +344,15 @@ export function CommitteeBoardroom({ symbol, market, name, onClose }: Props) {
         <div className="boardroom-body">
           <CommitteeSessionStage
             symbol={symbol}
-            facts={keyFacts}
-            analis={analisLine}
-            strateg={bullThesis}
-            risiko={bearRisk}
+            facts={stage.facts}
+            analis={stage.analis}
+            strateg={stage.strateg}
+            risiko={stage.risiko}
             verdict={verdict ?? null}
             confidence={confidence}
-            rationale={rationale}
-            invalidation={invalidation}
-            latencyMs={latencyByAgent}
+            rationale={stage.rationale}
+            invalidation={stage.invalidation}
+            latencyMs={stage.latencyMs}
             playKey={session.id}
           />
 
@@ -452,62 +414,6 @@ export function CommitteeBoardroom({ symbol, market, name, onClose }: Props) {
 // ---------------------------------------------------------------------------
 // RINGKASAN PUTUSAN
 // ---------------------------------------------------------------------------
-
-/**
- * Alasan yang tersimpan di sesi sudah ditempeli "Risiko utama: …" dan
- * "Pembatalan: …" (lihat lib/agents/committee.ts). Keduanya punya tempat
- * sendiri di layar, jadi di sini dipotong supaya tidak terbaca dua kali.
- */
-function cleanRationale(text: string | null | undefined): string | undefined {
-  if (!text) return undefined
-  const cut = text.search(/\s(Risiko utama|Pembatalan|Main risk|Invalidation):/i)
-  return (cut > 0 ? text.slice(0, cut) : text).trim() || undefined
-}
-
-function strategThesis(raw: string): string | undefined {
-  return findVal(parseLabeledSections(raw), ['tesis investasi utama', 'tesis investasi', 'tesis utama', 'tesis'])
-}
-
-function risikoWorstCase(raw: string): string | undefined {
-  const map = parseLabeledSections(raw)
-  return (
-    findVal(map, ['skenario kerugian maksimal', 'skenario rugi', 'skenario terburuk', 'worst case']) ??
-    findVal(map, ['kelemahan utama', 'kelemahan'])
-  )
-}
-
-type FactTone = StageFact['tone']
-
-/** Dua kalimat pertama, untuk agen yang tidak menulis dalam format berlabel. */
-function firstSentences(raw: string): string {
-  const flat = raw.replace(/\s+/g, ' ').trim()
-  const m = flat.match(/^(.+?[.!?])\s+(.+?[.!?])(\s|$)/)
-  const text = m ? `${m[1]} ${m[2]}` : flat
-  return text.length > 280 ? `${text.slice(0, 277)}…` : text
-}
-
-/** Angka pijakan dari giliran analis, hanya yang benar-benar ia tulis. */
-function analisFacts(raw: string): { label: string; value: string; tone: FactTone }[] {
-  const map: Record<string, string> = {}
-  for (const line of raw.split('\n')) {
-    const i = line.indexOf(':')
-    if (i > 0) map[line.slice(0, i).toLowerCase().trim()] = line.slice(i + 1).trim()
-  }
-  const signed = (v: string): FactTone => (isPos(v) ? 'positive' : 'negative')
-  const defs: { label: string; keys: string[]; tone: (v: string) => FactTone }[] = [
-    { label: 'Return 90 hari', keys: ['imbal hasil 90 hari', 'return 90d', '90 hari'], tone: signed },
-    { label: 'Return 1 tahun', keys: ['imbal hasil 365 hari', 'return 365d', '365 hari', '1 tahun'], tone: signed },
-    { label: 'Drawdown maks', keys: ['penurunan terdalam', 'max drawdown', 'drawdown'], tone: () => 'negative' },
-    { label: 'Volatilitas', keys: ['volatilitas disetahunkan', 'volatilitas'], tone: () => 'neutral' },
-    { label: 'Rasio volume', keys: ['rasio volume', 'volume 20v100'], tone: () => 'neutral' },
-  ]
-  const facts: { label: string; value: string; tone: FactTone }[] = []
-  for (const d of defs) {
-    const value = findVal(map, d.keys)
-    if (value) facts.push({ label: d.label, value, tone: d.tone(value) })
-  }
-  return facts
-}
 
 // ---------------------------------------------------------------------------
 // SUB-RENDERER MASING-MASING AGEN
@@ -796,95 +702,4 @@ function FallbackRenderer({ raw }: { raw: string }) {
       })}
     </div>
   )
-}
-
-// ---------------------------------------------------------------------------
-// UTILITY PARSER HELPERS
-// ---------------------------------------------------------------------------
-
-/** Parser toleran format untuk teks terstruktur dari agen AI */
-function parseLabeledSections(raw: string): Record<string, string> {
-  const map: Record<string, string> = {}
-  const lines = raw
-    .split('\n')
-    .map((l) => l.trim())
-    .filter(Boolean)
-
-  let currentKey: string | null = null
-  let currentValParts: string[] = []
-
-  const flush = () => {
-    if (currentKey && currentValParts.length > 0) {
-      map[currentKey] = currentValParts.join(' ')
-    }
-  }
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
-
-    // Deteksi jika baris memiliki pemisah titik dua pendek (contoh: "Posisi: Sedang", "Bukti 1: Imbal hasil...")
-    const colonIdx = line.indexOf(':')
-    if (colonIdx > 0 && colonIdx < 45) {
-      flush()
-      currentKey = line
-        .slice(0, colonIdx)
-        .toLowerCase()
-        .trim()
-        .replace(/^[\*✓✕\-•\d\.\)]+\s*/, '')
-      currentValParts = [line.slice(colonIdx + 1).trim()]
-      continue
-    }
-
-    // Deteksi jika baris adalah heading terisolasi tanpa titik dua
-    const cleanLine = line.replace(/^[\*✓✕\-•\d\.\)]+\s*/, '').trim()
-    const lower = cleanLine.toLowerCase()
-    const isKnownHeader =
-      lower.startsWith('tesis') ||
-      lower.startsWith('bukti') ||
-      lower.startsWith('kelemahan') ||
-      lower.startsWith('data yang diabaikan') ||
-      lower.startsWith('data diabaikan') ||
-      lower.startsWith('validasi') ||
-      lower.startsWith('risiko likuiditas') ||
-      lower.startsWith('skenario') ||
-      lower.startsWith('kondisi wajib') ||
-      lower.startsWith('syarat pembatalan') ||
-      lower.startsWith('cutloss') ||
-      lower.startsWith('cut loss') ||
-      lower.startsWith('posisi') ||
-      lower.startsWith('horizon') ||
-      lower.startsWith('catatan')
-
-    if (isKnownHeader && cleanLine.length < 55) {
-      flush()
-      currentKey = lower
-      currentValParts = []
-      continue
-    }
-
-    // Baris kelanjutan teks
-    if (currentKey) {
-      currentValParts.push(line)
-    } else {
-      currentValParts.push(line)
-    }
-  }
-  flush()
-
-  return map
-}
-
-function findVal(map: Record<string, string>, keys: string[]): string | undefined {
-  for (const k of keys) {
-    if (map[k]) return map[k]
-  }
-  for (const [mk, mv] of Object.entries(map)) {
-    if (keys.some((k) => mk.includes(k))) return mv
-  }
-  return undefined
-}
-
-function isPos(val: string): boolean {
-  if (val.includes('-')) return false
-  return true
 }

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AGENTS, type AgentId } from './landing-protocol'
 import { verdictLabel } from '@/lib/format/verdict'
+import type { StageFact } from '@/lib/agents/session-view'
 
 /*
  * Ruang sidang di dashboard, dengan bahasa visual yang sama dengan bagian
@@ -14,11 +15,7 @@ import { verdictLabel } from '@/lib/format/verdict'
  * membaca putusan tidak harus menunggu: tombol "Lewati" menampilkan semuanya.
  */
 
-export interface StageFact {
-  label: string
-  value: string
-  tone: 'positive' | 'negative' | 'neutral'
-}
+export type { StageFact }
 
 interface Props {
   symbol: string

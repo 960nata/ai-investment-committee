@@ -790,6 +790,31 @@ export async function getLatestAgentSessionForSymbol(market: MarketCode, symbol:
   }
 }
 
+/**
+ * Sidang terakhir yang selesai dengan transkrip lengkap, dari instrumen mana
+ * pun — dipajang di beranda. Sesi yang gagal, masih berjalan, atau berakhir
+ * tanpa giliran analis (mis. abstain karena data kurang) dilewati: panggung
+ * sidang tidak punya apa-apa untuk diputar dari sesi seperti itu.
+ */
+export async function getLatestCompletedAgentSession() {
+  const sessions = await db
+    .select()
+    .from(agentSession)
+    .where(
+      and(
+        eq(agentSession.status, 'done'),
+        sql`${agentSession.verdict} is not null`,
+        sql`exists (select 1 from ${agentMessage} where ${agentMessage.sessionId} = ${agentSession.id} and ${agentMessage.agent} = 'analis')`,
+      ),
+    )
+    .orderBy(desc(agentSession.finishedAt))
+    .limit(1)
+
+  const session = sessions[0] ?? null
+  if (!session) return null
+  return { session, turns: await getAgentTranscript(session.id) }
+}
+
 // ---------------------------------------------------------------------------
 // Fitur harian
 // ---------------------------------------------------------------------------

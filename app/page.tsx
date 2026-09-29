@@ -6,6 +6,7 @@ import {
   getLatestScoresForSymbol,
   getLatestScoreConfidenceCounts,
   getLatestScoredModelVersion,
+  getLatestCompletedAgentSession,
   describeAge,
   type InstrumentQuote,
 } from '@/lib/db/queries'
@@ -13,6 +14,7 @@ import { getMarketNewsList } from '@/lib/db/news-queries'
 import { verifyAdminSession } from '@/lib/auth/admin-auth'
 import { getCurrentUser } from '@/lib/auth/user-auth'
 import { MODEL_VERSION } from '@/lib/scoring/weights'
+import { toLiveSession } from '@/lib/agents/session-view'
 import { LandingNav } from '@/components/landing-nav'
 import { NextAiLanding } from '@/components/next-ai-landing'
 import { LandingProtocol } from '@/components/landing-protocol'
@@ -111,16 +113,30 @@ const getCachedLandingData = unstable_cache(
 )
 
 /**
+ * Sidang komite terakhir untuk bagian "Cara sidang berjalan". Ditahan 30 detik
+ * seperti endpoint yang dipakai bagian itu untuk memeriksa sidang baru.
+ */
+const getCachedLatestSession = unstable_cache(
+  async () => {
+    const data = await getLatestCompletedAgentSession()
+    return data ? toLiveSession(data.session, data.turns) : null
+  },
+  ['landing-latest-committee-session'],
+  { revalidate: 30 }
+)
+
+/**
  * Beranda.
  */
 export default async function LandingPage() {
   const scoredVersion =
     (await getLatestScoredModelVersion(MODEL_VERSION).catch(() => null)) ?? MODEL_VERSION
 
-  const [landingData, isAdmin, session] = await Promise.all([
+  const [landingData, isAdmin, session, latestSession] = await Promise.all([
     getCachedLandingData(scoredVersion),
     verifyAdminSession().catch(() => false),
     getCurrentUser(),
+    getCachedLatestSession().catch(() => null),
   ])
 
   const { instruments, latestNews, freshness, sample, confidence, chartSamples } = landingData
@@ -194,7 +210,7 @@ export default async function LandingPage() {
       )}
 
       <WorkflowSection />
-      <LandingProtocol />
+      <LandingProtocol initial={latestSession} />
 
       <LimitsSection
         insufficient={confidence.byConfidence['tidak memadai'] ?? 0}
