@@ -27,6 +27,7 @@ import { runFundamentalJob } from '@/lib/fundamentals/job'
 import { runCommittee } from '@/lib/agents/committee'
 import { runKseiJob } from '@/lib/ownership/job'
 import { runMacroJob } from '@/lib/macro/job'
+import { runExternalJob } from '@/lib/external/job'
 import { runAutoNewsJob } from '@/lib/agents/auto-news'
 import { translateMissingNews } from '@/lib/agents/news-translator'
 import { publishJob } from '@/lib/queue/qstash'
@@ -60,6 +61,7 @@ const HANDLERS: Record<string, (payload: JobPayload) => Promise<BatchResult>> = 
   'fundamental-global': fundamentalBatch,
   'ingest-ksei-monthly': kseiBatch,
   'ingest-macro': macroBatch,
+  'ingest-external': externalBatch,
   'komite-review': reviewCommittee,
   'warta-otomatis': autoNewsBatch,
   'warta-terjemah': translateNewsBatch,
@@ -372,6 +374,19 @@ async function alertBatch(): Promise<BatchResult> {
     quarantined: 0,
     errors: [],
     extra: { alertsFired: r.fired, alertsPrimed: r.primed },
+  }
+}
+
+/** Sentimen dan arus dana: Fear & Greed, taker-buy Binance, COT, TFF. */
+async function externalBatch(): Promise<BatchResult> {
+  const r = await runExternalJob()
+  return {
+    itemsProcessed: r.seriesProcessed,
+    itemsFailed: r.errors.length,
+    candlesWritten: r.rowsWritten,
+    quarantined: 0,
+    errors: r.errors,
+    extra: { externalRows: r.rowsWritten },
   }
 }
 

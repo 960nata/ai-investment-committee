@@ -26,6 +26,8 @@ export type FeatureGroup =
   | 'valuasi'
   | 'kualitas'
   | 'kepemilikan'
+  | 'sentimen'
+  | 'arus'
 
 /**
  * Peran fitur di dalam sistem.
@@ -693,6 +695,80 @@ export const FEATURES: FeatureSpec[] = [
     label: 'Perubahan porsi institusi, 3 bulan',
     rationale:
       'Institusi memperdagangkan informasi lebih banyak daripada ritel; peralihan kepemilikan dari individu ke institusi cenderung mendahului kinerja harga.',
+    normalise: true,
+  },
+  // --- sentimen (lib/external) ---------------------------------------------
+  // Sentimen pasar, bukan per instrumen: satu angka untuk seluruh kripto, satu
+  // untuk seluruh ekuitas. Tetap berguna, karena yang ditanyakan kelompok ini
+  // adalah suasana pasar tempat instrumen itu diperdagangkan.
+  {
+    name: 'fear_greed',
+    group: 'sentimen',
+    role: 'score',
+    direction: -1,
+    label: 'Fear & Greed kripto',
+    rationale:
+      'Indikator kontrarian: keserakahan ekstrem di pasar kripto terdokumentasi mendahului imbal hasil yang lebih lemah, ketakutan ekstrem mendahului pemulihan.',
+    normalise: true,
+  },
+  {
+    name: 'vix_level',
+    group: 'sentimen',
+    role: 'score',
+    direction: 1,
+    label: 'Tingkat ketakutan (VIX)',
+    rationale:
+      'Premi risiko volatilitas: saat VIX tinggi, investor dibayar lebih untuk memegang risiko, dan imbal hasil ekuitas berikutnya secara historis lebih tinggi.',
+    normalise: true,
+  },
+  // --- arus dana (lib/external) ---------------------------------------------
+  {
+    name: 'taker_buy_ratio_20',
+    group: 'arus',
+    role: 'score',
+    direction: 1,
+    label: 'Porsi beli agresif, 20 hari',
+    rationale:
+      'Volume taker-buy adalah pembeli yang menyeberang spread karena tidak mau menunggu; porsinya yang naik adalah arus beli bersih yang bisa diukur langsung dari bursa.',
+    normalise: true,
+  },
+  {
+    name: 'cot_mm_net_pct',
+    group: 'arus',
+    role: 'display',
+    direction: null,
+    label: 'Posisi bersih managed money (COT)',
+    rationale:
+      'Ditampilkan sebagai konteks. Tingkat posisinya sendiri bisa berarti tren yang kuat atau pasar yang sudah penuh sesak; yang punya arah adalah perubahannya.',
+    normalise: false,
+  },
+  {
+    name: 'cot_mm_net_chg_4w',
+    group: 'arus',
+    role: 'score',
+    direction: 1,
+    label: 'Perubahan posisi managed money, 4 minggu',
+    rationale:
+      'Dana spekulatif besar yang menambah posisi beli bersih adalah arus masuk ke kontrak itu, dan perubahan posisinya terdokumentasi searah dengan harga jangka pendek.',
+    normalise: true,
+  },
+  {
+    name: 'tff_lev_net_pct',
+    group: 'arus',
+    role: 'display',
+    direction: null,
+    label: 'Posisi bersih leveraged funds (TFF)',
+    rationale: 'Konteks posisi dana lindung nilai di kontrak berjangka indeks.',
+    normalise: false,
+  },
+  {
+    name: 'tff_lev_net_chg_4w',
+    group: 'arus',
+    role: 'score',
+    direction: 1,
+    label: 'Perubahan posisi leveraged funds, 4 minggu',
+    rationale:
+      'Penambahan posisi beli bersih dana lindung nilai di kontrak berjangka indeks adalah arus masuk yang dilaporkan resmi tiap minggu.',
     normalise: true,
   },
 ]

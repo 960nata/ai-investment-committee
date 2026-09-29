@@ -961,6 +961,26 @@ test('rasio berbasis harga kosong bila mata uang harga dan laporan berbeda', () 
 })
 
 // ---------------------------------------------------------------------------
+// Sentimen dan arus dana (lib/external)
+
+test('deret eksternal masuk sebagai fitur dan ikut dinormalisasi', () => {
+  const series = syntheticSeries(600)
+  const fng = series.close.map((_, i) => 20 + (i % 60))
+  const out = computeFeatures({ market: 'CRYPTO', series, external: { fear_greed: fng } })
+  const last = out.rows.at(-1)!.values
+  assert(last.fear_greed === fng.at(-1), `fear_greed diteruskan apa adanya, dapat ${last.fear_greed}`)
+  assert(last.fear_greed_z !== null && last.fear_greed_z !== undefined, 'fear_greed punya z-score terhadap riwayatnya')
+})
+
+test('tanpa sumber eksternal, fitur sentimen dan arus dana kosong, bukan nol', () => {
+  const out = computeFeatures({ market: 'GLOBAL', series: syntheticSeries(300) })
+  const last = out.rows.at(-1)!.values
+  for (const key of ['fear_greed', 'vix_level', 'taker_buy_ratio_20', 'cot_mm_net_chg_4w', 'tff_lev_net_chg_4w']) {
+    assert(key in last && last[key] === null, `${key} harus ada dan null, dapat ${last[key]}`)
+  }
+})
+
+// ---------------------------------------------------------------------------
 
 if (failures.length > 0) {
   console.error(`\n${failures.length} uji gagal:\n`)

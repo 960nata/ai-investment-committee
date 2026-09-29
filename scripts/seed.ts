@@ -57,6 +57,10 @@ const SCHEDULES: ScheduleSeed[] = [
   { jobName: 'ingest-ksei-monthly', hoursOfDay: [16], timezone: 'Asia/Jakarta', tradingDaysOnly: true, market: 'IDX', enabled: true, note: '16.00 WIB, kepemilikan KSEI bila bulan baru terbit' },
   // Deret makro berubah bulanan atau tahunan; sehari sekali lebih dari cukup.
   { jobName: 'ingest-macro', hoursOfDay: [3], timezone: 'UTC', tradingDaysOnly: false, market: null, enabled: true, note: '03.00 UTC, suku bunga, inflasi, PDB' },
+  // Sentimen dan arus dana untuk kelas aset tanpa laporan keuangan: Fear &
+  // Greed, taker-buy Binance, COT dan TFF CFTC. Tengah malam UTC, sesudah
+  // lilin harian Binance ditutup dan sebelum job fitur kripto jam 01.00 UTC.
+  { jobName: 'ingest-external', hoursOfDay: [0], timezone: 'UTC', tradingDaysOnly: false, market: null, enabled: true, note: '00.00 UTC, Fear & Greed, taker-buy, COT, TFF' },
   // Warta otomatis dari RSS media keuangan. Tiga kali sehari mengikuti ritme
   // berita: pagi setelah Wall Street tutup, siang saat jeda sesi IDX, dan sore
   // setelah IDX tutup. Satu artikel per putaran, dan editor AI boleh menolak.

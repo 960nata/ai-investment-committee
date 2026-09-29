@@ -99,17 +99,23 @@ export const GROUP_OF: Record<FeatureGroup, ScoreGroup> = {
   // KSEI. Hanya saham IDX yang punya datanya; untuk pasar lain kelompok ini
   // tetap kosong dan terhitung sebagai lubang, bukan sebagai netral.
   kepemilikan: 'arus_dana',
+  // Data non-harga dari lib/external: Fear & Greed dan VIX untuk sentimen;
+  // taker-buy Binance, COT, dan TFF untuk arus dana.
+  sentimen: 'sentimen',
+  arus: 'arus_dana',
 }
 
 /** Kelompok yang belum punya fitur sama sekali, untuk ditampilkan apa adanya. */
-export const GROUPS_WITHOUT_FEATURES: ScoreGroup[] = ['sentimen']
+export const GROUPS_WITHOUT_FEATURES: ScoreGroup[] = []
 
 /**
  * Kelompok yang fiturnya hanya ada untuk sebagian pasar. Disebut terbuka supaya
  * pembaca tidak mengira kelompok itu berlaku rata di semua instrumen.
  */
 export const GROUPS_PARTIAL: Partial<Record<ScoreGroup, string>> = {
-  arus_dana: 'Baru untuk saham IDX, dari data kepemilikan KSEI. Broker summary harian belum ada.',
+  arus_dana:
+    'Saham IDX dari KSEI, kripto dari taker-buy Binance, komoditas dari COT CFTC, indeks AS dari TFF CFTC. Saham AS dan global, serta indeks Asia-Eropa, belum punya sumber.',
+  sentimen: 'Pasar, bukan per instrumen: Fear & Greed untuk kripto, VIX untuk saham dan indeks. Komoditas belum punya sumber.',
 }
 
 /**

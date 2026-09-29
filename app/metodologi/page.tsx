@@ -43,6 +43,8 @@ const FEATURE_GROUP_LABEL: Record<FeatureGroup, string> = {
   valuasi: 'Valuasi',
   kualitas: 'Kualitas & pertumbuhan',
   kepemilikan: 'Kepemilikan (KSEI)',
+  sentimen: 'Sentimen pasar',
+  arus: 'Arus dana',
 }
 
 const ROLE_LABEL = {

@@ -17,6 +17,7 @@ import { runIngestJob } from '../lib/jobs/ingest'
 import { runFeatureJob } from '../lib/features/job'
 import { runScoreJob } from '../lib/scoring/job'
 import { runFundamentalJob } from '../lib/fundamentals/job'
+import { runExternalJob } from '../lib/external/job'
 import { runCrossSectionJob } from '../lib/features/cross-section-job'
 import { runKseiJob } from '../lib/ownership/job'
 import { runMacroJob, macroAssumptions } from '../lib/macro/job'
@@ -44,6 +45,7 @@ const JOBS = [
   'normalise-cross-section',
   'ingest-ksei-monthly',
   'ingest-macro',
+  'ingest-external',
   'warta-otomatis',
   'warta-terjemah',
   'evaluasi-alert',
@@ -100,6 +102,16 @@ async function main(): Promise<void> {
     if (result.monthsMissing.length) console.log(`  bulan tanpa berkas: ${result.monthsMissing.join(', ')}`)
     if (result.unmatchedCodes) console.log(`  ${result.unmatchedCodes} saham dipantau tidak ada di berkas ${result.unmatchedMonth}`)
     for (const e of result.errors.slice(0, 10)) console.log(`  ! ${e}`)
+    console.log(`  selesai dalam ${((Date.now() - started) / 1000).toFixed(1)} detik\n`)
+    return
+  }
+
+  if (job === 'ingest-external') {
+    console.log(`\n${job} · Fear & Greed, taker-buy Binance, COT, TFF`)
+    const started = Date.now()
+    const result = await runExternalJob()
+    console.log(`  ${result.seriesProcessed} deret, ${result.rowsWritten} baris ditulis`)
+    for (const e of result.errors) console.log(`  ! ${e}`)
     console.log(`  selesai dalam ${((Date.now() - started) / 1000).toFixed(1)} detik\n`)
     return
   }

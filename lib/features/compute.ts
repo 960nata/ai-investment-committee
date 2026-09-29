@@ -120,6 +120,11 @@ export interface ComputeInput {
    * `availableAt`, dengan alasan yang sama seperti `reportedAt` di atas.
    */
   ownership?: OwnershipPointLite[]
+  /**
+   * Deret non-harga (sentimen, arus dana) per nama fitur, sudah disejajarkan
+   * indeks per indeks dengan `series`. Lihat `lib/external`.
+   */
+  external?: Record<string, MaybeSeries>
 }
 
 export interface ComputeResult {
@@ -296,6 +301,13 @@ export function computeFeatures(input: ComputeInput): ComputeResult {
     for (const [name, serie] of Object.entries(ownershipSeries(date, input.ownership))) {
       raw[name] = serie
     }
+  }
+
+  // --- sentimen & arus dana (lib/external) ----------------------------------
+  // Kuncinya selalu ada; isinya hanya untuk kelas aset yang punya sumbernya.
+  for (const spec of FEATURES) {
+    if (spec.group !== 'sentimen' && spec.group !== 'arus') continue
+    raw[spec.name] = input.external?.[spec.name] ?? new Array<number | null>(length).fill(null)
   }
 
   const window = normalisationWindow(market)

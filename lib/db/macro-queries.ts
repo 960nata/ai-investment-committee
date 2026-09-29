@@ -7,7 +7,11 @@ import { db } from './client'
 import { macroSeries } from './schema'
 import type { MacroPoint } from '@/lib/macro/sources'
 
-export async function upsertMacro(points: MacroPoint[], chunkSize = 500): Promise<number> {
+/** Titik deret apa pun: makro (FRED, Bank Dunia) maupun data non-harga di `lib/external`. */
+export async function upsertMacro(
+  points: (Omit<MacroPoint, 'source'> & { source: string })[],
+  chunkSize = 500,
+): Promise<number> {
   let written = 0
   for (let i = 0; i < points.length; i += chunkSize) {
     const slice = points.slice(i, i + chunkSize)
@@ -43,4 +47,14 @@ export async function lastMacro(seriesId: string, n: number): Promise<{ date: st
     .where(eq(macroSeries.seriesId, seriesId))
     .orderBy(desc(macroSeries.date))
     .limit(n)
+}
+
+/** Satu deret dalam rentang tanggal, sebagai peta tanggal → nilai. */
+export async function macroRange(seriesId: string, from: string, to: string): Promise<Map<string, number>> {
+  const rows = await db
+    .select({ date: macroSeries.date, value: macroSeries.value })
+    .from(macroSeries)
+    .where(sql`${macroSeries.seriesId} = ${seriesId} and ${macroSeries.date} between ${from} and ${to}`)
+    .orderBy(macroSeries.date)
+  return new Map(rows.map((r) => [r.date, r.value]))
 }
