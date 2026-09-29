@@ -473,8 +473,9 @@ export function LimitsSection({
                   <span>tinggi, sedang, atau rendah</span>
                 </p>
                 <p className="lp-limits-why">
-                  Sebagian besar komoditas, indeks, dan memecoin: data arus dana dan sentimen
-                  untuk jenis aset ini belum ada. Ditampilkan apa adanya, bukan diisi angka asal.
+                  Umumnya memecoin dan saham yang transaksinya tipis: volume hariannya terlalu
+                  kecil untuk menghasilkan sinyal yang bisa dipercaya. Ditampilkan apa adanya,
+                  bukan diisi angka asal.
                 </p>
               </div>
             )}
