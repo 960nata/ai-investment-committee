@@ -76,10 +76,18 @@ function connect(): Database {
  * Gejalanya halaman menggantung tanpa satu pun pesan galat, dan penyebabnya
  * tidak terlihat dari mana pun. Di produksi tidak ada muat ulang modul, jadi di
  * sana penyimpanan itu aman sekaligus perlu.
+ *
+ * Di luar produksi klien disimpan di variabel modul: ikut dibuang saat modul
+ * dimuat ulang, jadi tidak ada soket basi, tetapi tetap satu klien untuk
+ * seluruh umur modul. Membuat klien baru di tiap akses berarti TCP, TLS, dan
+ * autentikasi ulang untuk tiap kueri — ±0,7 detik ke pooler Seoul — dan klien
+ * lamanya tidak pernah ditutup. Skrip `npm run job` juga berjalan di mode ini.
  */
+let moduleDb: Database | undefined
+
 export const db = new Proxy({} as Database, {
   get(_target, property) {
-    const instance = isProduction ? (globalThis.__pgDb ??= connect()) : connect()
+    const instance = isProduction ? (globalThis.__pgDb ??= connect()) : (moduleDb ??= connect())
     const value = Reflect.get(instance, property)
     // Metode diikat ke instance aslinya; kalau `this` menunjuk ke proxy,
     // Drizzle kehilangan state internalnya.
