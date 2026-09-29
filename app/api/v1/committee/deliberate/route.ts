@@ -10,8 +10,8 @@
  *
  * Karena itu jalur POST-nya dijaga berlapis, dari yang paling murah:
  *
- *   1. `proxy.ts` menyaring perkakas otomatis dan membatasi tiga panggilan per
- *      jam per pemanggil.
+ *   1. `proxy.ts` menyaring perkakas otomatis dan membatasi dua puluh panggilan
+ *      per jam per pemanggil.
  *   2. Sesi diwajibkan di sini. Pemanggil tanpa akun tidak pernah sampai ke
  *      lapisan model sama sekali.
  *   3. `force` — yang melewati penggunaan-ulang hasil harian — hanya untuk
@@ -38,6 +38,14 @@ import type { MarketCode } from '@/lib/db/schema'
 import { SYMBOL_PATTERN } from '@/lib/format/market'
 
 export const dynamic = 'force-dynamic'
+
+/**
+ * Empat giliran dari empat penyedia berbeda, berurutan: ±25 detik bila semua
+ * lancar, lebih bila ada yang harus jatuh ke cadangan. Batas bawaan function
+ * bisa lebih pendek dari itu, dan rapat yang terpotong di giliran ketua
+ * membakar tiga panggilan tanpa menghasilkan putusan.
+ */
+export const maxDuration = 60
 
 /** Pasar yang dikenal. Apa pun di luar ini tidak pernah sampai ke kueri. */
 const MARKETS: readonly MarketCode[] = ['CRYPTO', 'IDX', 'US', 'GLOBAL']

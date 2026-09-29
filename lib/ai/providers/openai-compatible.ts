@@ -130,12 +130,12 @@ export const openRouterAdapter = createOpenAiCompatibleAdapter({
   id: 'openrouter',
   name: 'OpenRouter',
   baseUrl: 'https://openrouter.ai/api/v1',
-  // Model gratis. Yang lama (deepseek-v4-flash-0731:free) sudah dihapus
-  // OpenRouter, sehingga penyedia ini gagal di setiap panggilan. Pengganti ini
-  // model khusus keuangan, menjawab bahasa Indonesia dengan baik (~3 detik).
-  // Balasan kosong tetap ditolak adapter, dan registry pindah ke penyedia
-  // berikutnya.
-  model: process.env.OPENROUTER_MODEL ?? 'inclusionai/ling-3.0-flash-fin:free',
+  // Model gratis OpenRouter datang dan pergi tanpa pemberitahuan: deepseek-v4-
+  // flash-0731:free dihapus, lalu ling-3.0-flash-fin:free jadi berbayar saja
+  // (404) — dan selama itu 25 kunci di sini tidak menjawab satu pun panggilan.
+  // dots-3-note menjawab bahasa Indonesia utuh dalam ~8 detik. Bila ia juga
+  // hilang, registry pindah ke penyedia berikutnya; ganti lewat OPENROUTER_MODEL.
+  model: process.env.OPENROUTER_MODEL ?? 'dots-studio/dots-3-note-preview:free',
   envPrefix: 'OPENROUTER_API_KEY',
   // Tanpa ini model menghabiskan hampir seluruh `max_tokens` untuk penalaran
   // tersembunyi, dan jawabannya terpotong di tengah kalimat (diuji: 700 token
@@ -188,6 +188,11 @@ export const nvidiaAdapter = createOpenAiCompatibleAdapter({
   id: 'nvidia',
   name: 'NVIDIA NIM',
   baseUrl: 'https://integrate.api.nvidia.com/v1',
-  model: process.env.NVIDIA_MODEL ?? 'meta/llama-3.3-70b-instruct',
+  // Llama 3.3 70B dipensiunkan NVIDIA per 26 Agustus 2026 (HTTP 410). gpt-oss
+  // memisahkan penalaran dari jawabannya; Nemotron 3 menumpahkannya ke `content`.
+  model: process.env.NVIDIA_MODEL ?? 'openai/gpt-oss-20b',
   envPrefix: 'NVIDIA_API_KEY',
+  // Bawaannya menalar panjang: pada prompt komite ±1.600 token ia butuh 36 detik
+  // dan jawabannya terpotong di `max_tokens`. Dengan 'low': 4,5 detik, utuh.
+  extraBody: { reasoning_effort: 'low' },
 })

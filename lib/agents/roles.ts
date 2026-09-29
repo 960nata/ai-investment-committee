@@ -29,6 +29,16 @@ export interface AgentRole {
    * candle; yang menilai tesis cukup metrik ringkasnya.
    */
   facts: 'full' | 'summary'
+  /**
+   * Penyedia yang ditanya lebih dulu untuk peran ini.
+   *
+   * Tiap peran sengaja dipegang keluarga model berbeda. Empat giliran dari satu
+   * model yang sama adalah satu pendapat yang ditulis empat kali: pengawas
+   * risiko yang dilatih dengan data dan kecenderungan yang sama dengan strateg
+   * cenderung setuju dengannya. Bila penyedia ini gagal, rapat tetap berjalan
+   * lewat cadangan — lihat `committee.ts`.
+   */
+  provider: string
 }
 
 /**
@@ -66,6 +76,7 @@ export const ANALIS: AgentRole = {
   temperature: 0.1,
   maxOutputTokens: 420,
   facts: 'full',
+  provider: 'groq',
   system: [
     'Kamu analis data kuantitatif komite investasi. Tugasmu MELAPORKAN, bukan memutuskan.',
     'Hasilkan:',
@@ -83,6 +94,7 @@ export const STRATEG: AgentRole = {
   temperature: 0.5,
   maxOutputTokens: 460,
   facts: 'full',
+  provider: 'openrouter',
   system: [
     'Kamu strateg portofolio. Susun SATU tesis yang bisa diuji dari laporan analis:',
     '1. Tesis dalam satu kalimat.',
@@ -102,6 +114,7 @@ export const RISIKO: AgentRole = {
   temperature: 0.3,
   maxOutputTokens: 420,
   facts: 'summary',
+  provider: 'nvidia',
   system: [
     'Kamu pengawas risiko. Tugasmu MENYERANG tesis strateg, bukan menyeimbangkannya — tesis yang kuat akan bertahan; kalau kamu menahan diri, tidak ada yang menghentikan keputusan buruk.',
     'Hasilkan:',
@@ -120,6 +133,7 @@ export const KETUA: AgentRole = {
   temperature: 0.2,
   maxOutputTokens: 380,
   facts: 'summary',
+  provider: 'gemini',
   json: true,
   system: [
     'Kamu ketua komite investasi. Timbang laporan analis, tesis strateg, dan keberatan pengawas risiko, lalu putuskan.',

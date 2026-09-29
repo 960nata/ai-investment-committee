@@ -29,6 +29,23 @@ interface Turn {
   latencyMs?: number | null
 }
 
+const PROVIDER_NAMES: Record<string, string> = {
+  gemini: 'Gemini',
+  groq: 'Groq',
+  openrouter: 'OpenRouter',
+  deepseek: 'DeepSeek',
+  mistral: 'Mistral',
+  nvidia: 'NVIDIA',
+  premium: 'Premium',
+}
+
+/** "NVIDIA · llama-3.3-70b-instruct" — nama model tanpa awalan organisasinya. */
+function modelLabel(providerId: string | null | undefined, model: string): string {
+  const short = model.split('/').pop() ?? model
+  const provider = providerId ? PROVIDER_NAMES[providerId] ?? providerId : null
+  return provider ? `${provider} · ${short}` : short
+}
+
 interface SessionData {
   id: number
   symbol: string
@@ -380,6 +397,11 @@ export function CommitteeBoardroom({ symbol, market, name, onClose }: Props) {
                             {idx + 1}. {role.title}
                           </span>
                           <Tag tone={role.badgeTone}>{role.badge}</Tag>
+                          {turn.model ? (
+                            <span className="agent-model mono" title={turn.model}>
+                              {modelLabel(turn.providerId, turn.model)}
+                            </span>
+                          ) : null}
                         </div>
                         {turn.latencyMs ? (
                           <span className="turn-latency">{(turn.latencyMs / 1000).toFixed(1)}s</span>

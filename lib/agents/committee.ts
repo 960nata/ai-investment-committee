@@ -39,6 +39,7 @@ import {
   type MarketFacts,
 } from './tools'
 import { COMMITTEE, type AgentRole } from './roles'
+import { LLM_ADAPTERS } from '@/lib/ai/adapters'
 import { parseVerdict, type CommitteeVerdict } from './verdict'
 
 export { parseVerdict, type CommitteeVerdict }
@@ -153,6 +154,7 @@ export async function runCommittee(input: CommitteeInput): Promise<CommitteeResu
   const turns: CommitteeResult['turns'] = existing.map((m) => ({
     agent: m.agent,
     content: m.content,
+    providerId: m.providerId ?? undefined,
   }))
 
   let rawVerdict: string | null =
@@ -169,6 +171,7 @@ export async function runCommittee(input: CommitteeInput): Promise<CommitteeResu
         temperature: role.temperature,
         maxOutputTokens: role.maxOutputTokens,
         json: role.json,
+        prefer: speakingOrder(role.provider, turns),
       })
 
       await recordAgentMessage({
@@ -322,6 +325,20 @@ async function reusePreviousSession(
  * sebagai ucapannya sendiri dan cenderung menyetujuinya — persis kebalikan dari
  * yang dibutuhkan pengawas risiko.
  */
+/**
+ * Urutan penyedia untuk satu giliran: penyedia peran itu dulu, lalu yang belum
+ * bicara di rapat ini, baru yang sudah.
+ *
+ * Tanpa urutan kedua, penyedia peran yang sedang kena limit membuat gilirannya
+ * jatuh ke penyedia teratas registry — yang besar kemungkinan sudah menjawab
+ * giliran sebelumnya — dan rapat empat model diam-diam menyusut jadi dua.
+ */
+function speakingOrder(own: string, turns: { providerId?: string }[]): string[] {
+  const spoken = new Set(turns.map((t) => t.providerId).filter(Boolean))
+  const ids = LLM_ADAPTERS.map((a) => a.id).filter((id) => id !== own)
+  return [own, ...ids.filter((id) => !spoken.has(id)), ...ids.filter((id) => spoken.has(id))]
+}
+
 /**
  * Pagu panjang satu catatan saat diteruskan ke giliran berikutnya.
  *

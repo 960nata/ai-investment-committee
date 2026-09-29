@@ -92,6 +92,15 @@ export class AllProvidersFailedError extends Error {
   }
 }
 
+/** Susun ulang rantai: yang diminta lebih dulu, sisanya di urutan asal. */
+function preferred(chain: ProviderEntry[], prefer: string[] | undefined): ProviderEntry[] {
+  if (!prefer?.length) return chain
+  const first = prefer
+    .map((id) => chain.find((e) => e.adapter.id === id))
+    .filter((e): e is ProviderEntry => e !== undefined)
+  return [...new Set([...first, ...chain])]
+}
+
 /**
  * Jalankan satu permintaan, turun ke kunci lalu penyedia berikutnya saat gagal.
  *
@@ -101,8 +110,8 @@ export class AllProvidersFailedError extends Error {
  */
 export async function complete(request: LlmRequest): Promise<LlmResponse> {
   const attempts: AttemptLog[] = []
-  const chain =
-    request.tier === 'premium' ? [...getPremiumEntries(), ...getEntries()] : getEntries()
+  const base = preferred(getEntries(), request.prefer)
+  const chain = request.tier === 'premium' ? [...getPremiumEntries(), ...base] : base
 
   for (const entry of chain) {
     const { adapter, pool } = entry

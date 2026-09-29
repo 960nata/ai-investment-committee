@@ -2492,6 +2492,15 @@ body.rail-lock {
   color: var(--ink);
 }
 
+.agent-model {
+  font-size: var(--t-micro);
+  color: var(--ink-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
 .turn-latency {
   margin-left: auto;
   font-family: var(--mono);

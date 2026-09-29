@@ -32,6 +32,12 @@ export interface LlmRequest {
    * Premium tidak boleh mendapat jawaban kosong hanya karena satu kunci mati.
    */
   tier?: 'standard' | 'premium'
+  /**
+   * Penyedia yang didahulukan, urut. Penyedia yang tidak disebut tetap jadi
+   * cadangan di urutan registry, jadi preferensi tidak pernah membuat
+   * permintaan gagal — ia hanya menentukan siapa yang ditanya lebih dulu.
+   */
+  prefer?: string[]
 }
 
 export interface LlmResponse {
@@ -76,8 +82,12 @@ export class LlmError extends Error {
  */
 export function classifyStatus(status: number): LlmFailureKind {
   if (status === 429) return 'rate_limited'
-  if (status === 401 || status === 403) return 'auth'
-  if (status === 404 || status >= 500) return 'server'
+  // 402: saldo kunci berbayar habis. Sama seperti kunci mati — kunci itu tidak
+  // akan menjawab sampai diisi ulang, penyedia lain masih bisa.
+  if (status === 401 || status === 402 || status === 403) return 'auth'
+  // 404 dan 410: model atau endpoint penyedia ini sudah tidak ada. Itu masalah
+  // penyedianya, bukan permintaan kita — penyedia lain masih bisa menjawab.
+  if (status === 404 || status === 410 || status >= 500) return 'server'
   return 'bad_request'
 }
 
