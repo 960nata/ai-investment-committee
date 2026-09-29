@@ -257,6 +257,40 @@ function applyRange(chart: IChartApi, sorted: Candle[], range: ChartRangeId) {
 // Grafik intraday (mode 1D realtime)
 // ---------------------------------------------------------------------------
 
+const WIB_TIME = new Intl.DateTimeFormat('id-ID', {
+  timeZone: 'Asia/Jakarta',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+})
+const WIB_DATE = new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', day: 'numeric', month: 'short' })
+
+/** Detik UNIX → jam WIB; `withDate` untuk label pergantian hari dan crosshair. */
+function formatWib(unix: number, withDate: boolean): string {
+  const d = new Date(unix * 1000)
+  const time = WIB_TIME.format(d).replace('.', ':')
+  return withDate ? `${WIB_DATE.format(d)} ${time}` : time
+}
+
+/**
+ * Batang volume, dengan lonjakan dipotong.
+ *
+ * Lelang penutupan BEI bisa membukukan puluhan kali volume lilin biasa dalam
+ * satu lilin 5 menit, dan skala volume mengikuti batang tertinggi — sisanya
+ * jadi garis rata. Batang dipotong di 4× median supaya pola volume sesi tetap
+ * terbaca; lilin yang dipotong tetap yang tertinggi.
+ */
+function intradayVolumes(sorted: IntradayCandle[]) {
+  const nonZero = sorted.map((d) => d.volume).filter((v) => v > 0).sort((a, b) => a - b)
+  const median = nonZero.length ? nonZero[Math.floor(nonZero.length / 2)] : 0
+  const cap = median > 0 ? median * 4 : Infinity
+  return sorted.map((d) => ({
+    time: d.time as any,
+    value: Math.min(d.volume, cap),
+    color: d.close >= d.open ? UP_SOFT : DOWN_SOFT,
+  }))
+}
+
 export function IntradayChart({
   data,
   livePrice = null,
@@ -302,11 +336,15 @@ export function IntradayChart({
             vertLine: { color: 'rgba(224, 161, 60, 0.35)', labelBackgroundColor: '#e0a13c' },
             horzLine: { color: 'rgba(224, 161, 60, 0.35)', labelBackgroundColor: '#e0a13c' },
           },
+          // Bawaan pustaka ini UTC: sesi BEI 09:00–16:00 WIB tergambar sebagai
+          // 02:00–09:00. Pembacanya di Indonesia, jadi semua jam ditulis WIB.
+          localization: { timeFormatter: (t: number) => formatWib(t, true) },
           timeScale: {
             borderColor: '#2e3532',
             timeVisible: true,
             secondsVisible: false,
             minBarSpacing: 1,
+            tickMarkFormatter: (t: number, type: number) => formatWib(t, type < 3),
           },
           rightPriceScale: { borderColor: '#2e3532' },
           width: container.clientWidth,
@@ -346,13 +384,7 @@ export function IntradayChart({
               close: d.close,
             })),
           )
-          volumeSeries.setData(
-            sorted.map((d) => ({
-              time: d.time as any,
-              value: d.volume,
-              color: d.close >= d.open ? UP_SOFT : DOWN_SOFT,
-            })),
-          )
+          volumeSeries.setData(intradayVolumes(sorted))
           chart.timeScale().fitContent()
 
           const currentLive = livePriceRef.current
@@ -411,13 +443,7 @@ export function IntradayChart({
       })),
     )
     if (volumeSeriesRef.current) {
-      volumeSeriesRef.current.setData(
-        sorted.map((d) => ({
-          time: d.time as any,
-          value: d.volume,
-          color: d.close >= d.open ? UP_SOFT : DOWN_SOFT,
-        })),
-      )
+      volumeSeriesRef.current.setData(intradayVolumes(sorted))
     }
     if (needsFit) chartRef.current.timeScale().fitContent()
   }, [data])
