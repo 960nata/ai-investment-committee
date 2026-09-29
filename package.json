@@ -38,6 +38,7 @@
     "@upstash/redis": "^1.38.4",
     "@vercel/analytics": "^2.0.1",
     "apexcharts": "^7.6.1",
+    "botid": "^1.5.11",
     "drizzle-orm": "^0.45.2",
     "firebase": "^12.19.0",
     "leaflet": "^1.9.4",

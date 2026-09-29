@@ -8,8 +8,10 @@
  *      perkakas otomatis (jalurnya di bawah /api/v1/kalkulator/).
  *   2. Masukan dibatasi: pertanyaan pendek, konteks hitungan berupa angka saja,
  *      tanpa riwayat percakapan — satu pertanyaan, satu jawaban pendek.
- *   3. Cloudflare Turnstile wajib untuk tiap pertanyaan. Bot berhenti di sini
- *      sebelum menyentuh model.
+ *   3. Vercel BotID: permintaan dari selain peramban sungguhan ditolak tanpa
+ *      pengunjung perlu mencentang apa pun. Cloudflare Turnstile menjadi lapis
+ *      tambahan opsional bila kuncinya diisi. Bot berhenti di sini sebelum
+ *      menyentuh pagu maupun model.
  *   4. Pagu harian: pengunjung anonim memakai saluran `anonymous` — jatahnya
  *      kecil, terpisah dari jatah pengguna yang masuk, dan dibatasi lagi per
  *      sidik IP. Pengguna yang sudah masuk memakai jatah akunnya sendiri.
@@ -19,6 +21,7 @@
  */
 
 import { NextResponse } from 'next/server'
+import { checkBotId } from 'botid/server'
 import { z } from 'zod'
 import { getCurrentUser } from '@/lib/auth/user-auth'
 import { verifyTurnstile } from '@/lib/auth/turnstile'
@@ -82,6 +85,12 @@ export async function POST(request: Request) {
   const body = await readBody(request, Body)
   if (!body.ok) return body.response
   const { question, context, turnstileToken } = body.data
+
+  // Bot ditolak paling awal: sebelum pagu dipesan dan sebelum model dipanggil.
+  const bot = await checkBotId().catch(() => null)
+  if (bot?.isBot) {
+    return NextResponse.json({ error: 'Permintaan ditolak.' }, { status: 403, headers: NO_STORE })
+  }
 
   const user = await getCurrentUser()
   const ip = callerIp(request)
