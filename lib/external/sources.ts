@@ -11,7 +11,7 @@
  *   TAKER:<sym>   porsi volume beli agresif (taker buy) per koin, harian, dari
  *                 kline Binance — kolom yang sama yang sudah dipakai untuk harga
  *   COT:<sym>     posisi bersih managed money / open interest, mingguan (CFTC
- *                 Disaggregated), untuk komoditas
+ *                 Disaggregated), untuk komoditas; COTOI:<sym> open interest-nya
  *   TFF:<sym>     posisi bersih leveraged funds / open interest, mingguan (CFTC
  *                 Traders in Financial Futures), untuk indeks AS, VIX, dan dolar
  *
@@ -151,7 +151,7 @@ async function fetchCftc(
   code: string,
   longField: string,
   shortField: string,
-): Promise<{ date: string; net: number }[]> {
+): Promise<{ date: string; net: number; oi: number }[]> {
   const params = new URLSearchParams({
     $select: `report_date_as_yyyy_mm_dd,open_interest_all,${longField},${shortField}`,
     $where: `cftc_contract_market_code='${code}'`,
@@ -165,13 +165,13 @@ async function fetchCftc(
   })
   if (!res.ok) throw new Error(`CFTC ${code} HTTP ${res.status}`)
   const rows = (await res.json()) as Record<string, string>[]
-  const out: { date: string; net: number }[] = []
+  const out: { date: string; net: number; oi: number }[] = []
   for (const r of rows) {
     const oi = Number(r.open_interest_all)
     const long = Number(r[longField])
     const short = Number(r[shortField])
     if (!(oi > 0) || !Number.isFinite(long) || !Number.isFinite(short)) continue
-    out.push({ date: cotAvailableAt(r.report_date_as_yyyy_mm_dd), net: (long - short) / oi })
+    out.push({ date: cotAvailableAt(r.report_date_as_yyyy_mm_dd), net: (long - short) / oi, oi })
   }
   return out
 }
@@ -181,7 +181,13 @@ export async function fetchCot(symbol: string): Promise<ExternalPoint[]> {
   const code = COT_CONTRACTS[symbol]
   if (!code) return []
   const rows = await fetchCftc('72hh-3qpy', code, 'm_money_positions_long_all', 'm_money_positions_short_all')
-  return rows.map((r) => ({ seriesId: `COT:${symbol}`, date: r.date, value: r.net, source: 'cftc' }))
+  return rows.flatMap((r) => [
+    { seriesId: `COT:${symbol}`, date: r.date, value: r.net, source: 'cftc' },
+    // Open interest dalam kontrak: ukuran likuiditas kontrak berjangka yang
+    // bisa dipercaya. Volume Yahoo untuk simbol `=F` hanya milik satu bulan
+    // kontrak dan jatuh ke nol di sekitar pergantian kontrak.
+    { seriesId: `COTOI:${symbol}`, date: r.date, value: r.oi, source: 'cftc' },
+  ])
 }
 
 /** Posisi bersih leveraged funds sebagai porsi open interest, per indeks. */

@@ -234,8 +234,12 @@ export async function runFeatureJob(input: FeatureJobInput): Promise<FeatureJobR
       // dan menyejajarkannya per posisi akan menggeser seluruh riwayat.
       const benchmark = benchmarkFor(instrument, market)
       const benchmarkByDate = benchmark ? await benchmarkSeries(benchmark) : null
+      // Dibawa maju sampai lima hari: bursa punya hari libur berbeda (S&P 500
+      // tutup saat Nikkei buka), dan candle tolok ukur hari ini sering belum
+      // masuk saat instrumennya sudah. Tanpa ini baris terbaru kehilangan
+      // kekuatan relatifnya justru pada hari yang dilihat orang.
       const benchmarkClose: MaybeSeries | undefined = benchmarkByDate
-        ? series.date.map((d) => benchmarkByDate.get(d) ?? null)
+        ? alignForward(series.date, benchmarkByDate, 5)
         : undefined
 
       // Seluruh laporan yang pernah terbit ditarik sekali, lalu engine fitur
