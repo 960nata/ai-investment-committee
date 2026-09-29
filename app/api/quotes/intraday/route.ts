@@ -132,34 +132,13 @@ async function fetchYahooIntraday(symbol: string): Promise<IntradayCandle[]> {
       })
     }
     // range=1d kosong saat bursa tutup (akhir pekan, libur), jadi diambil 5 hari
-    // lalu dipotong ke sesi terakhir saja.
-    return lastSession(candles)
+    // dan dikirim utuh. Grafik membuka tampilan di sesi terakhir; sesi-sesi
+    // sebelumnya tetap bisa digeser ke kiri.
+    return candles
   } catch (err) {
     console.warn('[Intraday] Yahoo gagal:', err instanceof Error ? err.message : err)
     return []
   }
-}
-
-/** Jeda sepanjang ini di antara dua lilin berarti bursa sempat tutup semalam. */
-const SESSION_GAP_SECONDS = 4 * 3600
-
-/**
- * Lilin sesi terakhir: sesudah jeda panjang terakhir dalam 24 jam terakhir.
- *
- * Memotong 24 jam saja keliru untuk bursa yang tutup semalam. Saat BEI buka
- * jam 10 pagi, 24 jam ke belakang ikut membawa separuh sesi kemarin, dan
- * grafiknya melompat dari penutupan kemarin ke pembukaan hari ini. Istirahat
- * siang BEI (paling lama 2,5 jam di hari Jumat) dan jeda harian kontrak
- * berjangka (1 jam) lebih pendek dari ambangnya, jadi tidak ikut memotong.
- */
-function lastSession(candles: IntradayCandle[]): IntradayCandle[] {
-  const last = candles[candles.length - 1]
-  if (!last) return candles
-  const day = candles.filter((c) => c.time > last.time - 86_400)
-  for (let i = day.length - 1; i > 0; i--) {
-    if (day[i].time - day[i - 1].time > SESSION_GAP_SECONDS) return day.slice(i)
-  }
-  return day
 }
 
 export async function GET(request: Request) {
