@@ -60,7 +60,8 @@ function connect(): Database {
     // Postgres menunggu `ClientRead` tanpa ujung — lalu seluruh kueri yang
     // antre di belakangnya ikut menggantung sampai halaman menyerah. Paralelnya
     // tetap ada, lewat `max` koneksi di kolam.
-    max_pipeline: 1,
+    // Opsi ini ada di runtime postgres.js 3.4 tetapi tidak di deklarasi tipenya.
+    ...({ max_pipeline: 1 } as object),
     idle_timeout: 20,
     connect_timeout: 10,
     // extra_float_digits sengaja TIDAK dipasang di sini: pooler Supabase
