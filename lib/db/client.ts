@@ -32,7 +32,14 @@ const STATEMENT_TIMEOUT_MS = 15_000
  * Menyetel 8 koneksi di produksi memungkinkan query di Promise.all
  * berjalan paralel tanpa harus mengantre satu per satu di satu soket.
  */
-const MAX_CONNECTIONS = isProduction ? 8 : 5
+//
+// Sepuluh, bukan lima atau delapan: halaman terminal menjalankan tujuh kueri
+// sekaligus (lima di `load`, tiga lagi di dalam `getDashboardStats`). Bila
+// jumlahnya melebihi kolam, kueri mengantre di koneksi yang sedang dipakai, dan
+// lewat pooler transaksi Supabase antrean itu sesekali macet tanpa ujung —
+// halaman saham kedua yang dibuka menggantung sampai batas waktu. Terukur:
+// dengan 5 macet di putaran kedua, dengan 10 tidak pernah.
+const MAX_CONNECTIONS = 10
 
 declare global {
   var __pgDb: Database | undefined
@@ -47,6 +54,13 @@ function connect(): Database {
   const client = postgres(connectionString, {
     prepare: false,
     max: MAX_CONNECTIONS,
+    // Satu kueri per koneksi pada satu waktu. Bawaan postgres.js menumpuk
+    // sampai 100 kueri di satu soket (pipelining), dan pooler transaksi
+    // Supabase tidak tahan itu: sesekali koneksinya macet di tengah protokol —
+    // Postgres menunggu `ClientRead` tanpa ujung — lalu seluruh kueri yang
+    // antre di belakangnya ikut menggantung sampai halaman menyerah. Paralelnya
+    // tetap ada, lewat `max` koneksi di kolam.
+    max_pipeline: 1,
     idle_timeout: 20,
     connect_timeout: 10,
     // extra_float_digits sengaja TIDAK dipasang di sini: pooler Supabase
