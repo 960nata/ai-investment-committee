@@ -94,7 +94,6 @@ export function InstrumentExplorer({
   const [intradayLoading, setIntradayLoading] = useState(false)
   const [livePrice, setLivePrice] = useState<number | null>(null)
   const [tickDirection, setTickDirection] = useState<'up' | 'down' | null>(null)
-  const [isLiveMotion, setIsLiveMotion] = useState(true)
   const [watched, setWatched] = useState(() => new Set(watchlistIds))
 
   const isIntraday = range === '1D'
@@ -281,35 +280,10 @@ export function InstrumentExplorer({
     }
   }, [selected?.symbol, selected?.assetClass])
 
-  // Engine Denyut Pasar Realtime (Live Ticking Motion) untuk Saham / Komoditas / saat bursa tutup
-  useEffect(() => {
-    if (!isLiveMotion || !selected) return
-    const isCrypto = selected.assetClass === 'crypto' || selected.symbol.endsWith('USDT')
-    if (isCrypto) return
-
-    const tickInterval = setInterval(() => {
-      setLivePrice((prev) => {
-        if (prev == null || prev <= 0) return prev
-        // Fluktuasi mikro realistis ±0.03% s.d. ±0.06%
-        const deltaPct = (Math.random() - 0.495) * 0.0006
-        let next = prev * (1 + deltaPct)
-
-        if (next > 1000) next = Math.round(next * 10) / 10
-        else if (next > 100) next = Math.round(next * 100) / 100
-        else next = Math.round(next * 10000) / 10000
-
-        if (next !== prev) {
-          setTickDirection(next > prev ? 'up' : 'down')
-          setTimeout(() => setTickDirection(null), 400)
-        }
-        return next
-      })
-    }, 1800)
-
-    return () => clearInterval(tickInterval)
-  }, [isLiveMotion, selected?.symbol, selected?.assetClass])
-
-  // Polling kutipan harga realtime untuk instrumen terpilih dan baris yang sedang terlihat
+  // Polling kutipan harga realtime untuk instrumen terpilih dan baris yang sedang terlihat.
+  // Selain kripto (yang punya WebSocket sendiri), harga di sini juga yang
+  // menggerakkan lilin terakhir dan garis LIVE di grafik — hanya harga bursa
+  // yang sungguhan, tidak ada gerakan tiruan.
   useEffect(() => {
     const symbols = new Set<string>()
     if (selected) symbols.add(selected.symbol)
@@ -318,6 +292,7 @@ export function InstrumentExplorer({
     }
     if (symbols.size === 0) return
 
+    const selectedSymbol = selected && !isCryptoSymbol(selected.symbol) ? selected.symbol : null
     let cancelled = false
     async function fetchLive() {
       try {
@@ -327,6 +302,16 @@ export function InstrumentExplorer({
         const body = (await res.json()) as { quotes?: Record<string, LiveQuoteData> }
         if (!cancelled && body.quotes) {
           setLiveQuotes((prev) => ({ ...prev, ...body.quotes }))
+          const nextPrice = selectedSymbol ? body.quotes[selectedSymbol]?.price : undefined
+          if (nextPrice != null && nextPrice > 0) {
+            setLivePrice((prev) => {
+              if (prev !== null && prev !== nextPrice) {
+                setTickDirection(nextPrice > prev ? 'up' : 'down')
+                setTimeout(() => setTickDirection(null), 500)
+              }
+              return nextPrice
+            })
+          }
         }
       } catch {
         // Abaikan galat jaringan, tetap tampilkan harga candle historis
@@ -481,25 +466,23 @@ export function InstrumentExplorer({
                   {formatPrice(price, selected?.currency ?? '')}
                 </span>
                 <Change value={change} />
-                <button
-                  type="button"
-                  className={`live-motion-btn ${!isLiveMotion ? 'paused' : ''}`}
-                  onClick={() => setIsLiveMotion((prev) => !prev)}
+                <span
+                  className="live-motion-btn"
                   title={
-                    isLiveMotion
-                      ? 'Denyut pergerakan realtime aktif — klik untuk menjeda'
-                      : 'Denyut pergerakan nonaktif — klik untuk mengaktifkan'
+                    isCrypto
+                      ? 'Harga mengalir langsung dari Binance'
+                      : 'Harga bursa dari Yahoo Finance, diperbarui tiap 8 detik'
                   }
                 >
                   <span className="live-dot" />
-                  <span>{isCrypto ? 'WebSocket Live' : isLiveMotion ? 'Denyut Realtime' : 'Statis'}</span>
-                </button>
+                  <span>{isCrypto ? 'WebSocket Live' : 'Live · 8 dtk'}</span>
+                </span>
               </span>
             )
           })()}
           <span className="panel-meta">
             {isIntraday
-              ? intradayLoading ? 'memuat realtime...' : `${intradayCandles.length} candle · 5m`
+              ? intradayLoading ? 'memuat realtime...' : `${intradayCandles.length} candle · ${isCryptoSymbol(selected?.symbol ?? '') ? '5m' : '15m'}`
               : pending ? 'memuat' : `${candles.length} candle`}
             {isIntraday && intradayCandles.length > 0 && (
               <span className="live-pill" style={{ marginLeft: 6 }} title="Data diperbarui otomatis tiap 15 detik">
@@ -555,7 +538,9 @@ export function InstrumentExplorer({
           </div>
           {isIntraday ? (
             intradayCandles.length > 0 && (
-              <span className="chart-range-since">candle 5 menit · diperbarui otomatis</span>
+              <span className="chart-range-since">
+                candle {isCryptoSymbol(selected?.symbol ?? '') ? '5' : '15'} menit · diperbarui otomatis
+              </span>
             )
           ) : (
             candles.length > 0 && (
@@ -568,7 +553,7 @@ export function InstrumentExplorer({
           {isIntraday ? (
             intradayLoading ? (
               <Blank icon={<IconCandles size={22} />} title="Memuat grafik realtime...">
-                Mengambil data intraday 5 menit dari bursa.
+                Mengambil data intraday dari bursa.
               </Blank>
             ) : intradayCandles.length > 0 ? (
               <IntradayChart data={intradayCandles} livePrice={livePrice} />

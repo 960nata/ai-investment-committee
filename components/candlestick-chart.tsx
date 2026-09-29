@@ -291,37 +291,6 @@ function intradayVolumes(sorted: IntradayCandle[]) {
   }))
 }
 
-/** Jeda sepanjang ini di antara dua lilin berarti bursa sempat tutup semalam. */
-const SESSION_GAP_SECONDS = 4 * 3600
-
-/**
- * Buka tampilan di sesi terakhir, tanpa membuang sesi sebelumnya.
- *
- * Deret intraday saham berisi beberapa hari. Menampilkan semuanya sekaligus
- * membuat grafik melompat dari penutupan kemarin ke pembukaan hari ini di
- * tengah layar; memotongnya ke satu sesi membuat grafik pagi hari hanya
- * berisi beberapa lilin dan tidak bisa digeser ke belakang. Jadi semuanya
- * dimuat, dan jendela awalnya sesi terakhir — minimal 60 lilin supaya sesi
- * yang baru buka tetap terbaca. Istirahat siang BEI (paling lama 2,5 jam) dan
- * jeda harian kontrak berjangka (1 jam) tidak dihitung sebagai pergantian sesi.
- */
-function showLastSession(chart: IChartApi, sorted: IntradayCandle[]) {
-  let start = 0
-  for (let i = sorted.length - 1; i > 0; i--) {
-    if (sorted[i].time - sorted[i - 1].time > SESSION_GAP_SECONDS) {
-      start = i
-      break
-    }
-  }
-  const last = sorted.length - 1
-  if (start === 0) {
-    chart.timeScale().fitContent()
-    return
-  }
-  const from = Math.max(0, Math.min(start, last - 60))
-  chart.timeScale().setVisibleLogicalRange({ from: from - 0.5, to: last + 3 })
-}
-
 export function IntradayChart({
   data,
   livePrice = null,
@@ -416,7 +385,7 @@ export function IntradayChart({
             })),
           )
           volumeSeries.setData(intradayVolumes(sorted))
-          showLastSession(chart, sorted)
+          chart.timeScale().fitContent()
 
           const currentLive = livePriceRef.current
           if (currentLive != null && lastCandleRef.current) {
@@ -476,7 +445,7 @@ export function IntradayChart({
     if (volumeSeriesRef.current) {
       volumeSeriesRef.current.setData(intradayVolumes(sorted))
     }
-    if (needsFit) showLastSession(chartRef.current, sorted)
+    if (needsFit) chartRef.current.timeScale().fitContent()
   }, [data])
 
   // Update lilin 5m terakhir dan garis harga secara realtime

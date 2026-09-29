@@ -246,7 +246,7 @@ export function LandingMarketChart({ samples = [] }: { samples?: MarketSample[] 
       <p className="lp-market-foot">
         {candles.length > 0 ? (
           <>
-            <span>1 lilin = 5 menit</span>
+            <span>1 lilin = {tab.kind === 'crypto' ? 5 : 15} menit</span>
             <span>
               {tab.kind === 'crypto' ? 'live dari Binance, tiap detik' : 'dari Yahoo Finance, diperbarui tiap 15 detik'}
               {closed ? ' · menampilkan sesi terakhir' : ''}

@@ -4,7 +4,8 @@ import { fetchWithTimeout } from '@/lib/http/fetch'
 export const dynamic = 'force-dynamic'
 
 /**
- * Candle intraday 5 menit untuk grafik 1D realtime.
+ * Candle intraday untuk grafik 1D realtime: 5 menit untuk kripto, 15 menit
+ * untuk saham, indeks, dan komoditas.
  *
  * Crypto diambil dari Binance (klines), sisanya dari Yahoo Finance (chart).
  * Kedua sumber gratis, tanpa kunci, dan memberikan data 5 menit untuk
@@ -26,6 +27,14 @@ interface IntradayCandle {
 
 const CACHE = new Map<string, { candles: IntradayCandle[]; expiresAt: number }>()
 const CACHE_TTL_MS = 30_000
+
+/**
+ * Lilin Yahoo 15 menit, bukan 5. Saham berfraksi besar (BBCA Rp25) sering tidak
+ * bergerak satu tick pun dalam 5 menit, sehingga tiap lilinnya jadi balok
+ * setinggi satu tick atau garis datar — grafiknya terbaca seperti kode batang.
+ * Kripto tetap 5 menit dari Binance: harganya punya cukup banyak desimal.
+ */
+export const YAHOO_INTERVAL_MINUTES = 15
 
 const YAHOO_USER_AGENT = 'ai-investment-committee/0.1 (analisis data pribadi)'
 
@@ -96,7 +105,7 @@ async function fetchBinanceIntraday(symbol: string): Promise<IntradayCandle[]> {
 async function fetchYahooIntraday(symbol: string): Promise<IntradayCandle[]> {
   try {
     const res = await fetchWithTimeout(
-      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=5d&interval=5m`,
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=5d&interval=15m`,
       {
         label: `Yahoo Intraday (${symbol})`,
         headers: { 'User-Agent': YAHOO_USER_AGENT },
@@ -122,8 +131,20 @@ async function fetchYahooIntraday(symbol: string): Promise<IntradayCandle[]> {
       const v = q.volume?.[i]
       // Yahoo kadang mengembalikan null di slot yang belum terisi
       if (o == null || c == null) continue
+      // Titik terakhir sesi berjalan bercap waktu kutipan (mis. 15:49:59), bukan
+      // awal slotnya. Dibiarkan, ia jadi lilin ekstra yang berjarak beberapa
+      // menit dari tetangganya — digabung ke slotnya.
+      const time = timestamps[i] - (timestamps[i] % (YAHOO_INTERVAL_MINUTES * 60))
+      const prev = candles[candles.length - 1]
+      if (prev && prev.time === time) {
+        prev.high = Math.max(prev.high, h ?? c)
+        prev.low = Math.min(prev.low, l ?? c)
+        prev.close = c
+        prev.volume += v ?? 0
+        continue
+      }
       candles.push({
-        time: timestamps[i],
+        time,
         open: o,
         high: h ?? o,
         low: l ?? o,
@@ -132,8 +153,10 @@ async function fetchYahooIntraday(symbol: string): Promise<IntradayCandle[]> {
       })
     }
     // range=1d kosong saat bursa tutup (akhir pekan, libur), jadi diambil 5 hari
-    // dan dikirim utuh. Grafik membuka tampilan di sesi terakhir; sesi-sesi
-    // sebelumnya tetap bisa digeser ke kiri.
+    // dan dikirim utuh: beberapa sesi terakhir, seperti grafik intraday pada
+    // umumnya. Satu sesi saja di pagi hari hanya berisi beberapa lilin yang
+    // direntangkan selebar layar, dan untuk saham berfraksi besar (BBCA Rp25)
+    // tiap lilinnya jadi balok atau garis datar.
     return candles
   } catch (err) {
     console.warn('[Intraday] Yahoo gagal:', err instanceof Error ? err.message : err)
