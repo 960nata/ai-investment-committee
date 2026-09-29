@@ -202,6 +202,11 @@ function ruleFor(pathname: string, method: string): PathPolicy {
   // Satu panggilan ke sini menjalankan beberapa panggilan model sekaligus.
   // Inilah satu-satunya jalur di proyek ini yang penyalahgunaannya langsung
   // berarti kunci mati, jadi inilah yang dijaga paling keras.
+  // AI kalkulator publik: satu-satunya jalur model tanpa akun, jadi kuotanya
+  // sama ketatnya dengan komite dan perkakas otomatis disaring.
+  if (pathname.startsWith('/api/v1/kalkulator/')) {
+    return { scope: 'llm', rule: RULES.llm, strict: true }
+  }
   if (pathname.startsWith('/api/v1/committee/')) {
     return method === 'GET'
       ? { scope: 'read', rule: RULES.read, strict: false }

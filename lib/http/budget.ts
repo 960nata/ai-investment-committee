@@ -51,7 +51,30 @@ function perUserCeiling(): number {
   return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 15
 }
 
-export type SpendChannel = 'public' | 'scheduled'
+/**
+ * Bagian pagu untuk pengunjung tanpa akun (kalkulator publik).
+ *
+ * Sengaja kecil dan terpisah dari jatah publik: pengunjung anonim tidak punya
+ * identitas yang bisa dimintai tanggung jawab, jadi merekalah yang paling mudah
+ * dipakai untuk menguras kuota. Kalau jatah ini habis, pengguna yang sudah
+ * masuk tidak ikut kehabisan.
+ */
+const ANON_SHARE = 0.1
+
+/** Jatah satu pengunjung anonim (sidik IP) per hari. */
+function perAnonCeiling(): number {
+  const raw = Number(process.env.LLM_DAILY_PER_ANON)
+  return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 5
+}
+
+export type SpendChannel = 'public' | 'scheduled' | 'anonymous'
+
+/** Kunci penghitung per pemanggil: akun untuk saluran publik, sidik IP untuk anonim. */
+function subjectKey(channel: SpendChannel, userId?: number, subject?: string): string | null {
+  if (channel === 'public' && userId !== undefined) return `user:${userId}`
+  if (channel === 'anonymous' && subject) return `anon:${subject}`
+  return null
+}
 
 export interface BudgetVerdict {
   allowed: boolean
@@ -84,7 +107,7 @@ export interface BudgetVerdict {
  * dan tidak menjelaskan dirinya sendiri. Yang ini tetap terbatas, tetap bekerja,
  * dan mengaku sedang turun kelas lewat `degraded`.
  */
-const localCounter = { day: '', public: 0, scheduled: 0, users: new Map<number, number>() }
+const localCounter = { day: '', public: 0, scheduled: 0, anonymous: 0, users: new Map<string, number>() }
 
 function rollOverIfNewDay(): void {
   const today = new Date().toISOString().slice(0, 10)
@@ -93,20 +116,21 @@ function rollOverIfNewDay(): void {
   localCounter.day = today
   localCounter.public = 0
   localCounter.scheduled = 0
+  localCounter.anonymous = 0
   localCounter.users.clear()
 }
 
 function localSpend(
   channel: SpendChannel,
   units: number,
-  userId?: number,
+  subject: string | null,
 ): { used: number; userCount: number } {
   rollOverIfNewDay()
 
   let userCount = 0
-  if (userId !== undefined) {
-    userCount = (localCounter.users.get(userId) ?? 0) + 1
-    localCounter.users.set(userId, userCount)
+  if (subject !== null) {
+    userCount = (localCounter.users.get(subject) ?? 0) + 1
+    localCounter.users.set(subject, userCount)
   }
 
   localCounter[channel] += units
@@ -114,12 +138,12 @@ function localSpend(
 }
 
 /** Pasangan `localSpend` untuk satuan yang tidak jadi dipakai. */
-function localRefund(channel: SpendChannel, units: number, userId?: number): void {
+function localRefund(channel: SpendChannel, units: number, subject: string | null): void {
   rollOverIfNewDay()
 
   localCounter[channel] = Math.max(0, localCounter[channel] - units)
-  if (userId !== undefined) {
-    localCounter.users.set(userId, Math.max(0, (localCounter.users.get(userId) ?? 0) - 1))
+  if (subject !== null) {
+    localCounter.users.set(subject, Math.max(0, (localCounter.users.get(subject) ?? 0) - 1))
   }
 }
 
@@ -162,14 +186,21 @@ function secondsUntilReset(): number {
  */
 export async function reserveLlmBudget(
   channel: SpendChannel,
-  options: { userId?: number; units?: number; perUserLimit?: number } = {},
+  options: { userId?: number; subject?: string; units?: number; perUserLimit?: number } = {},
 ): Promise<BudgetVerdict> {
   const units = options.units ?? 1
   // Batas per akun dari pengaturan Premium (gratis vs Premium) bila diberikan;
-  // selain itu dari env seperti sebelumnya.
-  const perUserLimit = options.perUserLimit ?? perUserCeiling()
+  // selain itu dari env seperti sebelumnya. Pengunjung anonim punya batasnya sendiri.
+  const perUserLimit =
+    channel === 'anonymous' ? perAnonCeiling() : (options.perUserLimit ?? perUserCeiling())
   const total = ceiling()
-  const limit = channel === 'public' ? Math.floor(total * PUBLIC_SHARE) : total
+  const limit =
+    channel === 'public'
+      ? Math.floor(total * PUBLIC_SHARE)
+      : channel === 'anonymous'
+        ? Math.max(1, Math.floor(total * ANON_SHARE))
+        : total
+  const subject = subjectKey(channel, options.userId, options.subject)
   const resetSeconds = secondsUntilReset()
 
   const redis = redisClient()
@@ -183,9 +214,9 @@ export async function reserveLlmBudget(
 
     const fallbackLimit = Math.max(5, Math.floor(limit / 4))
     const fallbackUser = Math.max(3, Math.floor(perUserLimit / 4))
-    const { used, userCount } = localSpend(channel, units, options.userId)
+    const { used, userCount } = localSpend(channel, units, subject)
 
-    if (options.userId !== undefined && userCount > fallbackUser) {
+    if (subject !== null && userCount > fallbackUser) {
       return {
         allowed: false,
         used: userCount,
@@ -210,8 +241,8 @@ export async function reserveLlmBudget(
     // Jatah akun diperiksa lebih dulu. Kalau yang habis adalah jatah satu orang,
     // penghitung global tidak boleh ikut naik — kalau ikut naik, satu akun yang
     // terus menabrak batasnya sendiri tetap bisa menghabiskan jatah orang lain.
-    if (channel === 'public' && options.userId !== undefined) {
-      const key = todayKey(`user:${options.userId}`)
+    if (subject !== null) {
+      const key = todayKey(subject)
       const count = await redis.incr(key)
       if (count === 1) await redis.expire(key, resetSeconds)
 
@@ -250,7 +281,7 @@ export async function reserveLlmBudget(
     }
 
     const fallbackLimit = Math.max(5, Math.floor(limit / 4))
-    const { used } = localSpend(channel, units, options.userId)
+    const { used } = localSpend(channel, units, subject)
 
     return {
       allowed: used <= fallbackLimit,
@@ -272,29 +303,28 @@ export async function reserveLlmBudget(
  */
 export async function refundLlmBudget(
   channel: SpendChannel,
-  options: { userId?: number; units?: number } = {},
+  options: { userId?: number; subject?: string; units?: number } = {},
 ): Promise<void> {
   const units = options.units ?? 1
+  const subject = subjectKey(channel, options.userId, options.subject)
   const redis = redisClient()
 
   if (!redis) {
-    localRefund(channel, units, options.userId)
+    localRefund(channel, units, subject)
     return
   }
 
   try {
     const pipeline = redis.pipeline()
     pipeline.decrby(todayKey(channel), units)
-    if (channel === 'public' && options.userId !== undefined) {
-      pipeline.decr(todayKey(`user:${options.userId}`))
-    }
+    if (subject !== null) pipeline.decr(todayKey(subject))
     await pipeline.exec()
   } catch (err) {
     // Penghitung yang tadi menerima pesanan ini mungkin juga penghitung memori.
     // Mengembalikannya di sana tidak pernah salah: kalau pesanannya memang
     // masuk ke Redis, angkanya sudah nol dan `Math.max` menahannya di nol.
     console.error('[Budget] gagal mengembalikan satuan:', err)
-    localRefund(channel, units, options.userId)
+    localRefund(channel, units, subject)
   }
 }
 

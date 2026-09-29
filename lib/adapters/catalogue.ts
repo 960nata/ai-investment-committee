@@ -182,7 +182,9 @@ const KOMODITI: CatalogueEntry[] = ([
   ['OJ=F', 'Jus jeruk'],
   ['LE=F', 'Sapi hidup'],
   ['HE=F', 'Babi kurus'],
-  ['LBS=F', 'Kayu'],
+  // LBS=F dihentikan CME dan Yahoo kini menjawab 404. LBR=F kontrak
+  // penggantinya — spesifikasinya berbeda, jadi riwayatnya tidak disambung.
+  ['LBR=F', 'Kayu'],
 ] as [string, string][]).map(([symbol, name]) => ({
   symbol,
   name,
@@ -519,7 +521,9 @@ const SAHAM_INTERNASIONAL: CatalogueEntry[] = ([
   ['PHIA.AS', 'Philips', 'EUR', 'Belanda'],
 
   ['NESN.SW', 'Nestle', 'CHF', 'Swiss'],
-  ['ROG.SW', 'Roche', 'CHF', 'Swiss'],
+  // ROG.SW (Genussschein) tidak lagi tersedia di Yahoo. RO.SW saham pembawa
+  // Roche — efek yang berbeda dengan harga berbeda, jadi riwayatnya terpisah.
+  ['RO.SW', 'Roche', 'CHF', 'Swiss'],
   ['NOVN.SW', 'Novartis', 'CHF', 'Swiss'],
   ['UBSG.SW', 'UBS Group', 'CHF', 'Swiss'],
   ['ZURN.SW', 'Zurich Insurance', 'CHF', 'Swiss'],

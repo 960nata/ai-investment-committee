@@ -9,6 +9,7 @@ import {
   IconNews,
   IconShield,
   IconTarget,
+  IconCalculator,
   IconScales,
   IconCandles,
   IconFlow,
@@ -820,6 +821,18 @@ export function LandingNav({
               </Link>
             </div>
 
+            {/* Menu 6: Kalkulator investasi — publik, tanpa login */}
+            <div className="nav-dropdown-trigger">
+              <Link
+                href="/kalkulator"
+                className={`nav-trigger-btn ${pathname === '/kalkulator' ? 'active' : ''}`}
+                onMouseEnter={() => setActiveMenu(null)}
+              >
+                <IconCalculator size={14} />
+                <span>Kalkulator</span>
+              </Link>
+            </div>
+
           </nav>
 
           {/* Integrated Search Trigger */}
@@ -1076,6 +1089,15 @@ export function LandingNav({
                   available={languages}
                   onNavigate={() => setMobileOpen(false)}
                 />
+              </div>
+
+              {/* Section: Alat gratis — bisa dipakai tanpa akun */}
+              <div className="mobile-menu-section">
+                <div className="mobile-menu-title mono">ALAT GRATIS</div>
+                <Link href="/kalkulator" className="mobile-menu-link" onClick={() => setMobileOpen(false)}>
+                  <IconCalculator size={16} />
+                  <span>Kalkulator Investasi</span>
+                </Link>
               </div>
 
               {/* Section: Pasar */}

@@ -11,7 +11,6 @@
  */
 
 import { InstrumentExplorer } from '@/components/instrument-explorer'
-import { UserAnalyticsDashboard } from '@/components/user-analytics-dashboard'
 import type { Candle } from '@/components/candlestick-chart'
 import {
   IconCandles,
@@ -32,8 +31,6 @@ import {
   STALE_AFTER_MINUTES,
   type DashboardStats,
 } from '@/lib/db/queries'
-import { getVisitSummary } from '@/lib/db/visit-queries'
-import { getMeasurementId } from '@/lib/analytics/ga4'
 import { TAB_LAYOUT } from '@/lib/db/schema'
 import { MODEL_VERSION } from '@/lib/scoring/weights'
 import type { HorizonView } from '@/components/score-panel'
@@ -56,7 +53,6 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
   // lebih dulu, tetapi pemeriksaan di sini yang menjamin halaman ini tidak
   // pernah merender data untuk orang tanpa sesi.
   const session = await requireUser('/ringkasan')
-  const isAdmin = session.role === 'admin'
   // Tautan dari menu dan pita harga membawa aset atau kelas aset yang diminta.
   // Tanpa dibaca di sini, setiap tautan menu mendarat di halaman yang sama dan
   // menunya berhenti berarti apa-apa.
@@ -66,7 +62,7 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
   let error: string | null = null
 
   try {
-    data = await load({ symbol, tab, includeAnalytics: isAdmin, userId: session.uid })
+    data = await load({ symbol, tab, userId: session.uid })
   } catch (err) {
     error = err instanceof Error ? err.message : String(err)
   }
@@ -171,13 +167,9 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
 
       {error && <DatabaseNotice detail={error} />}
 
-      {/* Telemetri Google Analytics 4 & Peta Sebaran Lokasi Pengunjung (Leaflet) - Khusus Administrator */}
-      {isAdmin && (
-        <UserAnalyticsDashboard
-          measurementId={getMeasurementId()}
-          initialSummary={data?.visitSummary}
-        />
-      )}
+      {/* Analitik pengunjung sengaja tidak ada di sini, bahkan untuk admin:
+          terminal pengguna hanya untuk data pasar. Laporan GA4 dan peta
+          pengunjung ada di portal admin (/admin/analytics). */}
 
       {data && (
         <InstrumentExplorer
@@ -242,20 +234,17 @@ function Readout({
 async function load({
   symbol,
   tab,
-  includeAnalytics = false,
   userId,
 }: {
   symbol?: string
   tab?: string
-  includeAnalytics?: boolean
   userId?: number
 } = {}) {
-  const [stats, health, instruments, scores, visitSummary, watchlistIds] = await Promise.all([
+  const [stats, health, instruments, scores, watchlistIds] = await Promise.all([
     getDashboardStats(),
     listAdapterHealth(),
     listInstrumentQuotes(),
     listLatestScores(MODEL_VERSION),
-    includeAnalytics ? getVisitSummary('30d').catch(() => null) : Promise.resolve(null),
     // Watchlist pelengkap; kegagalannya tidak boleh menjatuhkan ringkasan.
     userId !== undefined ? listWatchlistIds(userId).catch(() => [] as number[]) : Promise.resolve([] as number[]),
   ])
@@ -354,7 +343,6 @@ async function load({
     initialCandles,
     queueConfigured: isQStashConfigured(),
     cacheAvailable: cache.isAvailable(),
-    visitSummary,
     watchlistIds,
   }
 }
