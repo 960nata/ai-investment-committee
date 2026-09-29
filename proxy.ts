@@ -199,18 +199,18 @@ interface PathPolicy {
  * puluh kali semenit.
  */
 function ruleFor(pathname: string, method: string): PathPolicy {
-  // Satu panggilan ke sini menjalankan beberapa panggilan model sekaligus.
-  // Inilah satu-satunya jalur di proyek ini yang penyalahgunaannya langsung
-  // berarti kunci mati, jadi inilah yang dijaga paling keras.
-  // AI kalkulator publik: satu-satunya jalur model tanpa akun, jadi kuotanya
-  // sama ketatnya dengan komite dan perkakas otomatis disaring.
+  // AI kalkulator publik: satu-satunya jalur model tanpa akun, jadi inilah yang
+  // dijaga paling keras dan perkakas otomatis disaring.
   if (pathname.startsWith('/api/v1/kalkulator/')) {
     return { scope: 'llm', rule: RULES.llm, strict: true }
   }
+  // Komite juga memanggil model, tapi hanya untuk akun yang sudah masuk, dan
+  // belanjanya dijaga pagu per akun di `budget.ts`. Kuota per alamat di sini
+  // cukup untuk menahan skrip, tidak untuk mengunci anggota.
   if (pathname.startsWith('/api/v1/committee/')) {
     return method === 'GET'
       ? { scope: 'read', rule: RULES.read, strict: false }
-      : { scope: 'llm', rule: RULES.llm, strict: true }
+      : { scope: 'committee', rule: RULES.committee, strict: true }
   }
   // Endpoint masuk dan daftar adalah sasaran tebakan beruntun, jadi kuotanya
   // jauh lebih sempit daripada pembacaan biasa.

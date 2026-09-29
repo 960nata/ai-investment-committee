@@ -219,6 +219,16 @@ export const RULES = {
    */
   llm: { limit: 3, windowSeconds: 3600 },
   /**
+   * Rapat dan tanya komite, yang hanya bisa dipanggil akun yang sudah masuk.
+   *
+   * Lebih longgar dari `llm` karena belanjanya sudah dijaga di lapisan yang
+   * mengenal akunnya: pagu harian per akun dan pagu global di `budget.ts`, dan
+   * rapat yang dipakai ulang dari hasil hari ini dikembalikan ke pagu. Tiga per
+   * jam per alamat membuat anggota yang membuka sidang tiga saham terkunci
+   * sejam — termasuk untuk hasil yang tidak memanggil model sama sekali.
+   */
+  committee: { limit: 20, windowSeconds: 3600 },
+  /**
    * Terjemahan antarmuka dari pemilih bahasa.
    *
    * Satu halaman besar butuh beberapa permintaan (teks dikirim berkelompok),
