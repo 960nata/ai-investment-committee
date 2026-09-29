@@ -291,6 +291,22 @@ function intradayVolumes(sorted: IntradayCandle[]) {
   }))
 }
 
+/** Lilin yang terlihat saat grafik dibuka: ±3 sesi BEI dalam lilin 15 menit. */
+const INTRADAY_VISIBLE_BARS = 80
+
+/**
+ * Buka tampilan di lilin-lilin terakhir dengan lebar lilin wajar. Riwayat
+ * intraday berisi puluhan hari; fitContent memampatkan semuanya jadi garis
+ * tipis, jadi sisanya dibiarkan di luar layar untuk digeser ke kiri.
+ */
+function showRecent(chart: IChartApi, count: number) {
+  const last = count - 1
+  chart.timeScale().setVisibleLogicalRange({
+    from: Math.max(0, last - INTRADAY_VISIBLE_BARS) - 0.5,
+    to: last + 3,
+  })
+}
+
 export function IntradayChart({
   data,
   livePrice = null,
@@ -385,7 +401,7 @@ export function IntradayChart({
             })),
           )
           volumeSeries.setData(intradayVolumes(sorted))
-          chart.timeScale().fitContent()
+          showRecent(chart, sorted.length)
 
           const currentLive = livePriceRef.current
           if (currentLive != null && lastCandleRef.current) {
@@ -445,7 +461,7 @@ export function IntradayChart({
     if (volumeSeriesRef.current) {
       volumeSeriesRef.current.setData(intradayVolumes(sorted))
     }
-    if (needsFit) chartRef.current.timeScale().fitContent()
+    if (needsFit) showRecent(chartRef.current, sorted.length)
   }, [data])
 
   // Update lilin 5m terakhir dan garis harga secara realtime

@@ -1494,27 +1494,9 @@ body.rail-lock {
   text-transform: uppercase;
   letter-spacing: 0.5px;
   border-radius: 999px;
-  cursor: pointer;
-  transition: all 0.2s ease;
   background: rgba(16, 185, 129, 0.12);
   color: #10b981;
   border: 1px solid rgba(16, 185, 129, 0.3);
-}
-
-.live-motion-btn:hover {
-  background: rgba(16, 185, 129, 0.2);
-  border-color: rgba(16, 185, 129, 0.5);
-}
-
-.live-motion-btn.paused {
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--ink-mute);
-  border-color: var(--line);
-}
-
-.live-motion-btn.paused .live-dot {
-  background: #64748b;
-  animation: none;
 }
 
 .chart-wide {

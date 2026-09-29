@@ -80,7 +80,7 @@ async function binanceFetch(path: string): Promise<Response> {
 async function fetchBinanceIntraday(symbol: string): Promise<IntradayCandle[]> {
   try {
     const res = await binanceFetch(
-      `/api/v3/klines?symbol=${encodeURIComponent(symbol)}&interval=5m&limit=288`,
+      `/api/v3/klines?symbol=${encodeURIComponent(symbol)}&interval=5m&limit=1000`,
     )
     if (!res.ok) return []
 
@@ -105,7 +105,7 @@ async function fetchBinanceIntraday(symbol: string): Promise<IntradayCandle[]> {
 async function fetchYahooIntraday(symbol: string): Promise<IntradayCandle[]> {
   try {
     const res = await fetchWithTimeout(
-      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=5d&interval=15m`,
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=60d&interval=15m`,
       {
         label: `Yahoo Intraday (${symbol})`,
         headers: { 'User-Agent': YAHOO_USER_AGENT },
@@ -152,11 +152,9 @@ async function fetchYahooIntraday(symbol: string): Promise<IntradayCandle[]> {
         volume: v ?? 0,
       })
     }
-    // range=1d kosong saat bursa tutup (akhir pekan, libur), jadi diambil 5 hari
-    // dan dikirim utuh: beberapa sesi terakhir, seperti grafik intraday pada
-    // umumnya. Satu sesi saja di pagi hari hanya berisi beberapa lilin yang
-    // direntangkan selebar layar, dan untuk saham berfraksi besar (BBCA Rp25)
-    // tiap lilinnya jadi balok atau garis datar.
+    // Diambil 60 hari (batas Yahoo untuk lilin 15 menit) dan dikirim utuh.
+    // Grafik membuka tampilan di beberapa sesi terakhir; riwayat sebelumnya
+    // tetap bisa digeser ke kiri, seperti grafik intraday pada umumnya.
     return candles
   } catch (err) {
     console.warn('[Intraday] Yahoo gagal:', err instanceof Error ? err.message : err)
