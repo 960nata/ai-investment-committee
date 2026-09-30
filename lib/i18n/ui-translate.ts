@@ -72,6 +72,7 @@ async function translateBatch(texts: string[], locale: Locale): Promise<string[]
 Rules:
 - Most strings are Indonesian; a few may already be English. Translate all of them into ${language}.
 - Keep numbers, dates, prices, percentages, and asset tickers (e.g. BTCUSDT, BBCA.JK, ^JKSE, NVDA) exactly as written.
+- Placeholders such as {0}, {1} stand for numbers. Keep every placeholder exactly once, unchanged, placed where the number belongs in ${language} grammar.
 - Keep the brand name "AI Investdesk" unchanged. "Komite" on its own is the name of the AI investment committee feature; translate it as a committee.
 - Keep the meaning and the tone. Short labels stay short. Do not add explanations.
 - This site never gives buy or sell advice; do not translate anything into a trading instruction.

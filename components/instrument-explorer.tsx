@@ -744,10 +744,11 @@ export function InstrumentExplorer({
                     ) : (
                       <RegionFlag region={instrument.region} size={13} />
                     )}
-                    <span className="card-pick-symbol">{display(instrument.symbol)}</span>
+                    <span className="card-pick-symbol" translate="no">{display(instrument.symbol)}</span>
                     <Change value={change} />
                   </span>
-                  <span className="card-pick-name">{instrument.name}</span>
+                  {/* Nama emiten tidak diterjemahkan: 448 nama perusahaan hanya menghabiskan kuota penerjemah. */}
+                  <span className="card-pick-name" translate="no">{instrument.name}</span>
                   <span className="card-pick-foot">
                     {price == null ? (
                       <span style={{ color: 'var(--ink-faint)' }}>belum ada harga</span>

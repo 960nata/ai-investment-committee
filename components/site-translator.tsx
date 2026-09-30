@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { LOCALE_INFO, SOURCE_LOCALE, type Locale } from '@/lib/i18n/locales'
 import { LOCALE_EVENT, localeFromPath, readPreference } from '@/lib/i18n/preference'
 import { STATIC_DICTIONARY } from '@/lib/i18n/static-dictionary'
+import { fill, template, translatable } from '@/lib/i18n/text-template'
 
 /*
  * Penerjemah halaman di peramban.
@@ -32,14 +33,6 @@ const ATTRS = ['placeholder', 'title', 'aria-label', 'alt'] as const
 const BATCH = 50
 const BATCH_CHARS = 12_000
 const STORE_LIMIT = 4000
-
-/** Teks tanpa huruf, atau satu token yang tampak seperti simbol/angka: tidak dikirim. */
-function translatable(core: string): boolean {
-  if (core.length < 2 || core.length > 1000) return false
-  if (!/\p{L}/u.test(core)) return false
-  if (!/\s/.test(core) && /[\d.^=/]|USDT$/.test(core)) return false
-  return true
-}
 
 function storeKey(locale: Locale) {
   return `komite_tr_${locale}`
@@ -163,13 +156,16 @@ export function SiteTranslator() {
         // (nilai berbeda) dianggap teks asli baru.
         if (applied.current.get(node) === value) continue
         const core = value.trim()
-        if (!translatable(core)) continue
+        const { key, values } = template(core)
+        if (!translatable(key)) continue
 
-        const hit = cache.get(core)
-        if (hit === undefined) {
-          missing.add(core)
+        const cached = cache.get(key)
+        if (cached === undefined) {
+          missing.add(key)
           continue
         }
+        const hit = fill(cached, values)
+        if (hit === null) continue
         if (!originals.current.has(node) || applied.current.get(node) !== value) {
           originals.current.set(node, value)
         }
@@ -188,13 +184,15 @@ export function SiteTranslator() {
           const current = el.getAttribute(attr)
           if (!current) continue
           const original = map?.get(attr) ?? current
-          const core = original.trim()
-          if (!translatable(core)) continue
-          const hit = cache.get(core)
-          if (hit === undefined) {
-            missing.add(core)
+          const { key, values } = template(original.trim())
+          if (!translatable(key)) continue
+          const cached = cache.get(key)
+          if (cached === undefined) {
+            missing.add(key)
             continue
           }
+          const hit = fill(cached, values)
+          if (hit === null) continue
           if (current === hit) continue
           if (!map) {
             map = new Map()
@@ -215,9 +213,15 @@ export function SiteTranslator() {
       retryAt.set(t, { at: Date.now() + wait, wait })
     }
 
+    // Toast hanya untuk terjemahan pertama halaman. Pembaruan kecil sesudahnya
+    // (harga, menu yang dibuka) diterjemahkan diam-diam, bukan berkedip terus.
+    let announced = false
+
     const fetchMissing = async (texts: string[]) => {
       if (texts.length === 0) return
-      setBusy(true)
+      const loud = !announced
+      announced = true
+      if (loud) setBusy(true)
       for (const t of texts) inflight.add(t)
       try {
         for (let i = 0; i < texts.length && !cancelled; ) {
@@ -253,7 +257,7 @@ export function SiteTranslator() {
         for (const t of texts) if (!cache.has(t)) backoff(t)
       } finally {
         for (const t of texts) inflight.delete(t)
-        if (!cancelled) {
+        if (!cancelled && loud) {
           setBusy(false)
           setJustDone(true)
           if (doneTimer.current) clearTimeout(doneTimer.current)
