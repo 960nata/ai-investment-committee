@@ -1303,18 +1303,6 @@ export function LandingNav({
                 <span>{signedIn ? 'Buka Terminal Pasar' : 'Masuk ke Akun'}</span>
                 {signedIn && <IconArrowRight size={14} />}
               </Link>
-              {!signedIn && (
-                <div style={{ marginTop: '10px', textAlign: 'center' }}>
-                  <Link
-                    href="/admin/login"
-                    onClick={() => setMobileOpen(false)}
-                    className="mono"
-                    style={{ fontSize: '11px', color: 'var(--ink-mute)', textDecoration: 'none' }}
-                  >
-                    Portal Administrator &rarr;
-                  </Link>
-                </div>
-              )}
             </div>
           </aside>
         </>

@@ -14,7 +14,7 @@ export function AdminLogoutButton() {
 
     try {
       await fetch('/api/v1/admin/auth', { method: 'DELETE' })
-      router.push('/admin/login')
+      router.push('/')
       router.refresh()
     } catch {
       setLoading(false)

@@ -143,12 +143,7 @@ export function Rail() {
           Menampilkan peluang beserta data mentahnya. Tidak pernah menganjurkan satu pun
           keputusan.
           <div style={{ marginTop: 'var(--space-2)', paddingTop: 'var(--space-2)', borderTop: '1px solid var(--line)' }}>
-            <Link href="/admin" className="mono" style={{ color: 'var(--ink-faint)', fontSize: '11px', textDecoration: 'none' }}>
-              &rarr; Portal Admin AI Investdesk
-            </Link>
-            <div style={{ marginTop: 6 }}>
-              <MadeBy className="mono" />
-            </div>
+            <MadeBy className="mono" />
           </div>
         </div>
       </aside>

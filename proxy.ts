@@ -221,8 +221,9 @@ function ruleFor(pathname: string, method: string): PathPolicy {
       : { scope: 'committee', rule: RULES.committee, strict: true }
   }
   // Endpoint masuk dan daftar adalah sasaran tebakan beruntun, jadi kuotanya
-  // jauh lebih sempit daripada pembacaan biasa.
-  if (pathname.startsWith('/api/v1/auth/')) {
+  // jauh lebih sempit daripada pembacaan biasa. Masuk admin termasuk — dulu ia
+  // ikut kuota baca, 120 tebakan PIN per menit.
+  if (pathname.startsWith('/api/v1/auth/') || pathname === '/api/v1/admin/auth') {
     return { scope: 'auth', rule: RULES.auth, strict: false }
   }
   // Tiap POST checkout membuat satu tagihan sungguhan di Tripay, jadi kuotanya
@@ -384,6 +385,31 @@ export async function proxy(request: NextRequest, event?: NextFetchEvent) {
     }
   }
 
+  // --- Pintu masuk admin ----------------------------------------------------
+  // Halaman masuk admin hanya dilayani di alamat rahasia; alamat aslinya dijawab
+  // 404 seperti halaman yang memang tidak ada. Ini bukan pengganti kata sandi —
+  // penjaganya tetap PIN, akun, dan kuota masuk — tapi pemindai yang mencoba
+  // /admin/login di ribuan situs tidak lagi menemukan formulir untuk ditebak.
+  const loginSlug = adminLoginSlug()
+  let rewriteTo: string | null = null
+  if (loginSlug) {
+    if (pathname === '/admin/login') rewriteTo = '/__tidak-ditemukan'
+    else if (pathname === `/${loginSlug}`) rewriteTo = '/admin/login'
+  }
+
+  // Portal admin diperiksa di sini, bukan hanya di layout-nya. Layout dan
+  // halaman dirender paralel: `notFound()` di layout tetap membiarkan isi
+  // halaman ikut terkirim dalam payload RSC — judul, menu, dan data portal
+  // terbaca di sumber halaman 404 oleh siapa pun.
+  if (
+    rewriteTo === null &&
+    (pathname === '/admin' || pathname.startsWith('/admin/')) &&
+    pathname !== '/admin/login' &&
+    !isRequestAdminAuthenticated(request)
+  ) {
+    rewriteTo = '/__tidak-ditemukan'
+  }
+
   // --- Halaman --------------------------------------------------------------
   const nonce = crypto.randomUUID()
   const csp = contentSecurityPolicy(nonce)
@@ -394,11 +420,25 @@ export async function proxy(request: NextRequest, event?: NextFetchEvent) {
   requestHeaders.set('x-nonce', nonce)
   requestHeaders.set('content-security-policy', csp)
 
-  const response = NextResponse.next({ request: { headers: requestHeaders } })
+  const response = rewriteTo
+    ? NextResponse.rewrite(new URL(rewriteTo, request.url), { request: { headers: requestHeaders } })
+    : NextResponse.next({ request: { headers: requestHeaders } })
   for (const [key, value] of Object.entries(headers)) response.headers.set(key, value)
   response.headers.set('content-security-policy', csp)
+  if (rewriteTo === '/admin/login') response.headers.set('x-robots-tag', 'noindex, nofollow')
 
   return response
+}
+
+/**
+ * Alamat rahasia halaman masuk admin, tanpa garis miring. Null bila belum
+ * diisi — halaman tetap di /admin/login supaya pemasangan lama tidak terkunci.
+ * Dibatasi huruf, angka, dan tanda hubung, minimal 12 karakter: alamat pendek
+ * atau berisi garis miring akan bertabrakan dengan rute lain atau mudah ditebak.
+ */
+function adminLoginSlug(): string | null {
+  const slug = process.env.ADMIN_LOGIN_SLUG?.trim().replace(/^\/+|\/+$/g, '')
+  return slug && /^[a-zA-Z0-9-]{12,}$/.test(slug) ? slug : null
 }
 
 export const config = {

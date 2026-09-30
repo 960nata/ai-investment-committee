@@ -1,4 +1,4 @@
-import { redirect } from 'next/navigation'
+import { notFound } from 'next/navigation'
 import { verifyAdminSession } from '@/lib/auth/admin-auth'
 import { getAiTokensDashboardData } from '@/lib/ai/telemetry'
 import { AiTokensDashboardClient } from '@/components/ai-tokens/ai-tokens-dashboard-client'
@@ -14,7 +14,7 @@ export const metadata = {
 export default async function AdminAiTokensPage() {
   const isAdmin = await verifyAdminSession()
   if (!isAdmin) {
-    redirect('/admin/login')
+    notFound()
   }
 
   const initialData = await getAiTokensDashboardData('24h')

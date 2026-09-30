@@ -66,7 +66,6 @@ export function LandingFooter() {
             <Link href="/daftar">Daftar Akun Baru</Link>
             <PremiumFooterLink />
             <DonationFooterLink />
-            <Link href="/admin/login" style={{ color: 'var(--signal)' }}>Portal Administrator</Link>
           </div>
         </div>
 

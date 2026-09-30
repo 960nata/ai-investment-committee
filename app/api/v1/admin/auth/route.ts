@@ -85,16 +85,20 @@ export async function POST(req: NextRequest) {
         message: 'Otorisasi administrator berhasil.',
       })
 
-      // Pasang cookie admin session
-      response.cookies.set({
-        name: COOKIE_NAME,
-        value: getAdminSessionCookieValue(),
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        path: '/',
-        maxAge: SESSION_MAX_AGE_SECONDS,
-      })
+      // Pasang cookie admin session — hanya bila rahasia admin diisi. Tanpanya
+      // cookie sesi pengguna ber-peran admin di bawah sudah cukup.
+      const adminCookie = getAdminSessionCookieValue()
+      if (adminCookie) {
+        response.cookies.set({
+          name: COOKIE_NAME,
+          value: adminCookie,
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          path: '/',
+          maxAge: SESSION_MAX_AGE_SECONDS,
+        })
+      }
 
       // Pasang juga cookie user session dengan role admin
       response.cookies.set({
@@ -112,7 +116,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Jalur 2: Otorisasi Kunci Akses / Master PIN Administrator
-    if (!pin || !verifyAdminPin(pin)) {
+    const pinCookie = getAdminSessionCookieValue()
+    if (!pin || !pinCookie || !verifyAdminPin(pin)) {
       return NextResponse.json(
         { ok: false, error: 'PIN atau kunci otorisasi administrator tidak valid.' },
         { status: 401 },
@@ -127,7 +132,7 @@ export async function POST(req: NextRequest) {
 
     response.cookies.set({
       name: COOKIE_NAME,
-      value: getAdminSessionCookieValue(),
+      value: pinCookie,
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',

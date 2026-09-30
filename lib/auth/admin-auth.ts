@@ -7,7 +7,7 @@
  */
 
 import { cookies } from 'next/headers'
-import { COOKIE_NAME, createSessionSignature } from './admin-token'
+import { COOKIE_NAME, isValidAdminSignature } from './admin-token'
 import { USER_SESSION_COOKIE, readSessionToken } from './session'
 
 export {
@@ -25,7 +25,7 @@ export async function verifyAdminSession(): Promise<boolean> {
   try {
     const cookieStore = await cookies()
     const sessionCookie = cookieStore.get(COOKIE_NAME)
-    if (sessionCookie?.value && sessionCookie.value === createSessionSignature()) {
+    if (isValidAdminSignature(sessionCookie?.value)) {
       return true
     }
 

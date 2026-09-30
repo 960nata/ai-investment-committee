@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   IconPulse,
-  IconLock,
   IconArrowRight,
   IconAlert,
   IconGauge,
@@ -209,49 +208,6 @@ function UserLoginForm() {
             Belum punya akun? <Link href="/daftar">Daftar gratis</Link>
           </p>
         </form>
-
-        {/* Pemisah eksplisit untuk akses Administrator */}
-        <div
-          style={{
-            marginTop: '20px',
-            padding: '12px 14px',
-            borderRadius: 'var(--radius-sm)',
-            background: 'rgba(250, 134, 42, 0.05)',
-            border: '1px solid rgba(250, 134, 42, 0.22)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '12px',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ color: 'var(--signal)' }}>
-              <IconLock size={15} />
-            </span>
-            <div>
-              <div style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--ink)' }}>
-                Pengelola atau Redaksi?
-              </div>
-              <div className="mono" style={{ fontSize: '10px', color: 'var(--ink-mute)' }}>
-                Login Administrator terpisah
-              </div>
-            </div>
-          </div>
-          <Link
-            href="/admin/login"
-            className="btn btn-quiet mono"
-            style={{
-              fontSize: '11px',
-              padding: '4px 10px',
-              borderColor: 'rgba(250, 134, 42, 0.4)',
-              color: 'var(--signal)',
-              textDecoration: 'none',
-              flexShrink: 0,
-            }}
-          >
-            Portal Admin &rarr;
-          </Link>
-        </div>
 
         <div className="auth-foot">
           <Link href="/" className="mono">

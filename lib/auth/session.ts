@@ -46,10 +46,12 @@ function sessionSecret(): string {
   const secret = process.env.SESSION_SECRET || process.env.ADMIN_SECRET_KEY
 
   if (!secret || secret.length < 16) {
+    // Di produksi berhenti, bukan sekadar memperingatkan: kunci cadangan di bawah
+    // tertulis di repo publik, jadi siapa pun bisa menandatangani sesi ber-peran
+    // admin dengannya. Masuk yang gagal terlihat; pintu yang terbuka tidak.
     if (process.env.NODE_ENV === 'production') {
-      console.warn(
-        '[auth] SESSION_SECRET belum diisi. Sesi pengguna ditandatangani kunci cadangan ' +
-          'yang tidak rahasia. Isi SESSION_SECRET (openssl rand -base64 32) sebelum dipakai publik.',
+      throw new Error(
+        '[auth] SESSION_SECRET belum diisi (min. 16 karakter). Isi dengan: openssl rand -base64 32',
       )
     }
     return 'komite-session-dev-secret-please-change'
