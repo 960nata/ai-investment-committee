@@ -781,8 +781,10 @@ export function InstrumentExplorer({
 
 // ---------------------------------------------------------------------------
 
-function Change({ value }: { value: number | null }) {
-  if (value === null) return <span className="change" />
+function Change({ value }: { value: number | null | undefined }) {
+  // Harga live bisa datang tanpa persen (undefined) atau NaN; `toFixed` pada
+  // nilai seperti itu melempar dan menjatuhkan seluruh halaman.
+  if (typeof value !== 'number' || !Number.isFinite(value)) return <span className="change" />
 
   // Nol persen ditulis apa adanya, bukan diwarnai. Hari tanpa perubahan bukan
   // hari baik maupun buruk.

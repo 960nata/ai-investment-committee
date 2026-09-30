@@ -28,6 +28,14 @@ export const metadata: Metadata = {
     "Alat analisis data untuk saham IDX, saham AS, dan crypto. " +
     "Menampilkan peluang beserta dasarnya, bukan anjuran.",
   keywords: ["saham", "analisis", "IDX", "crypto", "investasi", "probabilistik"],
+  // Terjemahan bawaan Chrome dimatikan. Ia membungkus teks halaman dengan
+  // <font>, lalu begitu React mengubah bagian itu (mis. saham lain diklik)
+  // node yang dicari React sudah tidak ada dan seluruh halaman jatuh ke
+  // "This page couldn't load". Penerjemah situs sendiri (SiteTranslator)
+  // hanya mengganti isi teks, jadi aman. Sengaja lewat meta, bukan
+  // translate="no" di <html>: atribut itu juga dihormati SiteTranslator dan
+  // akan mematikan seluruh terjemahan situs.
+  other: { google: "notranslate" },
 };
 
 export default function RootLayout({

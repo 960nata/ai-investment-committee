@@ -54,6 +54,30 @@ function rangeStart(lastDate: string, id: ChartRangeId): string {
   return d.toISOString().slice(0, 10)
 }
 
+/**
+ * Buang lilin yang akan ditolak lightweight-charts.
+ *
+ * Pustaka itu tidak memaafkan: satu waktu kembar, urutan mundur, atau harga
+ * NaN/null membuat `setData` melempar — dan galat di dalam effect menjatuhkan
+ * seluruh halaman, bukan cuma grafiknya. Waktu kembar diambil yang terakhir.
+ */
+function cleanSeries<T extends { open: number; high: number; low: number; close: number; volume: number }>(
+  data: T[],
+  key: (d: T) => string | number,
+): T[] {
+  const byTime = new Map<string | number, T>()
+  for (const d of data) {
+    if (![d.open, d.high, d.low, d.close].every((v) => typeof v === 'number' && Number.isFinite(v))) continue
+    const volume = typeof d.volume === 'number' && Number.isFinite(d.volume) ? d.volume : 0
+    byTime.set(key(d), { ...d, volume })
+  }
+  return [...byTime.values()].sort((a, b) => {
+    const ka = key(a)
+    const kb = key(b)
+    return ka < kb ? -1 : ka > kb ? 1 : 0
+  })
+}
+
 // ---------------------------------------------------------------------------
 // Grafik harian (mode lama)
 // ---------------------------------------------------------------------------
@@ -115,7 +139,7 @@ export function CandlestickChart({
           height: container.clientHeight,
         })
 
-        const sorted = [...data].sort((a, b) => a.date.localeCompare(b.date))
+        const sorted = cleanSeries(data, (d) => d.date)
 
         const candleSeries = chart.addSeries(CandlestickSeries, {
           upColor: UP,
@@ -125,28 +149,32 @@ export function CandlestickChart({
           wickUpColor: UP,
           wickDownColor: DOWN,
         })
-        candleSeries.setData(
-          sorted.map((d) => ({
-            time: d.date,
-            open: d.open,
-            high: d.high,
-            low: d.low,
-            close: d.close,
-          })),
-        )
-
         const volumeSeries = chart.addSeries(HistogramSeries, {
           priceFormat: { type: 'volume' },
           priceScaleId: 'volume',
         })
         chart.priceScale('volume').applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } })
-        volumeSeries.setData(
-          sorted.map((d) => ({
-            time: d.date,
-            value: d.volume,
-            color: d.close >= d.open ? UP_SOFT : DOWN_SOFT,
-          })),
-        )
+
+        try {
+          candleSeries.setData(
+            sorted.map((d) => ({
+              time: d.date,
+              open: d.open,
+              high: d.high,
+              low: d.low,
+              close: d.close,
+            })),
+          )
+          volumeSeries.setData(
+            sorted.map((d) => ({
+              time: d.date,
+              value: d.volume,
+              color: d.close >= d.open ? UP_SOFT : DOWN_SOFT,
+            })),
+          )
+        } catch (err) {
+          console.error('[chart] data harian ditolak', err)
+        }
 
         chartRef.current = chart
         candleSeriesRef.current = candleSeries
@@ -168,7 +196,9 @@ export function CandlestickChart({
           })
         }
 
-        applyRange(chart, sorted, rangeRef.current)
+        try {
+          applyRange(chart, sorted, rangeRef.current)
+        } catch {}
 
         const observer = new ResizeObserver(() => {
           chart.applyOptions({ width: container.clientWidth, height: container.clientHeight })
@@ -194,7 +224,10 @@ export function CandlestickChart({
 
   useEffect(() => {
     rangeRef.current = range
-    if (chartRef.current) applyRange(chartRef.current, sortedRef.current, range)
+    if (!chartRef.current) return
+    try {
+      applyRange(chartRef.current, sortedRef.current, range)
+    } catch {}
   }, [range])
 
   // Update lilin terakhir dan horizontal price line secara realtime tiap kali harga berdenyut
@@ -386,22 +419,26 @@ export function IntradayChart({
         candleSeriesRef.current = candleSeries
         volumeSeriesRef.current = volumeSeries
 
-        if (data.length > 0) {
-          const sorted = [...data].sort((a, b) => a.time - b.time)
+        const sorted = cleanSeries(data, (d) => d.time)
+        if (sorted.length > 0) {
           sortedRef.current = sorted
           lastCandleRef.current = { ...sorted[sorted.length - 1] }
 
-          candleSeries.setData(
-            sorted.map((d) => ({
-              time: d.time as any,
-              open: d.open,
-              high: d.high,
-              low: d.low,
-              close: d.close,
-            })),
-          )
-          volumeSeries.setData(intradayVolumes(sorted))
-          showRecent(chart, sorted.length)
+          try {
+            candleSeries.setData(
+              sorted.map((d) => ({
+                time: d.time as any,
+                open: d.open,
+                high: d.high,
+                low: d.low,
+                close: d.close,
+              })),
+            )
+            volumeSeries.setData(intradayVolumes(sorted))
+            showRecent(chart, sorted.length)
+          } catch (err) {
+            console.error('[chart] data intraday ditolak', err)
+          }
 
           const currentLive = livePriceRef.current
           if (currentLive != null && lastCandleRef.current) {
@@ -441,27 +478,30 @@ export function IntradayChart({
 
   // Perbarui data saat data baru masuk dari upstream tanpa menghancurkan chart
   useEffect(() => {
-    if (!chartRef.current || !candleSeriesRef.current || data.length === 0) return
+    if (!chartRef.current || !candleSeriesRef.current) return
 
-    const sorted = [...data].sort((a, b) => a.time - b.time)
+    const sorted = cleanSeries(data, (d) => d.time)
+    if (sorted.length === 0) return
     // Riwayat penuh baru tiba setelah lilin tunggal dari stream — sesuaikan ulang zoom
     const needsFit = sortedRef.current.length < 2 && sorted.length > 1
     sortedRef.current = sorted
     lastCandleRef.current = { ...sorted[sorted.length - 1] }
 
-    candleSeriesRef.current.setData(
-      sorted.map((d) => ({
-        time: d.time as any,
-        open: d.open,
-        high: d.high,
-        low: d.low,
-        close: d.close,
-      })),
-    )
-    if (volumeSeriesRef.current) {
-      volumeSeriesRef.current.setData(intradayVolumes(sorted))
+    try {
+      candleSeriesRef.current.setData(
+        sorted.map((d) => ({
+          time: d.time as any,
+          open: d.open,
+          high: d.high,
+          low: d.low,
+          close: d.close,
+        })),
+      )
+      volumeSeriesRef.current?.setData(intradayVolumes(sorted))
+      if (needsFit) showRecent(chartRef.current, sorted.length)
+    } catch (err) {
+      console.error('[chart] pembaruan intraday ditolak', err)
     }
-    if (needsFit) showRecent(chartRef.current, sorted.length)
   }, [data])
 
   // Update lilin 5m terakhir dan garis harga secara realtime
