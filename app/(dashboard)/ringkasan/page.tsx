@@ -42,6 +42,13 @@ import { CHART_HISTORY_YEARS } from '@/lib/format/chart-range'
 
 export const dynamic = 'force-dynamic'
 
+// Terjemahan bawaan Chrome dimatikan khusus di halaman ini. Ia membungkus teks
+// dengan <font>, lalu begitu React mengganti isi saat saham diklik, node yang
+// dicari React sudah tidak ada dan halamannya jatuh ke "This page couldn't
+// load". Sengaja tidak dipasang global: halaman lain, termasuk berita, tetap
+// boleh diterjemahkan Chrome.
+export const metadata = { other: { google: 'notranslate' } }
+
 const CHART_RANGE_DAYS = CHART_HISTORY_YEARS * 366
 
 interface OverviewPageProps {

@@ -1,7 +1,7 @@
 'use client'
 
 /**
- * Batas galat untuk seluruh halaman dasbor.
+ * Batas galat untuk halaman ringkasan (grafik saham).
  *
  * Tanpa berkas ini, satu galat di komponen mana pun — grafik yang menolak
  * datanya, harga live yang datang cacat — menjatuhkan halaman ke layar bawaan
@@ -15,7 +15,7 @@ import Link from 'next/link'
 import { IconAlert } from '@/components/icons'
 import { Blank } from '@/components/ui'
 
-export default function DashboardError({
+export default function RingkasanError({
   error,
   retry,
 }: {
