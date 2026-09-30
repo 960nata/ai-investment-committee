@@ -20047,13 +20047,15 @@ body.rail-lock {
 
 /* ===========================================================================
    ANALITIK — LAPORAN TRAFIK INTERNAL (tr-*)
+   ---------------------------------------------------------------------------
+   Satu kartu ringkasan di atas, lalu panel-panel yang tingginya dibatasi.
+   Daftar panjang digulir di dalam panelnya sendiri, bukan memanjangkan halaman.
    =========================================================================== */
 
 .tr {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  margin-bottom: 12px;
 }
 
 .tr-card {
@@ -20065,6 +20067,8 @@ body.rail-lock {
 }
 
 .tr-card.tr-flush {
+  display: flex;
+  flex-direction: column;
   padding: 0;
   overflow: hidden;
 }
@@ -20082,9 +20086,26 @@ body.rail-lock {
   color: var(--ink-mute);
 }
 
+.tr-card-head svg {
+  color: var(--signal);
+}
+
+.tr-card-head.tr-pad {
+  margin: 0;
+  padding: 14px 16px 12px;
+}
+
+.tr-card-count {
+  margin-left: auto;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: var(--ink-faint);
+}
+
 .tr-muted {
   margin: 0;
   font-size: 11px;
+  line-height: 1.55;
   color: var(--ink-faint);
 }
 
@@ -20097,76 +20118,87 @@ body.rail-lock {
   color: var(--ink-mute);
 }
 
-/* --- Pengunjung aktif --------------------------------------------------- */
+.tr-nowrap {
+  white-space: nowrap;
+}
 
-.tr-live {
-  position: relative;
+/* Panel bergulir: tinggi dibatasi, bayangan tipis di bawah menandakan masih ada isi. */
+.tr-scroll {
+  max-height: 460px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+/* --- Kartu ringkasan ---------------------------------------------------- */
+
+.tr-overview {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 18px 20px;
+  flex-direction: column;
   overflow: hidden;
-  border: 1px solid rgba(79, 157, 142, 0.35);
+  border: 1px solid var(--line);
   border-radius: var(--radius-md);
   background:
-    radial-gradient(120% 140% at 0% 0%, rgba(79, 157, 142, 0.16), transparent 55%),
+    radial-gradient(90% 120% at 0% 0%, rgba(224, 161, 60, 0.07), transparent 55%),
     var(--surface-1);
 }
 
-.tr-live-main {
+.tr-live {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 18px;
+  gap: 10px 14px;
+  padding: 11px 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-0);
 }
 
 .tr-live-dot {
-  position: relative;
-  width: 12px;
-  height: 12px;
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
+  background: var(--ink-faint);
+}
+
+.tr-live.is-active .tr-live-dot {
   background: var(--green);
-  box-shadow: 0 0 0 0 rgba(79, 157, 142, 0.6);
   animation: tr-pulse 1.8s ease-out infinite;
 }
 
 @keyframes tr-pulse {
   0% { box-shadow: 0 0 0 0 rgba(79, 157, 142, 0.55); }
-  100% { box-shadow: 0 0 0 16px rgba(79, 157, 142, 0); }
+  100% { box-shadow: 0 0 0 10px rgba(79, 157, 142, 0); }
 }
 
-.tr-live-number {
+.tr-live-text {
   margin: 0;
-  font-size: 34px;
-  font-weight: 700;
-  line-height: 1;
-  color: var(--green);
-}
-
-.tr-live-number.small {
-  font-size: 22px;
-  color: var(--ink);
-}
-
-.tr-live-label {
-  margin: 4px 0 0;
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  font-size: 11.5px;
   color: var(--ink-mute);
 }
 
+.tr-live-text b {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.tr-live.is-active .tr-live-text b:first-child {
+  color: var(--green);
+}
+
 .tr-live-sep {
-  width: 1px;
-  height: 36px;
-  background: var(--line);
+  margin: 0 8px;
+  color: var(--ink-faint);
 }
 
 .tr-live-pages {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  margin-left: auto;
 }
 
 .tr-chip {
@@ -20182,8 +20214,13 @@ body.rail-lock {
   font-size: 11px;
   color: var(--ink-soft);
   text-decoration: none;
-  text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.tr-chip-label {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .tr-chip b {
@@ -20198,43 +20235,30 @@ a.tr-chip:hover {
   color: var(--signal);
 }
 
-/* --- Angka utama -------------------------------------------------------- */
-
+/* Angka utama: satu baris, dipisah garis tipis, bukan enam kotak lepas. */
 .tr-kpis {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .tr-kpi {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--surface-1);
-  transition: border-color 0.15s ease, transform 0.15s ease;
+  padding: 20px 20px 18px;
+  min-width: 0;
 }
 
-.tr-kpi:hover {
-  border-color: rgba(224, 161, 60, 0.45);
-  transform: translateY(-1px);
-}
-
-.tr-kpi.is-hero {
-  background:
-    linear-gradient(160deg, rgba(224, 161, 60, 0.12), transparent 60%),
-    var(--surface-1);
-  border-color: rgba(224, 161, 60, 0.3);
+.tr-kpi + .tr-kpi {
+  border-left: 1px solid var(--line);
 }
 
 .tr-kpi-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 7px;
   font-size: 10px;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--ink-mute);
 }
@@ -20244,14 +20268,11 @@ a.tr-chip:hover {
 }
 
 .tr-kpi-value {
-  font-size: 28px;
+  font-size: 34px;
   font-weight: 700;
   line-height: 1;
+  letter-spacing: -0.02em;
   color: var(--ink);
-}
-
-.tr-kpi.is-hero .tr-kpi-value {
-  font-size: 34px;
 }
 
 .tr-kpi-foot {
@@ -20259,6 +20280,7 @@ a.tr-chip:hover {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+  min-height: 18px;
   font-size: 10.5px;
   color: var(--ink-faint);
 }
@@ -20282,12 +20304,75 @@ a.tr-chip:hover {
   color: var(--halted);
 }
 
+/* Rasio pendamping di bawah angka utama. */
+.tr-ratios {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 32px;
+  margin: 0;
+  padding: 12px 20px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: rgba(233, 236, 233, 0.015);
+  font-size: 11px;
+}
+
+.tr-ratios > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tr-ratios dt {
+  color: var(--ink-mute);
+}
+
+.tr-ratios dd {
+  margin: 0;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.tr-meter {
+  display: block;
+  width: 64px;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--surface-3);
+}
+
+.tr-meter > span {
+  display: block;
+  height: 100%;
+  background: var(--signal);
+}
+
 /* --- Grafik tren -------------------------------------------------------- */
+
+.tr-trend-wrap {
+  padding: 14px 20px 10px;
+}
+
+.tr-trend-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-bottom: 4px;
+}
+
+.tr-trend-title {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
 
 .tr-legend {
   display: flex;
   gap: 16px;
-  margin-bottom: 8px;
   font-size: 11px;
   color: var(--ink-soft);
 }
@@ -20344,7 +20429,7 @@ a.tr-chip:hover {
 .tr-line-visitors {
   fill: none;
   stroke: var(--ink-soft);
-  stroke-width: 2;
+  stroke-width: 1.5;
   stroke-dasharray: 5 4;
   stroke-linejoin: round;
 }
@@ -20367,15 +20452,56 @@ a.tr-chip:hover {
 }
 
 .tr-hit:hover {
-  fill: rgba(224, 161, 60, 0.08);
+  fill: rgba(224, 161, 60, 0.07);
 }
 
-/* --- Tabel -------------------------------------------------------------- */
+/* --- Tata letak dua kolom ---------------------------------------------- */
 
-.tr-table td {
-  padding-top: 7px;
-  padding-bottom: 7px;
-  vertical-align: middle;
+.tr-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.tr-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* --- Daftar halaman ----------------------------------------------------- */
+
+.tr-list-row {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) 72px 78px 82px;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 16px;
+  border-bottom: 1px solid rgba(46, 53, 50, 0.6);
+}
+
+.tr-scroll .tr-list-row:last-child {
+  border-bottom: 0;
+}
+
+.tr-scroll .tr-list-row:hover {
+  background: var(--surface-2);
+}
+
+.tr-list-head {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  border-bottom-color: var(--line);
+  background: var(--surface-2);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--ink-mute);
+}
+
+.tr-list-head span:nth-child(n + 3) {
+  text-align: right;
 }
 
 .tr-rank {
@@ -20383,10 +20509,21 @@ a.tr-chip:hover {
   color: var(--ink-faint);
 }
 
+.tr-num {
+  font-size: 12px;
+  text-align: right;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.tr-num.quiet {
+  color: var(--ink-mute);
+}
+
 .tr-page {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
   min-width: 0;
 }
 
@@ -20408,106 +20545,21 @@ a.tr-chip:hover {
 
 .tr-bar {
   display: block;
-  height: 4px;
-  margin-top: 3px;
+  height: 3px;
+  margin-top: 4px;
   overflow: hidden;
   border-radius: 2px;
   background: var(--surface-3);
-}
-
-.tr-bar.thick {
-  height: 7px;
 }
 
 .tr-bar > span {
   display: block;
   height: 100%;
   border-radius: 2px;
-  background: linear-gradient(90deg, rgba(224, 161, 60, 0.55), var(--signal));
+  background: linear-gradient(90deg, rgba(224, 161, 60, 0.5), var(--signal));
 }
 
-.tr-last-path {
-  max-width: 220px;
-  overflow: hidden;
-  font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.tr-table-note {
-  padding: 10px 16px 14px;
-}
-
-/* --- Perangkat & daftar peringkat -------------------------------------- */
-
-.tr-devices {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
-}
-
-.tr-device {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--surface-1);
-}
-
-.tr-device-icon {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 42px;
-  height: 42px;
-  border-radius: 10px;
-  background: var(--signal-dim);
-  color: var(--signal);
-}
-
-.tr-device-icon svg {
-  width: 20px;
-  height: 20px;
-}
-
-.tr-device-body {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
-.tr-device-top {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-}
-
-.tr-device-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--ink);
-}
-
-.tr-device-share {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--signal);
-}
-
-.tr-device-foot {
-  font-size: 10.5px;
-  color: var(--ink-faint);
-}
-
-.tr-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 12px;
-}
+/* --- Daftar peringkat --------------------------------------------------- */
 
 .tr-rank-card {
   display: flex;
@@ -20516,18 +20568,19 @@ a.tr-chip:hover {
 }
 
 .tr-rank-card .tr-card-head {
-  margin-bottom: 0;
+  margin-bottom: 2px;
 }
 
 .tr-rank-top {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
   gap: 10px;
   font-size: 12px;
 }
 
 .tr-rank-name {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   color: var(--ink-soft);
   text-overflow: ellipsis;
@@ -20538,9 +20591,184 @@ a.tr-chip:hover {
   font-size: 11px;
 }
 
+.tr-rank-share {
+  font-size: 10.5px;
+  color: var(--ink-faint);
+}
+
 .tr-rank-value {
+  min-width: 28px;
+  font-weight: 700;
+  text-align: right;
+  color: var(--ink);
+}
+
+.tr-rank-note {
+  margin: 2px 0 0;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line);
+  font-size: 10.5px;
+  color: var(--ink-faint);
+}
+
+/* --- Asal pengunjung ---------------------------------------------------- */
+
+.tr-geo {
+  display: grid;
+  grid-template-columns: minmax(0, 1.9fr) minmax(260px, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+}
+
+.tr-geo-map {
+  position: relative;
+  min-width: 0;
+  min-height: 440px;
+  border-right: 1px solid var(--line);
+}
+
+/* Peta mengisi setinggi kolom daftar kota, bukan sebaliknya meninggalkan celah. */
+.tr-geo-map .visitor-map-frame {
+  position: absolute;
+  inset: 0;
+  border-bottom: 0;
+}
+
+.tr-geo-map .visitor-map {
+  height: 100%;
+}
+
+.tr-geo-side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+}
+
+.tr-geo-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.tr-geo-stats > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+}
+
+.tr-geo-stats > div + div {
+  border-left: 1px solid var(--line);
+}
+
+.tr-geo-stats b {
+  font-size: 18px;
   font-weight: 700;
   color: var(--ink);
+}
+
+.tr-geo-stats span {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+.tr-geo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tr-geo-country {
+  margin-left: 6px;
+  font-size: 10px;
+  color: var(--ink-faint);
+}
+
+/* --- Perangkat ---------------------------------------------------------- */
+
+.tr-tech {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.tr-stackbar {
+  display: flex;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--surface-3);
+}
+
+.tr-stackbar .seg + .seg {
+  border-left: 2px solid var(--surface-1);
+}
+
+.tr-device-card .s0 { background: var(--signal); }
+.tr-device-card .s1 { background: #8a6a3a; }
+.tr-device-card .s2 { background: var(--ink-mute); }
+
+.tr-device-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tr-device-list li {
+  display: grid;
+  grid-template-columns: 8px 18px 1fr auto;
+  grid-template-areas:
+    'sw ic name share'
+    '. . foot foot';
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 2px;
+}
+
+.tr-swatch {
+  grid-area: sw;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.tr-device-icon {
+  grid-area: ic;
+  display: flex;
+  color: var(--ink-mute);
+}
+
+.tr-device-name {
+  grid-area: name;
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.tr-device-share {
+  grid-area: share;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.tr-device-foot {
+  grid-area: foot;
+  font-size: 10.5px;
+  color: var(--ink-faint);
 }
 
 .tr-device-cell {
@@ -20549,6 +20777,7 @@ a.tr-chip:hover {
   gap: 6px;
   font-size: 11px;
   color: var(--ink-soft);
+  white-space: nowrap;
 }
 
 /* --- Jam ramai ---------------------------------------------------------- */
@@ -20560,7 +20789,7 @@ a.tr-chip:hover {
 .tr-heat-grid {
   display: grid;
   grid-template-columns: 34px repeat(24, minmax(14px, 1fr));
-  grid-auto-rows: 20px;
+  grid-auto-rows: 22px;
   gap: 3px;
   min-width: 520px;
 }
@@ -20593,7 +20822,7 @@ a.tr-chip:hover {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  margin-top: 12px;
+  margin-top: 14px;
   font-size: 10px;
   color: var(--ink-faint);
 }
@@ -20610,13 +20839,66 @@ a.tr-chip:hover {
   color: var(--ink-soft);
 }
 
+.tr-heat-note b {
+  color: var(--signal);
+}
+
 /* --- Klik --------------------------------------------------------------- */
 
 .tr-clicks {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 12px;
-  align-items: start;
+  align-items: stretch;
+}
+
+.tr-click-list {
+  flex: 1;
+  max-height: 560px;
+}
+
+.tr-click-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(46, 53, 50, 0.6);
+}
+
+.tr-click-row:last-child {
+  border-bottom: 0;
+}
+
+.tr-click-row:hover {
+  background: var(--surface-2);
+}
+
+.tr-click-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tr-click-count {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex-shrink: 0;
+  gap: 2px;
+  min-width: 64px;
+}
+
+.tr-click-count b {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.tr-click-count span {
+  font-size: 10px;
+  color: var(--ink-faint);
 }
 
 .tr-heat-pages {
@@ -20660,7 +20942,8 @@ a.tr-chip:hover {
 
 .tr-page-canvas {
   position: relative;
-  height: 460px;
+  height: 400px;
+  overflow: hidden;
   background:
     repeating-linear-gradient(0deg, transparent 0 46px, rgba(233, 236, 233, 0.025) 46px 47px),
     var(--surface-0);
@@ -20677,7 +20960,40 @@ a.tr-chip:hover {
   pointer-events: auto;
 }
 
+.tr-frame-note {
+  margin-top: 10px;
+}
+
 /* --- Pengunjung --------------------------------------------------------- */
+
+.tr-visitors {
+  max-height: 520px;
+}
+
+.tr-visitors thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.tr-table td {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  vertical-align: middle;
+}
+
+.tr-last-path {
+  max-width: 240px;
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tr-table-note {
+  padding: 10px 16px 12px;
+  border-top: 1px solid var(--line);
+}
 
 .tr-visitor {
   display: inline-flex;
@@ -20685,6 +21001,7 @@ a.tr-chip:hover {
   gap: 8px;
   font-size: 11.5px;
   color: var(--ink);
+  white-space: nowrap;
 }
 
 .tr-avatar {
@@ -20693,10 +21010,10 @@ a.tr-chip:hover {
   width: 24px;
   height: 24px;
   border-radius: 7px;
-  background: hsl(var(--h, 30) 45% 32%);
+  background: hsl(var(--h, 30) 35% 26%);
   font-size: 9px;
   font-weight: 700;
-  color: hsl(var(--h, 30) 70% 85%);
+  color: hsl(var(--h, 30) 60% 82%);
 }
 
 .tr-badge {
@@ -20707,33 +21024,668 @@ a.tr-chip:hover {
   text-transform: uppercase;
 }
 
-.tr-badge.new {
-  background: var(--signal-dim);
-  color: var(--signal);
-}
-
 .tr-badge.back {
   background: rgba(79, 157, 142, 0.14);
   color: var(--green);
 }
 
-@media (max-width: 900px) {
+/* Rincian galat: pesan penyebab, dipotong supaya tidak menguasai layar. */
+.ga-notice-detail {
+  max-height: 4.8em;
+  overflow: hidden;
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+
+/* --- Layar sempit ------------------------------------------------------- */
+
+@media (max-width: 1180px) {
+  .tr-split {
+    grid-template-columns: 1fr;
+  }
+
+  .tr-stack {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  .tr-tech {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tr-tech > :first-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 960px) {
+  .tr-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tr-kpi:nth-child(3) {
+    border-left: 0;
+  }
+
+  .tr-kpi:nth-child(n + 3) {
+    border-top: 1px solid var(--line);
+  }
+
+  .tr-geo {
+    grid-template-columns: 1fr;
+  }
+
+  .tr-geo-map {
+    min-height: 360px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
   .tr-clicks {
     grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 640px) {
-  .tr-live-number {
-    font-size: 28px;
+  .tr-live-pages {
+    margin-left: 0;
   }
 
-  .tr-kpi-value,
-  .tr-kpi.is-hero .tr-kpi-value {
+  .tr-kpi {
+    padding: 16px 14px;
+  }
+
+  .tr-kpi-value {
     font-size: 26px;
+  }
+
+  .tr-ratios,
+  .tr-trend-wrap {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  /* Grafik digeser ke samping alih-alih diperkecil sampai labelnya tak terbaca. */
+  .tr-trend-wrap {
+    overflow-x: auto;
+  }
+
+  .tr-trend {
+    min-width: 600px;
+  }
+
+  .tr-stack,
+  .tr-tech {
+    grid-template-columns: 1fr;
+  }
+
+  .tr-list-row {
+    grid-template-columns: 20px minmax(0, 1fr) 56px;
+    gap: 10px;
+    padding: 9px 14px;
+  }
+
+  /* Di ponsel cukup tayangannya; pengunjung dan waktu ada di tooltip & tabel lain. */
+  .tr-list-row > :nth-child(n + 4) {
+    display: none;
+  }
+
+  .tr-geo-map {
+    min-height: 300px;
+  }
+
+  .tr-page-canvas {
+    height: 320px;
   }
 
   .tr-heat-note {
     margin-left: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tr-live.is-active .tr-live-dot {
+    animation: none;
+  }
+}
+
+/* ===========================================================================
+   Analitik Pengguna — kepala ringkas + peta Leaflet sebagai pusat halaman
+   =========================================================================== */
+
+.an-page {
+  gap: 14px;
+}
+
+.an-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px 24px;
+  padding: 4px 2px 6px;
+}
+
+.an-head .admin-page-headline {
+  margin-bottom: 4px;
+}
+
+.an-head-sub {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-mute);
+}
+
+.an-head-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+/* Pemilih rentang sebagai satu kontrol bersegmen, bukan tiga tombol lepas. */
+.an-range {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+}
+
+.an-range-link {
+  padding: 6px 14px;
+  border-radius: calc(var(--radius-sm) - 2px);
+  font-size: 11px;
+  color: var(--ink-mute);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 120ms ease, background 120ms ease;
+}
+
+.an-range-link:hover {
+  color: var(--ink);
+}
+
+.an-range-link.active {
+  background: var(--signal-dim);
+  color: var(--signal);
+  font-weight: 600;
+}
+
+.an-status {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 10.5px;
+}
+
+.an-status li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--ink-faint);
+}
+
+.an-status i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 6px var(--green);
+}
+
+.an-status li.warn i {
+  background: var(--halted);
+  box-shadow: none;
+}
+
+.an-status b {
+  max-width: 16ch;
+  overflow: hidden;
+  font-weight: 500;
+  color: var(--ink-soft);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- Peta ---------------------------------------------------------------- */
+
+.an-geo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+}
+
+.an-geo-map {
+  position: relative;
+  isolation: isolate;
+  min-width: 0;
+  min-height: 540px;
+  border-right: 1px solid var(--line);
+}
+
+.an-geo-map .visitor-map-frame {
+  position: absolute;
+  inset: 0;
+  border-bottom: 0;
+}
+
+.an-geo-map .visitor-map {
+  height: 100%;
+}
+
+/* Panel kaca yang melayang di atas peta. Di atas lingkaran penanda (400),
+   di bawah denyut, tooltip, dan popup Leaflet (600+). */
+.an-geo-live,
+.an-geo-stats,
+.visitor-map-notice {
+  position: absolute;
+  z-index: 550;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-sm);
+  background: rgba(12, 14, 13, 0.78);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.an-geo-live {
+  top: 14px;
+  left: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  font-size: 11px;
+  color: var(--ink-mute);
+}
+
+.an-geo-live b {
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.an-geo-live-sep {
+  color: var(--ink-faint);
+}
+
+.an-geo-live-dot {
+  width: 7px;
+  height: 7px;
+  margin-right: 2px;
+  border-radius: 50%;
+  background: var(--ink-faint);
+}
+
+.an-geo-live.is-active .an-geo-live-dot {
+  background: var(--green);
+  animation: an-ping 1.8s ease-out infinite;
+}
+
+.an-geo-live.is-active b:first-of-type {
+  color: var(--green);
+}
+
+.an-geo-stats {
+  bottom: 14px;
+  left: 14px;
+  display: grid;
+  grid-template-columns: repeat(4, auto);
+  margin: 0;
+}
+
+.an-geo-stats > div {
+  padding: 9px 16px;
+}
+
+.an-geo-stats > div + div {
+  border-left: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.an-geo-stats dt {
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.an-geo-stats dd {
+  margin: 2px 0 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.visitor-map-notice {
+  top: 50%;
+  left: 50%;
+  padding: 10px 16px;
+  transform: translate(-50%, -50%);
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  text-align: center;
+  pointer-events: none;
+}
+
+/* --- Kolom samping -------------------------------------------------------- */
+
+.an-geo-side {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  max-height: 540px;
+  padding: 16px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.an-geo-side-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+.an-geo-side-head svg {
+  color: var(--signal);
+}
+
+.an-geo-range {
+  margin-left: auto;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: var(--ink-faint);
+}
+
+.an-geo-title {
+  margin: 6px 0 0;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.an-geo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.an-geo-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.an-geo-rank {
+  flex-shrink: 0;
+  width: 18px;
+  padding-top: 1px;
+  font-size: 10.5px;
+  color: var(--ink-faint);
+  text-align: right;
+}
+
+.an-geo-list li:first-child .an-geo-rank {
+  color: var(--signal);
+  font-weight: 700;
+}
+
+.an-geo-row {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.an-geo-row-top {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.an-geo-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12.5px;
+  color: var(--ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.an-geo-cc {
+  margin-left: 6px;
+  font-size: 10px;
+  color: var(--ink-faint);
+}
+
+.an-geo-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.an-geo-bar {
+  display: block;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--surface-3);
+}
+
+.an-geo-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgba(224, 161, 60, 0.5), var(--signal));
+}
+
+.an-geo-countries {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 11px;
+}
+
+.an-geo-countries li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  background: var(--surface-0);
+}
+
+.an-geo-cc-lg {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.an-geo-share {
+  flex: 1;
+  color: var(--ink-faint);
+}
+
+.an-geo-foot {
+  margin: auto 0 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-size: 10.5px;
+  line-height: 1.55;
+  color: var(--ink-faint);
+}
+
+.an-geo-error {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--halted);
+}
+
+/* --- Penanda & popup Leaflet ---------------------------------------------- */
+
+.vm-pulse {
+  border-radius: 50%;
+  background: transparent;
+}
+
+.vm-pulse::before,
+.vm-pulse::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 2px solid #ffd48a;
+  border-radius: 50%;
+  animation: an-ring 2s ease-out infinite;
+}
+
+.vm-pulse::after {
+  animation-delay: 1s;
+}
+
+.visitor-map .leaflet-tooltip.vm-tooltip {
+  padding: 4px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-xs);
+  background: var(--surface-1);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink);
+}
+
+.visitor-map .leaflet-tooltip.vm-tooltip::before {
+  display: none;
+}
+
+.vm-popup strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 12.5px;
+}
+
+.vm-popup-grid {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 3px 16px;
+  font-size: 11px;
+}
+
+.vm-popup-grid span {
+  color: var(--ink-mute);
+}
+
+.vm-popup-grid b {
+  text-align: right;
+}
+
+.vm-popup-live {
+  display: block;
+  margin-top: 8px;
+  font-size: 10.5px;
+  color: var(--green);
+}
+
+@keyframes an-ring {
+  from {
+    opacity: 0.9;
+    transform: scale(0.4);
+  }
+  to {
+    opacity: 0;
+    transform: scale(2.4);
+  }
+}
+
+@keyframes an-ping {
+  0% {
+    box-shadow: 0 0 0 0 rgba(94, 189, 130, 0.6);
+  }
+  100% {
+    box-shadow: 0 0 0 8px rgba(94, 189, 130, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vm-pulse::before,
+  .vm-pulse::after,
+  .an-geo-live.is-active .an-geo-live-dot {
+    animation: none;
+  }
+}
+
+@media (max-width: 1100px) {
+  .an-geo {
+    grid-template-columns: 1fr;
+  }
+
+  .an-geo-map {
+    min-height: 440px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .an-geo-side {
+    max-height: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .an-head-side {
+    align-items: flex-start;
+  }
+
+  .an-status {
+    justify-content: flex-start;
+  }
+
+  .an-geo-map {
+    min-height: 360px;
+  }
+
+  .an-geo-stats {
+    right: 10px;
+    bottom: 10px;
+    left: 10px;
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .an-geo-stats > div {
+    padding: 7px 8px;
+  }
+
+  .an-geo-stats dd {
+    font-size: 14px;
+  }
+
+  .an-geo-live {
+    top: 10px;
+    left: 10px;
+    font-size: 10px;
   }
 }

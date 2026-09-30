@@ -8,6 +8,11 @@
  *
  * Grafiknya SVG biasa yang digambar di server — tidak ada pustaka grafik yang
  * ikut ke peramban. Keterangan saat kursor diarahkan memakai <title> bawaan.
+ *
+ * Susunannya dibaca dari atas: satu kartu ringkasan (sekarang, angka utama,
+ * tren), lalu apa yang dibaca, dari mana orangnya, pakai apa, kapan, apa yang
+ * diklik, dan siapa saja. Daftar panjang digulir di dalam panelnya sendiri
+ * supaya satu tabel empat puluh baris tidak mendorong sisa laporan ke bawah.
  */
 
 import Link from 'next/link'
@@ -30,7 +35,26 @@ import type { CountRow, VisitAnalytics } from '@/lib/db/visit-queries'
 const TZ = 'Asia/Jakarta'
 const DAYS = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab']
 
-export function TrafficReport({ data, range }: { data: VisitAnalytics; range: string }) {
+/**
+ * Di bawah angka ini periode sebelumnya terlalu tipis untuk dibandingkan:
+ * satu tayangan kemarin dan tiga ratus hari ini menghasilkan "+31400%", angka
+ * yang benar secara hitungan tetapi tidak mengatakan apa pun.
+ */
+const MIN_BASELINE = 10
+
+/** Label cadangan dari kueri untuk baris yang kolomnya kosong. */
+const UNRECORDED = new Set(['Belum tercatat', 'unknown'])
+
+export function TrafficReport({
+  data,
+  range,
+  geo,
+}: {
+  data: VisitAnalytics
+  range: string
+  /** Bagian peta, dirender halaman dan diselipkan di tengah laporan. */
+  geo?: React.ReactNode
+}) {
   const { totals, previous } = data
   const pagesPerSession = totals.sessions > 0 ? totals.views / totals.sessions : 0
   const bounce = totals.sessions > 0 ? totals.bounceSessions / totals.sessions : 0
@@ -38,112 +62,115 @@ export function TrafficReport({ data, range }: { data: VisitAnalytics; range: st
 
   return (
     <div className="tr">
-      {/* --- Sekarang ------------------------------------------------------ */}
-      <section className="tr-live" aria-label="Pengunjung aktif">
-        <div className="tr-live-main">
-          <span className="tr-live-dot" aria-hidden="true" />
-          <div>
-            <p className="tr-live-number mono">{fmt(data.live.last5)}</p>
-            <p className="tr-live-label mono">aktif 5 menit terakhir</p>
-          </div>
-          <div className="tr-live-sep" />
-          <div>
-            <p className="tr-live-number small mono">{fmt(data.live.last30)}</p>
-            <p className="tr-live-label mono">dalam 30 menit</p>
-          </div>
+      {/* --- Ringkasan: sekarang, angka utama, tren ------------------------ */}
+      <section className="tr-overview" aria-label="Ringkasan trafik">
+        <LiveStrip live={data.live} />
+
+        <div className="tr-kpis">
+          <Kpi
+            icon={<IconEye size={14} />}
+            label="Tayangan halaman"
+            value={fmt(totals.views)}
+            current={totals.views}
+            previous={previous.views}
+          />
+          <Kpi
+            icon={<IconUser size={14} />}
+            label="Pengunjung unik"
+            value={fmt(totals.visitors)}
+            current={totals.visitors}
+            previous={previous.visitors}
+          />
+          <Kpi
+            icon={<IconLayers size={14} />}
+            label="Sesi"
+            value={fmt(totals.sessions)}
+            foot={`${decimal(pagesPerSession)} halaman per sesi`}
+          />
+          <Kpi
+            icon={<IconRadar size={14} />}
+            label="Klik tercatat"
+            value={fmt(totals.clicks)}
+            foot={totals.views > 0 ? `${decimal(totals.clicks / totals.views)} klik per tayangan` : '—'}
+          />
         </div>
-        <div className="tr-live-pages">
-          {data.live.pagesNow.length === 0 ? (
-            <span className="tr-muted mono">tidak ada yang membuka situs saat ini</span>
-          ) : (
-            data.live.pagesNow.map((p) => (
-              <span key={p.label} className="tr-chip mono" title={`${p.visitors} pengunjung`}>
-                {p.label}
-                <b>{p.views}</b>
-              </span>
-            ))
-          )}
+
+        <dl className="tr-ratios mono">
+          <div>
+            <dt>Langsung pergi</dt>
+            <dd>{pct(bounce)}</dd>
+            <span className="tr-meter" aria-hidden="true"><span style={{ width: `${bounce * 100}%` }} /></span>
+          </div>
+          <div>
+            <dt>Pengunjung kembali</dt>
+            <dd>{pct(returningShare)}</dd>
+            <span className="tr-meter" aria-hidden="true"><span style={{ width: `${returningShare * 100}%` }} /></span>
+          </div>
+          <div>
+            <dt>Pernah datang sebelumnya</dt>
+            <dd>{fmt(totals.returning)} orang</dd>
+          </div>
+        </dl>
+
+        <div className="tr-trend-wrap">
+          <div className="tr-trend-head mono">
+            <span className="tr-trend-title">
+              {data.trend.unit === 'hour' ? 'Tren per jam (WIB)' : 'Tren per hari'}
+            </span>
+            <span className="tr-legend">
+              <span><i className="tr-key area" /> Tayangan</span>
+              <span><i className="tr-key line" /> Pengunjung unik</span>
+            </span>
+          </div>
+          <TrendChart points={data.trend.points} unit={data.trend.unit} />
         </div>
       </section>
 
-      {/* --- Angka utama --------------------------------------------------- */}
-      <div className="tr-kpis">
-        <Kpi
-          icon={<IconEye size={15} />}
-          label="Tayangan halaman"
-          value={fmt(totals.views)}
-          delta={change(totals.views, previous.views)}
-          foot={`${fmt(previous.views)} periode sebelumnya`}
-          hero
-        />
-        <Kpi
-          icon={<IconUser size={15} />}
-          label="Pengunjung unik"
-          value={fmt(totals.visitors)}
-          delta={change(totals.visitors, previous.visitors)}
-          foot={`${fmt(totals.returning)} pernah datang sebelumnya`}
-          hero
-        />
-        <Kpi
-          icon={<IconLayers size={15} />}
-          label="Sesi"
-          value={fmt(totals.sessions)}
-          foot={`${pagesPerSession.toFixed(1).replace('.', ',')} halaman per sesi`}
-        />
-        <Kpi
-          icon={<IconTrendDown size={15} />}
-          label="Langsung pergi"
-          value={pct(bounce)}
-          foot="sesi yang hanya membuka 1 halaman"
-        />
-        <Kpi
-          icon={<IconActivity size={15} />}
-          label="Pengunjung kembali"
-          value={pct(returningShare)}
-          foot="dari seluruh pengunjung unik"
-        />
-        <Kpi
-          icon={<IconRadar size={15} />}
-          label="Klik tercatat"
-          value={fmt(totals.clicks)}
-          foot={totals.views > 0 ? `${(totals.clicks / totals.views).toFixed(1).replace('.', ',')} klik per tayangan` : '—'}
-        />
+      {/* --- Konten ---------------------------------------------------------- */}
+      <Section title="Yang dibaca" />
+      <div className="tr-split">
+        <div className="tr-card tr-flush">
+          <div className="tr-card-head mono tr-pad">
+            <IconEye size={14} />
+            <span>Halaman paling banyak dibuka</span>
+            <span className="tr-card-count">{data.pages.length} halaman</span>
+          </div>
+          <PagesList pages={data.pages} />
+        </div>
+        <div className="tr-stack">
+          <RankList title="Sumber kunjungan" icon={<IconRadar size={14} />} rows={data.referrers} />
+          <RankList title="Halaman pertama dibuka" icon={<IconActivity size={14} />} rows={data.entryPages} mono />
+        </div>
       </div>
 
-      {/* --- Tren ------------------------------------------------------------ */}
-      <Section title={data.trend.unit === 'hour' ? 'TREN PER JAM (WIB)' : 'TREN PER HARI'} />
-      <div className="tr-card">
-        <TrendChart points={data.trend.points} unit={data.trend.unit} />
-      </div>
+      {/* --- Asal pengunjung ------------------------------------------------- */}
+      {geo && (
+        <>
+          <Section title="Asal pengunjung" />
+          {geo}
+        </>
+      )}
 
-      {/* --- Halaman --------------------------------------------------------- */}
-      <Section title="HALAMAN YANG DIKUNJUNGI" />
-      <div className="tr-card tr-flush">
-        <PagesTable pages={data.pages} />
-      </div>
-
-      {/* --- Perangkat, peramban, sumber ------------------------------------- */}
-      <Section title="PERANGKAT, PERAMBAN & SUMBER" />
-      <DeviceSplit rows={data.devices} />
-      <div className="tr-grid">
+      {/* --- Perangkat & teknologi ------------------------------------------ */}
+      <Section title="Perangkat & peramban" />
+      <div className="tr-tech">
+        <DeviceSplit rows={data.devices} />
         <RankList title="Peramban" icon={<IconGlobe size={14} />} rows={data.browsers} />
         <RankList title="Sistem operasi" icon={<IconLayers size={14} />} rows={data.os} />
-        <RankList title="Sumber kunjungan" icon={<IconRadar size={14} />} rows={data.referrers} />
-        <RankList title="Halaman pertama dibuka" icon={<IconEye size={14} />} rows={data.entryPages} mono />
       </div>
 
       {/* --- Jam ramai ------------------------------------------------------- */}
-      <Section title="JAM RAMAI (HARI × JAM, WIB)" />
+      <Section title="Jam ramai · hari × jam, WIB" />
       <div className="tr-card">
         <Heatmap cells={data.heatmap} />
       </div>
 
       {/* --- Klik ------------------------------------------------------------ */}
-      <Section title="YANG PALING BANYAK DIKLIK" />
+      <Section title="Yang paling banyak diklik" />
       <ClickSection data={data} range={range} />
 
       {/* --- Pengunjung ------------------------------------------------------ */}
-      <Section title="PENGUNJUNG TERAKHIR" />
+      <Section title="Pengunjung terakhir" />
       <div className="tr-card tr-flush">
         <VisitorsTable data={data} />
       </div>
@@ -156,8 +183,34 @@ export function TrafficReport({ data, range }: { data: VisitAnalytics; range: st
 function Section({ title }: { title: string }) {
   return (
     <div className="admin-section-header mono">
-      <span className="admin-section-title">{title}</span>
+      <span className="admin-section-title">{title.toUpperCase()}</span>
       <span className="admin-section-line" />
+    </div>
+  )
+}
+
+function LiveStrip({ live }: { live: VisitAnalytics['live'] }) {
+  const active = live.last5 > 0
+  return (
+    <div className={`tr-live${active ? ' is-active' : ''}`}>
+      <span className="tr-live-dot" aria-hidden="true" />
+      <p className="tr-live-text mono">
+        <b>{fmt(live.last5)}</b> aktif sekarang
+        <span className="tr-live-sep" aria-hidden="true">·</span>
+        <b>{fmt(live.last30)}</b> dalam 30 menit
+      </p>
+      <div className="tr-live-pages">
+        {live.pagesNow.length === 0 ? (
+          <span className="tr-muted mono">tidak ada yang membuka situs saat ini</span>
+        ) : (
+          live.pagesNow.map((p) => (
+            <span key={p.label} className="tr-chip mono" title={`${p.visitors} pengunjung`}>
+              {p.label}
+              <b>{p.views}</b>
+            </span>
+          ))
+        )}
+      </div>
     </div>
   )
 }
@@ -167,32 +220,36 @@ function Kpi({
   label,
   value,
   foot,
-  delta,
-  hero,
+  current,
+  previous,
 }: {
   icon: React.ReactNode
   label: string
   value: string
-  foot: string
-  delta?: number | null
-  hero?: boolean
+  foot?: string
+  /** Diisi berpasangan untuk angka yang dibandingkan dengan periode sebelumnya. */
+  current?: number
+  previous?: number
 }) {
+  const comparable = current !== undefined && previous !== undefined
+  const delta = comparable && previous >= MIN_BASELINE ? (current - previous) / previous : null
+
   return (
-    <div className={`tr-kpi${hero ? ' is-hero' : ''}`}>
+    <div className="tr-kpi">
       <div className="tr-kpi-head mono">
-        <span>{label}</span>
         {icon}
+        <span>{label}</span>
       </div>
       <div className="tr-kpi-value mono">{value}</div>
       <div className="tr-kpi-foot mono">
-        {delta !== undefined && delta !== null && (
+        {delta !== null && (
           <span className={`tr-delta ${delta >= 0 ? 'up' : 'down'}`}>
-            {delta >= 0 ? <IconTrendUp size={12} /> : <IconTrendDown size={12} />}
+            {delta >= 0 ? <IconTrendUp size={11} /> : <IconTrendDown size={11} />}
             {delta >= 0 ? '+' : ''}
             {(delta * 100).toFixed(0)}%
           </span>
         )}
-        <span>{foot}</span>
+        <span>{comparable ? `${fmt(previous)} periode sebelumnya` : foot}</span>
       </div>
     </div>
   )
@@ -203,11 +260,11 @@ function Kpi({
  * hitungan orang/halaman, jadi skalanya memang sama dan tidak butuh sumbu kedua.
  */
 function TrendChart({ points, unit }: { points: VisitAnalytics['trend']['points']; unit: 'hour' | 'day' }) {
-  if (points.length === 0) return <p className="tr-muted mono">belum ada data</p>
+  if (points.length === 0) return <p className="tr-empty mono">belum ada data</p>
 
   const W = 1000
-  const H = 240
-  const PAD = { l: 36, r: 12, t: 14, b: 26 }
+  const H = 220
+  const PAD = { l: 36, r: 16, t: 22, b: 26 }
   const max = Math.max(1, ...points.map((p) => p.views))
   const niceMax = niceCeil(max)
   const step = (W - PAD.l - PAD.r) / Math.max(1, points.length - 1)
@@ -221,127 +278,134 @@ function TrendChart({ points, unit }: { points: VisitAnalytics['trend']['points'
   const ticks = [0, 0.5, 1].map((f) => Math.round(niceMax * f))
   const labelEvery = Math.max(1, Math.ceil(points.length / 8))
   const peak = points.reduce((best, p, i) => (p.views > points[best].views ? i : best), 0)
+  // Label puncak di tepi grafik ditambatkan ke dalam supaya tidak terpotong.
+  const peakAnchor = peak === 0 ? 'start' : peak === points.length - 1 ? 'end' : 'middle'
 
   return (
-    <>
-      <div className="tr-legend mono">
-        <span><i className="tr-key area" /> Tayangan</span>
-        <span><i className="tr-key line" /> Pengunjung unik</span>
-      </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="tr-trend" role="img" aria-label="Tren tayangan dan pengunjung">
-        <defs>
-          <linearGradient id="tr-area" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--signal)" stopOpacity="0.35" />
-            <stop offset="100%" stopColor="var(--signal)" stopOpacity="0" />
-          </linearGradient>
-        </defs>
+    <svg viewBox={`0 0 ${W} ${H}`} className="tr-trend" role="img" aria-label="Tren tayangan dan pengunjung">
+      <defs>
+        <linearGradient id="tr-area" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="var(--signal)" stopOpacity="0.32" />
+          <stop offset="100%" stopColor="var(--signal)" stopOpacity="0" />
+        </linearGradient>
+      </defs>
 
-        {ticks.map((t) => (
-          <g key={t}>
-            <line x1={PAD.l} x2={W - PAD.r} y1={y(t)} y2={y(t)} className="tr-grid-line" />
-            <text x={PAD.l - 8} y={y(t) + 3} className="tr-axis" textAnchor="end">
-              {t}
-            </text>
-          </g>
-        ))}
+      {ticks.map((t) => (
+        <g key={t}>
+          <line x1={PAD.l} x2={W - PAD.r} y1={y(t)} y2={y(t)} className="tr-grid-line" />
+          <text x={PAD.l - 8} y={y(t) + 3} className="tr-axis" textAnchor="end">
+            {t}
+          </text>
+        </g>
+      ))}
 
-        <path d={area} fill="url(#tr-area)" />
-        <path d={line('views')} className="tr-line-views" />
-        <path d={line('visitors')} className="tr-line-visitors" />
+      <path d={area} fill="url(#tr-area)" />
+      <path d={line('views')} className="tr-line-views" />
+      <path d={line('visitors')} className="tr-line-visitors" />
 
-        {points[peak].views > 0 && (
-          <g>
-            <circle cx={x(peak)} cy={y(points[peak].views)} r="4.5" className="tr-peak" />
-            <text x={x(peak)} y={y(points[peak].views) - 10} className="tr-peak-label" textAnchor="middle">
-              puncak {points[peak].views}
-            </text>
-          </g>
-        )}
+      {points[peak].views > 0 && (
+        <g>
+          <circle cx={x(peak)} cy={y(points[peak].views)} r="4.5" className="tr-peak" />
+          <text x={x(peak)} y={y(points[peak].views) - 10} className="tr-peak-label" textAnchor={peakAnchor}>
+            puncak {points[peak].views}
+          </text>
+        </g>
+      )}
 
-        {points.map((p, i) =>
-          i % labelEvery === 0 ? (
-            <text key={p.at} x={x(i)} y={H - 6} className="tr-axis" textAnchor="middle">
-              {bucketLabel(p.at, unit)}
-            </text>
-          ) : null,
-        )}
+      {points.map((p, i) =>
+        i % labelEvery === 0 ? (
+          <text key={p.at} x={x(i)} y={H - 6} className="tr-axis" textAnchor="middle">
+            {bucketLabel(p.at, unit)}
+          </text>
+        ) : null,
+      )}
 
-        {/* Sasaran kursor selebar satu ember — lebih mudah dikenai daripada garisnya. */}
-        {points.map((p, i) => (
-          <rect key={`hit-${p.at}`} x={x(i) - step / 2} y={PAD.t} width={step} height={H - PAD.t - PAD.b} className="tr-hit">
-            <title>{`${bucketLabel(p.at, unit, true)} — ${p.views} tayangan, ${p.visitors} pengunjung`}</title>
-          </rect>
-        ))}
-      </svg>
-    </>
+      {/* Sasaran kursor selebar satu ember — lebih mudah dikenai daripada garisnya. */}
+      {points.map((p, i) => (
+        <rect key={`hit-${p.at}`} x={x(i) - step / 2} y={PAD.t} width={step} height={H - PAD.t - PAD.b} className="tr-hit">
+          <title>{`${bucketLabel(p.at, unit, true)} — ${p.views} tayangan, ${p.visitors} pengunjung`}</title>
+        </rect>
+      ))}
+    </svg>
   )
 }
 
-function PagesTable({ pages }: { pages: VisitAnalytics['pages'] }) {
+function PagesList({ pages }: { pages: VisitAnalytics['pages'] }) {
   if (pages.length === 0) return <p className="tr-empty mono">belum ada kunjungan pada rentang ini</p>
   const max = Math.max(...pages.map((p) => p.views))
   const total = pages.reduce((s, p) => s + p.views, 0)
 
   return (
-    <div className="admin-table-container">
-      <table className="admin-table tr-table">
-        <thead>
-          <tr>
-            <th style={{ width: '4%' }}>#</th>
-            <th style={{ width: '52%' }}>Halaman</th>
-            <th style={{ textAlign: 'right' }}>Tayangan</th>
-            <th style={{ textAlign: 'right' }}>Pengunjung</th>
-            <th style={{ textAlign: 'right' }}>Bagian</th>
-            <th style={{ textAlign: 'right' }}>Terakhir</th>
-          </tr>
-        </thead>
-        <tbody>
-          {pages.map((page, i) => (
-            <tr key={page.path}>
-              <td className="mono tr-rank">{i + 1}</td>
-              <td>
-                <div className="tr-page">
-                  <span className="tr-page-name">{pageName(page.path)}</span>
-                  <span className="tr-page-path mono">{page.path}</span>
-                  <span className="tr-bar"><span style={{ width: `${(page.views / max) * 100}%` }} /></span>
-                </div>
-              </td>
-              <td className="mono ga-num">{fmt(page.views)}</td>
-              <td className="mono ga-num quiet">{fmt(page.visitors)}</td>
-              <td className="mono ga-num quiet">{total > 0 ? pct(page.views / total) : '—'}</td>
-              <td className="mono ga-num quiet">{ago(page.lastSeen)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="tr-list">
+      <div className="tr-list-row tr-list-head mono" aria-hidden="true">
+        <span>#</span>
+        <span>Halaman</span>
+        <span>Tayangan</span>
+        <span>Pengunjung</span>
+        <span>Terakhir</span>
+      </div>
+      <ol className="tr-scroll">
+        {pages.map((page, i) => (
+          <li key={page.path} className="tr-list-row">
+            <span className="tr-rank mono">{i + 1}</span>
+            <span className="tr-page" title={`${page.path} · ${total > 0 ? pct(page.views / total) : '—'} dari tayangan`}>
+              <span className="tr-page-name">{pageName(page.path)}</span>
+              <span className="tr-page-path mono">{page.path}</span>
+              <span className="tr-bar"><span style={{ width: `${(page.views / max) * 100}%` }} /></span>
+            </span>
+            <span className="tr-num mono">{fmt(page.views)}</span>
+            <span className="tr-num quiet mono">{fmt(page.visitors)}</span>
+            <span className="tr-num quiet mono">{ago(page.lastSeen)}</span>
+          </li>
+        ))}
+      </ol>
     </div>
   )
 }
 
+/** Satu batang bertumpuk: bagiannya dibaca sekali lihat, bukan dari dua kartu. */
 function DeviceSplit({ rows }: { rows: CountRow[] }) {
   const total = rows.reduce((s, r) => s + r.views, 0)
-  if (total === 0) return null
+
   return (
-    <div className="tr-devices">
-      {rows.map((r) => (
-        <div key={r.label} className="tr-device">
-          <span className="tr-device-icon">{deviceIcon(r.label)}</span>
-          <div className="tr-device-body">
-            <div className="tr-device-top">
-              <span className="tr-device-name">{deviceName(r.label)}</span>
-              <span className="tr-device-share mono">{pct(r.views / total)}</span>
-            </div>
-            <span className="tr-bar thick"><span style={{ width: `${(r.views / total) * 100}%` }} /></span>
-            <span className="tr-device-foot mono">
-              {fmt(r.views)} tayangan · {fmt(r.visitors)} pengunjung
-            </span>
+    <div className="tr-card tr-device-card">
+      <div className="tr-card-head mono">
+        <IconDeviceDesktop size={14} />
+        <span>Jenis perangkat</span>
+      </div>
+      {total === 0 ? (
+        <p className="tr-muted mono">belum ada data</p>
+      ) : (
+        <>
+          <div className="tr-stackbar" aria-hidden="true">
+            {rows.map((r, i) => (
+              <span key={r.label} className={`seg s${i % 3}`} style={{ width: `${(r.views / total) * 100}%` }} />
+            ))}
           </div>
-        </div>
-      ))}
+          <ul className="tr-device-list">
+            {rows.map((r, i) => (
+              <li key={r.label}>
+                <i className={`tr-swatch s${i % 3}`} aria-hidden="true" />
+                <span className="tr-device-icon">{deviceIcon(r.label)}</span>
+                <span className="tr-device-name">{deviceName(r.label)}</span>
+                <span className="tr-device-share mono">{pct(r.views / total)}</span>
+                <span className="tr-device-foot mono">
+                  {fmt(r.views)} tayangan · {fmt(r.visitors)} pengunjung
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
     </div>
   )
 }
 
+/**
+ * Daftar peringkat. Baris "belum tercatat" dipisah ke catatan kaki: kolom yang
+ * baru ditambahkan belakangan membuat baris lama kosong, dan kalau ikut dibuat
+ * batang, ia menenggelamkan semua baris yang justru punya jawaban.
+ */
 function RankList({
   title,
   icon,
@@ -353,23 +417,31 @@ function RankList({
   rows: CountRow[]
   mono?: boolean
 }) {
-  const total = rows.reduce((s, r) => s + r.views, 0)
+  const known = rows.filter((r) => !UNRECORDED.has(r.label))
+  const unknown = rows.filter((r) => UNRECORDED.has(r.label)).reduce((s, r) => s + r.views, 0)
+  const max = Math.max(1, ...known.map((r) => r.views))
+  const total = known.reduce((s, r) => s + r.views, 0)
+
   return (
     <div className="tr-card tr-rank-card">
       <div className="tr-card-head mono">
         {icon}
         <span>{title}</span>
       </div>
-      {rows.length === 0 && <p className="tr-muted mono">belum ada data</p>}
-      {rows.map((r) => (
+      {known.length === 0 && <p className="tr-muted mono">belum ada data</p>}
+      {known.map((r) => (
         <div key={r.label} className="tr-rank-row" title={`${r.views} tayangan · ${r.visitors} pengunjung`}>
           <div className="tr-rank-top">
             <span className={`tr-rank-name${mono ? ' mono' : ''}`}>{r.label}</span>
+            <span className="tr-rank-share mono">{total > 0 ? pct(r.views / total) : ''}</span>
             <span className="tr-rank-value mono">{fmt(r.views)}</span>
           </div>
-          <span className="tr-bar"><span style={{ width: `${total > 0 ? (r.views / total) * 100 : 0}%` }} /></span>
+          <span className="tr-bar"><span style={{ width: `${(r.views / max) * 100}%` }} /></span>
         </div>
       ))}
+      {unknown > 0 && (
+        <p className="tr-rank-note mono">+ {fmt(unknown)} tayangan belum tercatat</p>
+      )}
     </div>
   )
 }
@@ -400,7 +472,7 @@ function Heatmap({ cells }: { cells: number[][] }) {
         <span>ramai</span>
         {busiest && busiest.v > 0 && (
           <span className="tr-heat-note">
-            paling ramai: {DAYS[busiest.d]} pukul {String(busiest.h).padStart(2, '0')}.00 ({busiest.v} tayangan)
+            paling ramai: <b>{DAYS[busiest.d]} pukul {String(busiest.h).padStart(2, '0')}.00</b> ({busiest.v} tayangan)
           </span>
         )}
       </div>
@@ -430,7 +502,7 @@ function ClickSection({ data, range }: { data: VisitAnalytics; range: string }) 
       <div className="tr-card">
         <p className="tr-empty mono">
           Belum ada klik tercatat. Pencatat klik baru aktif sejak pembaruan ini — begitu pengunjung
-          mulai mengklik tombol dan tautan, tabel dan peta panasnya terisi sendiri.
+          mulai mengklik tombol dan tautan, daftar dan peta panasnya terisi sendiri.
         </p>
       </div>
     )
@@ -442,34 +514,29 @@ function ClickSection({ data, range }: { data: VisitAnalytics; range: string }) 
   return (
     <div className="tr-clicks">
       <div className="tr-card tr-flush">
-        <div className="admin-table-container">
-          <table className="admin-table tr-table">
-            <thead>
-              <tr>
-                <th style={{ width: '48%' }}>Elemen</th>
-                <th>Halaman</th>
-                <th style={{ textAlign: 'right' }}>Klik</th>
-                <th style={{ textAlign: 'right' }}>Orang</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.clickTargets.map((c) => (
-                <tr key={`${c.path}-${c.label}`}>
-                  <td>
-                    <div className="tr-page">
-                      <span className="tr-page-name">{c.label}</span>
-                      {c.href && <span className="tr-page-path mono">→ {c.href}</span>}
-                      <span className="tr-bar"><span style={{ width: `${(c.clicks / maxClicks) * 100}%` }} /></span>
-                    </div>
-                  </td>
-                  <td className="mono quiet">{c.path}</td>
-                  <td className="mono ga-num">{fmt(c.clicks)}</td>
-                  <td className="mono ga-num quiet">{fmt(c.visitors)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="tr-card-head mono tr-pad">
+          <IconRadar size={14} />
+          <span>Elemen yang diklik</span>
+          <span className="tr-card-count">{fmt(data.totals.clicks)} klik</span>
         </div>
+        <ol className="tr-scroll tr-click-list">
+          {data.clickTargets.map((c) => (
+            <li key={`${c.path}-${c.label}`} className="tr-click-row">
+              <div className="tr-click-main">
+                <span className="tr-page-name">{c.label}</span>
+                <span className="tr-page-path mono" title={c.href ? `${c.path} → ${c.href}` : c.path}>
+                  di {c.path}
+                  {c.href && c.href !== c.path && <> → {c.href}</>}
+                </span>
+                <span className="tr-bar"><span style={{ width: `${(c.clicks / maxClicks) * 100}%` }} /></span>
+              </div>
+              <div className="tr-click-count mono">
+                <b>{fmt(c.clicks)}</b>
+                <span>{fmt(c.visitors)} orang</span>
+              </div>
+            </li>
+          ))}
+        </ol>
       </div>
 
       <div className="tr-card">
@@ -483,9 +550,10 @@ function ClickSection({ data, range }: { data: VisitAnalytics; range: string }) 
               key={p.label}
               href={`/admin/analytics?range=${range}&heat=${encodeURIComponent(p.label)}`}
               className={`tr-chip mono${p.label === data.heatPath ? ' active' : ''}`}
+              title={p.label}
               scroll={false}
             >
-              {p.label}
+              <span className="tr-chip-label">{p.label}</span>
               <b>{p.views}</b>
             </Link>
           ))}
@@ -508,7 +576,7 @@ function ClickSection({ data, range }: { data: VisitAnalytics; range: string }) 
             ))}
           </div>
         </div>
-        <p className="tr-muted mono">
+        <p className="tr-muted mono tr-frame-note">
           Posisi relatif terhadap panjang halaman; atas bingkai = atas halaman. Klik ponsel dan
           desktop ditumpuk bersama.
         </p>
@@ -520,51 +588,54 @@ function ClickSection({ data, range }: { data: VisitAnalytics; range: string }) 
 function VisitorsTable({ data }: { data: VisitAnalytics }) {
   if (data.visitors.length === 0) return <p className="tr-empty mono">belum ada pengunjung</p>
   return (
-    <div className="admin-table-container">
-      <table className="admin-table tr-table">
-        <thead>
-          <tr>
-            <th>Pengunjung</th>
-            <th>Lokasi</th>
-            <th>Perangkat</th>
-            <th style={{ textAlign: 'right' }}>Tayangan</th>
-            <th style={{ textAlign: 'right' }}>Sesi</th>
-            <th>Terakhir membuka</th>
-            <th style={{ textAlign: 'right' }}>Aktif</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.visitors.map((v) => (
-            <tr key={v.id}>
-              <td>
-                <span className="tr-visitor mono">
-                  <span className="tr-avatar" style={{ ['--h' as string]: hue(v.id) }}>{v.id.slice(0, 2)}</span>
-                  {v.id}
-                  <span className={`tr-badge ${v.returning ? 'back' : 'new'}`}>{v.returning ? 'kembali' : 'baru'}</span>
-                </span>
-              </td>
-              <td className="quiet">{[v.city, v.country].filter(Boolean).join(', ') || '—'}</td>
-              <td>
-                <span className="tr-device-cell">
-                  {deviceIcon(v.device)}
-                  <span className="mono">{[v.browser, v.os].filter(Boolean).join(' · ') || deviceName(v.device)}</span>
-                </span>
-              </td>
-              <td className="mono ga-num">{fmt(v.views)}</td>
-              <td className="mono ga-num quiet">{fmt(v.sessions)}</td>
-              <td className="mono quiet tr-last-path">{v.lastPath}</td>
-              <td className="mono ga-num quiet" title={new Date(v.lastSeen).toLocaleString('id-ID', { timeZone: TZ })}>
-                {ago(v.lastSeen)}
-              </td>
+    <>
+      <div className="admin-table-container tr-scroll tr-visitors">
+        <table className="admin-table tr-table">
+          <thead>
+            <tr>
+              <th>Pengunjung</th>
+              <th>Lokasi</th>
+              <th>Perangkat</th>
+              <th style={{ textAlign: 'right' }}>Tayangan</th>
+              <th style={{ textAlign: 'right' }}>Sesi</th>
+              <th>Terakhir membuka</th>
+              <th style={{ textAlign: 'right' }}>Aktif</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {data.visitors.map((v) => (
+              <tr key={v.id}>
+                <td>
+                  <span className="tr-visitor mono">
+                    <span className="tr-avatar" style={{ ['--h' as string]: hue(v.id) }}>{v.id.slice(0, 2)}</span>
+                    {v.id}
+                    {v.returning && <span className="tr-badge back">kembali</span>}
+                  </span>
+                </td>
+                <td className="quiet tr-nowrap">{[v.city, v.country].filter(Boolean).join(', ') || '—'}</td>
+                <td>
+                  <span className="tr-device-cell">
+                    {deviceIcon(v.device)}
+                    <span className="mono">{[v.browser, v.os].filter(Boolean).join(' · ') || deviceName(v.device)}</span>
+                  </span>
+                </td>
+                <td className="mono ga-num">{fmt(v.views)}</td>
+                <td className="mono ga-num quiet">{fmt(v.sessions)}</td>
+                <td className="mono quiet tr-last-path" title={v.lastPath}>{v.lastPath}</td>
+                <td className="mono ga-num quiet tr-nowrap" title={new Date(v.lastSeen).toLocaleString('id-ID', { timeZone: TZ })}>
+                  {ago(v.lastSeen)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       <p className="tr-muted mono tr-table-note">
-        Id pengunjung adalah potongan sidik ber-garam (IP + peramban), bukan alamat IP. Satu orang
-        yang ganti jaringan bisa tercatat sebagai pengunjung baru.
+        {fmt(data.visitors.length)} pengunjung terakhir. Id pengunjung adalah potongan sidik ber-garam
+        (IP + peramban), bukan alamat IP; satu orang yang ganti jaringan bisa tercatat sebagai
+        pengunjung baru.
       </p>
-    </div>
+    </>
   )
 }
 
@@ -580,8 +651,8 @@ function pct(ratio: number): string {
   return `${(ratio * 100).toFixed(1).replace('.', ',')}%`
 }
 
-function change(current: number, previous: number): number | null {
-  return previous > 0 ? (current - previous) / previous : null
+function decimal(n: number): string {
+  return n.toFixed(1).replace('.', ',')
 }
 
 function niceCeil(v: number): number {
@@ -644,6 +715,9 @@ function pageName(path: string): string {
     donasi: 'Donasi',
     login: 'Masuk',
     daftar: 'Daftar',
+    'rekam-jejak': 'Rekam jejak',
+    backtest: 'Backtest',
+    profil: 'Profil',
   }
   const base = names[first] ?? first.replace(/-/g, ' ')
   if (rest.length === 0) return base

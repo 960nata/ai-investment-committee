@@ -11,10 +11,40 @@ import { sql } from 'drizzle-orm'
 import { db } from './client'
 import { clickLog, visitLog, type NewClickLog, type NewVisitLog } from './schema'
 
-let tableReady = false
+/**
+ * Satu janji untuk seluruh proses, bukan satu bendera.
+ *
+ * Halaman analitik memanggil `getVisitSummary` dan `getVisitAnalytics`
+ * bersamaan. Dengan bendera boolean, keduanya melihat "belum siap" di proses
+ * yang baru menyala, lalu dua DDL yang sama berjalan bersamaan dan saling
+ * bertabrakan di katalog Postgres — kueri kedua gagal dan laporan trafik hilang
+ * pada kunjungan pertama setiap kali server dinyalakan ulang. Janji yang dibagi
+ * membuat pemanggil kedua menunggu yang pertama. Bila gagal, janjinya dibuang
+ * supaya permintaan berikutnya mencoba lagi alih-alih mewarisi galat lama.
+ */
+let tableReady: Promise<void> | null = null
 
-export async function ensureVisitTable(): Promise<void> {
-  if (tableReady) return
+export function ensureVisitTable(): Promise<void> {
+  tableReady ??= createVisitTables().catch((err) => {
+    tableReady = null
+    throw err
+  })
+  return tableReady
+}
+
+async function createVisitTables(): Promise<void> {
+  // Cek murah dulu. DDL di bawah memuat ALTER TABLE, yang butuh kunci eksklusif
+  // atas visit_log: di produksi ia antre di belakang INSERT kunjungan yang terus
+  // mengalir, kena statement_timeout, dan seluruh laporan ikut gagal padahal
+  // tabelnya sudah lengkap. Kolom `referrer` adalah yang paling akhir datang.
+  const [state] = await db.execute<{ ready: boolean }>(sql`
+    SELECT to_regclass('click_log') IS NOT NULL
+       AND EXISTS (
+         SELECT 1 FROM information_schema.columns
+         WHERE table_name = 'visit_log' AND column_name = 'referrer'
+       ) AS ready
+  `)
+  if (state?.ready) return
 
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS visit_log (
@@ -57,8 +87,6 @@ export async function ensureVisitTable(): Promise<void> {
     CREATE INDEX IF NOT EXISTS click_log_created_at_idx ON click_log (created_at DESC);
     CREATE INDEX IF NOT EXISTS click_log_path_idx ON click_log (path);
   `)
-
-  tableReady = true
 }
 
 /** Simpan satu kunjungan. */

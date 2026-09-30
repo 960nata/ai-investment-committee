@@ -37,7 +37,6 @@ import {
   IconEye,
   IconGlobe,
   IconLayers,
-  IconLock,
   IconRadar,
   IconTrendDown,
   IconTrendUp,
@@ -127,90 +126,75 @@ export default async function AdminAnalyticsPage({ searchParams }: AnalyticsPage
   else trafficError = errorText(trafficResult.reason)
 
   return (
-    <div className="admin-page-content" suppressHydrationWarning>
-      {/* 1. KEPALA HALAMAN + PEMILIH RENTANG */}
-      <div className="admin-page-hero" suppressHydrationWarning>
-        <span className="admin-hero-glow" aria-hidden="true" />
-
-        <div className="admin-page-hero-main">
+    <div className="admin-page-content an-page" suppressHydrationWarning>
+      {/* 1. KEPALA HALAMAN: judul, rentang, status integrasi dalam satu baris */}
+      <header className="an-head">
+        <div className="an-head-main">
           <div className="admin-eyebrow mono">
             <span className="badge-live-pulse" style={{ width: '6px', height: '6px' }} />
             <span>TELEMETRI PENGUNJUNG</span>
           </div>
-
           <h1 className="admin-page-headline">
             Analitik <span className="admin-headline-accent">Pengguna</span>
           </h1>
-
-          <p className="admin-page-standfirst">
-            Dicatat sendiri oleh aplikasi &mdash; halaman, perangkat, sumber, klik, dan pengunjung
-            &mdash; lalu dibaca langsung di server. Tidak ada API publik yang membuka angka ini, dan
-            tidak ada angka contoh: kalau satu bagian kosong, memang belum ada datanya.
+          <p className="an-head-sub">
+            Dicatat sendiri oleh aplikasi. Tidak ada angka contoh: bagian yang kosong memang belum
+            ada datanya.
           </p>
+        </div>
 
-          <nav className="ga-range-nav mono" aria-label="Rentang waktu">
+        <div className="an-head-side">
+          <nav className="an-range mono" aria-label="Rentang waktu">
             {RANGES.map((option) => (
               <Link
                 key={option}
                 href={`/admin/analytics?range=${option}`}
-                className={`ga-range-link${option === range ? ' active' : ''}`}
+                className={`an-range-link${option === range ? ' active' : ''}`}
                 aria-current={option === range ? 'page' : undefined}
               >
                 {RANGE_LABELS[option]}
               </Link>
             ))}
           </nav>
+          <ul className="an-status mono" aria-label="Status integrasi">
+            <StatusDot ok={Boolean(traffic)} label="Pencatat" value={traffic ? 'aktif' : 'galat'} />
+            <StatusDot ok={Boolean(measurementId)} label="gtag" value={measurementId ?? 'belum'} />
+            <StatusDot ok={configured} label="GA4 API" value={configured ? 'terhubung' : 'belum'} />
+          </ul>
         </div>
+      </header>
 
-        <div className="admin-hero-chips mono" suppressHydrationWarning>
-          <div className="admin-hero-chips-head">
-            <IconLock size={11} />
-            <span>STATUS INTEGRASI</span>
+      {/*
+       * 2. PETA. Sumbernya catatan kunjungan milik aplikasi sendiri, bukan GA4,
+       * jadi ia berdiri di luar seluruh percabangan GA4 — dan petanya tetap
+       * digambar walau datanya kosong atau kuerinya gagal; keadaannya ditulis
+       * di atas peta, bukan menggantikannya.
+       */}
+      <VisitorGeoSection
+        summary={visits}
+        error={visitsError}
+        live={traffic?.live ?? null}
+        rangeLabel={RANGE_LABELS[range]}
+      />
+
+      {/* 3. LAPORAN TRAFIK */}
+      {traffic ? (
+        <TrafficReport data={traffic} range={range} />
+      ) : (
+        trafficError && (
+          <div className="ga-notice ga-notice-error">
+            <IconAlert size={18} />
+            <div>
+              <h2 className="ga-notice-title">Laporan trafik gagal dimuat</h2>
+              <p className="ga-notice-body">
+                Biasanya sementara. <Link href={`/admin/analytics?range=${range}`}>Muat ulang</Link>{' '}
+                halaman ini.
+              </p>
+              <p className="ga-notice-body mono ga-notice-detail">{trafficError}</p>
+            </div>
           </div>
-
-          <div className="admin-hero-chip">
-            <span className={`chip-indicator ${traffic ? 'ok' : 'warn'}`} />
-            <span className="admin-hero-chip-name">Pencatat internal</span>
-            <span className={`admin-hero-chip-value ${traffic ? 'ok' : 'warn'}`}>
-              {traffic ? 'Aktif' : 'Galat'}
-            </span>
-          </div>
-
-          <div className="admin-hero-chip">
-            <span className={`chip-indicator ${measurementId ? 'ok' : 'warn'}`} />
-            <span className="admin-hero-chip-name">Tag gtag.js</span>
-            <span className={`admin-hero-chip-value ${measurementId ? 'ok' : 'warn'}`}>
-              {measurementId ?? 'Belum dipasang'}
-            </span>
-          </div>
-
-          <div className="admin-hero-chip">
-            <span className={`chip-indicator ${configured ? 'ok' : 'warn'}`} />
-            <span className="admin-hero-chip-name">Data API</span>
-            <span className={`admin-hero-chip-value ${configured ? 'ok' : 'warn'}`}>
-              {configured ? 'Terhubung' : 'Belum konfig'}
-            </span>
-          </div>
-
-          <div className="admin-hero-chips-foot">{RANGE_LABELS[range]}</div>
-        </div>
-      </div>
-
-      {traffic && <TrafficReport data={traffic} range={range} />}
-
-      {trafficError && (
-        <div className="ga-notice ga-notice-error">
-          <IconAlert size={18} />
-          <div>
-            <h2 className="ga-notice-title">Laporan trafik gagal dimuat</h2>
-            <p className="ga-notice-body mono">{trafficError}</p>
-            <p className="ga-notice-body">Biasanya sementara. Muat ulang halaman ini.</p>
-          </div>
-        </div>
+        )
       )}
-
-      {/* GA4 jadi pelengkap: hanya tampil kalau kredensial Data API diisi. */}
-      {!configured && <SetupNotice measurementId={measurementId} />}
 
       {live && <RealtimeSection live={live} />}
 
@@ -245,17 +229,8 @@ export default async function AdminAnalyticsPage({ searchParams }: AnalyticsPage
 
       {data && !data.empty && <Report data={data} />}
 
-      {/*
-       * Peta sengaja berada di luar seluruh percabangan GA4 di atas. Sumbernya
-       * catatan kunjungan milik aplikasi sendiri, jadi ia tetap punya isi pada
-       * pemasangan yang belum menyentuh Google Analytics sama sekali.
-       */}
-      <div className="admin-section-header mono" suppressHydrationWarning>
-        <span className="admin-section-title">PETA GEOLOKASI PENGUNJUNG</span>
-        <span className="admin-section-line" />
-      </div>
-
-      <VisitorGeoSection summary={visits} error={visitsError} />
+      {/* GA4 jadi pelengkap: hanya tampil kalau kredensial Data API diisi. */}
+      {!configured && <SetupNotice measurementId={measurementId} />}
     </div>
   )
 }
@@ -509,8 +484,20 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   ])
 }
 
+/**
+ * Pesan galat yang layak tampil di layar.
+ *
+ * Drizzle membungkus galat Postgres jadi "Failed query: <seluruh SQL> params:",
+ * dan untuk kueri skema itu berarti empat puluh baris DDL di tengah halaman
+ * tanpa satu kata pun tentang penyebabnya. Penyebab aslinya ada di `cause`.
+ */
 function errorText(err: unknown): string {
-  return err instanceof Error ? err.message : String(err)
+  if (!(err instanceof Error)) return String(err)
+  if (err.message.startsWith('Failed query:')) {
+    const cause = err.cause instanceof Error ? err.cause.message : null
+    return cause ? `Kueri basis data gagal: ${cause}` : 'Kueri basis data gagal.'
+  }
+  return err.message
 }
 
 /**
@@ -520,111 +507,146 @@ function errorText(err: unknown): string {
  * belum ada kunjungan berkoordinat sama sekali, atau ada dan digambar. Ketiganya
  * sengaja dibedakan — "peta kosong" yang berarti "basis data mati" dan yang
  * berarti "memang belum ada pengunjung" menuntut tindakan yang tidak sama.
+ * Petanya sendiri selalu digambar; keadaannya ditulis di atasnya.
  */
 function VisitorGeoSection({
   summary,
   error,
+  live,
+  rangeLabel,
 }: {
   summary: VisitSummary | null
   error: string | null
+  live: VisitAnalytics['live'] | null
+  rangeLabel: string
 }) {
-  if (error) {
-    return (
-      <div className="admin-table-card" suppressHydrationWarning>
-        <div className="ga-empty">
-          <IconAlert size={18} style={{ color: 'var(--halted)' }} />
-          <p className="ga-empty-title">Catatan kunjungan tidak terbaca</p>
-          <p className="ga-empty-text mono">{error}</p>
-        </div>
-      </div>
-    )
-  }
-
   const points = summary?.points ?? []
   const plotted = points.reduce((total, point) => total + point.visits, 0)
+  const cities = points.slice(0, 8)
+  const maxCity = Math.max(1, ...cities.map((point) => point.visits))
+  const countries = (summary?.countries ?? []).slice(0, 6)
+  const countryTotal = (summary?.countries ?? []).reduce((total, row) => total + row.visits, 0)
+
+  const notice = error
+    ? 'Catatan kunjungan tidak terbaca — muat ulang halaman'
+    : points.length > 0
+      ? null
+      : summary && summary.totalVisits > 0
+        ? `${formatCount(summary.totalVisits)} kunjungan, belum ada yang berkoordinat`
+        : 'Belum ada kunjungan pada rentang ini'
 
   return (
-    <div className="admin-table-card" suppressHydrationWarning>
-      <div className="admin-table-card-head">
-        <div>
-          <h2 className="admin-table-title">Dari mana pengunjung membuka AI Investdesk</h2>
-          <p className="admin-table-subtitle mono">
-            Dicatat sendiri oleh aplikasi, bukan dari GA4. Lokasi berasal dari geolokasi IP di tepi
-            jaringan; alamat IP-nya sendiri tidak pernah disimpan &mdash; yang tersimpan hanya
-            sidik ber-garam untuk membedakan pengunjung.
-          </p>
-        </div>
+    <section className="an-geo" aria-label="Peta sebaran pengunjung" suppressHydrationWarning>
+      <div className="an-geo-map">
+        <VisitorMap points={points} notice={notice} />
+
+        {live && (
+          <div className={`an-geo-live mono${live.last5 > 0 ? ' is-active' : ''}`}>
+            <span className="an-geo-live-dot" aria-hidden="true" />
+            <b>{formatCount(live.last5)}</b>
+            <span>aktif sekarang</span>
+            <span className="an-geo-live-sep" aria-hidden="true">·</span>
+            <b>{formatCount(live.last30)}</b>
+            <span>30 mnt</span>
+          </div>
+        )}
+
+        <dl className="an-geo-stats mono">
+          <div>
+            <dt>Kunjungan</dt>
+            <dd>{summary ? formatCount(summary.totalVisits) : '—'}</dd>
+          </div>
+          <div>
+            <dt>Pengunjung</dt>
+            <dd>{summary ? formatCount(summary.totalVisitors) : '—'}</dd>
+          </div>
+          <div>
+            <dt>Kota</dt>
+            <dd>{formatCount(points.length)}</dd>
+          </div>
+          <div>
+            <dt>Negara</dt>
+            <dd>{formatCount(summary?.countries.length ?? 0)}</dd>
+          </div>
+        </dl>
       </div>
 
-      {points.length === 0 ? (
-        <div className="ga-empty">
-          <IconGlobe size={18} />
-          <p className="ga-empty-title">Belum ada kunjungan berkoordinat</p>
-          <p className="ga-empty-text">
-            {summary && summary.totalVisits > 0 ? (
-              <>
-                {formatCount(summary.totalVisits)} kunjungan tercatat pada rentang ini, tetapi belum
-                satu pun membawa koordinat. Ini normal di pengembangan: koordinat datang dari header
-                tepi jaringan Vercel, dan di localhost header itu tidak ada.
-              </>
-            ) : (
-              <>
-                Belum ada kunjungan tercatat pada rentang ini. Data mulai terkumpul sendiri begitu
-                ada yang membuka situs.
-              </>
-            )}
-          </p>
+      <aside className="an-geo-side">
+        <div className="an-geo-side-head mono">
+          <IconGlobe size={13} />
+          <span>Asal pengunjung</span>
+          <span className="an-geo-range">{rangeLabel}</span>
         </div>
-      ) : (
-        <>
-          <VisitorMap points={points} />
 
-          <div className="visitor-map-stats mono" suppressHydrationWarning>
-            <span>
-              <strong>{formatCount(summary?.totalVisits ?? 0)}</strong> kunjungan
-            </span>
-            <span>
-              <strong>{formatCount(summary?.totalVisitors ?? 0)}</strong> pengunjung berbeda
-            </span>
-            <span>
-              <strong>{formatCount(points.length)}</strong> kota
-            </span>
-            {summary && summary.withoutLocation > 0 && (
-              <span className="quiet">
-                {formatCount(summary.withoutLocation)} kunjungan tanpa lokasi (tidak dipetakan)
-              </span>
-            )}
-          </div>
-
-          <div className="admin-table-container">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th style={{ width: '40%' }}>Kota</th>
-                  <th style={{ width: '18%' }}>Negara</th>
-                  <th style={{ width: '14%', textAlign: 'right' }}>Kunjungan</th>
-                  <th style={{ width: '14%', textAlign: 'right' }}>Pengunjung</th>
-                  <th style={{ width: '14%', textAlign: 'right' }}>Bagian</th>
-                </tr>
-              </thead>
-              <tbody>
-                {points.slice(0, 12).map((point) => (
-                  <tr key={`${point.city}-${point.latitude}-${point.longitude}`}>
-                    <td>{point.city}</td>
-                    <td className="mono quiet">{point.country ?? '—'}</td>
-                    <td className="mono ga-num">{formatCount(point.visits)}</td>
-                    <td className="mono ga-num quiet">{formatCount(point.visitors)}</td>
-                    <td className="mono ga-num quiet">
-                      {plotted > 0 ? `${((point.visits / plotted) * 100).toFixed(1)}%` : '—'}
-                    </td>
-                  </tr>
+        {error ? (
+          <p className="an-geo-error mono">{error}</p>
+        ) : (
+          <>
+            <h2 className="an-geo-title mono">Kota teratas</h2>
+            {cities.length === 0 ? (
+              <p className="tr-muted mono">belum ada kota tercatat</p>
+            ) : (
+              <ol className="an-geo-list">
+                {cities.map((point, i) => (
+                  <li key={`${point.city}-${point.latitude}-${point.longitude}`}>
+                    <span className="an-geo-rank mono">{i + 1}</span>
+                    <div className="an-geo-row">
+                      <div className="an-geo-row-top">
+                        <span className="an-geo-name">
+                          {point.city}
+                          {point.country && <span className="an-geo-cc mono">{point.country}</span>}
+                        </span>
+                        <span className="an-geo-value mono">{formatCount(point.visits)}</span>
+                      </div>
+                      <span className="an-geo-bar">
+                        <span style={{ width: `${(point.visits / maxCity) * 100}%` }} />
+                      </span>
+                    </div>
+                  </li>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
-    </div>
+              </ol>
+            )}
+
+            {countries.length > 0 && (
+              <>
+                <h2 className="an-geo-title mono">Negara</h2>
+                <ul className="an-geo-countries mono">
+                  {countries.map((row) => (
+                    <li key={row.country}>
+                      <span className="an-geo-cc-lg">{row.country}</span>
+                      <span className="an-geo-share">
+                        {countryTotal > 0 ? `${((row.visits / countryTotal) * 100).toFixed(1)}%` : '—'}
+                      </span>
+                      <span className="an-geo-value">{formatCount(row.visits)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+
+            <p className="an-geo-foot mono">
+              {points.length > cities.length && <>+ {points.length - cities.length} kota lain · </>}
+              {summary && summary.withoutLocation > 0
+                ? `${formatCount(summary.withoutLocation)} kunjungan tanpa lokasi`
+                : plotted > 0
+                  ? 'semua kunjungan berlokasi'
+                  : 'lokasi dari geolokasi IP di tepi jaringan'}
+              . Alamat IP tidak pernah disimpan.
+            </p>
+          </>
+        )}
+      </aside>
+    </section>
+  )
+}
+
+function StatusDot({ ok, label, value }: { ok: boolean; label: string; value: string }) {
+  return (
+    <li className={ok ? 'ok' : 'warn'} title={`${label}: ${value}`}>
+      <i aria-hidden="true" />
+      <span>{label}</span>
+      <b>{value}</b>
+    </li>
   )
 }
 

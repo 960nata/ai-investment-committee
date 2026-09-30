@@ -37,7 +37,17 @@ const TILE_REF_URL =
 const TILE_ATTRIBUTION =
   '&copy; <a href="https://www.esri.com/">Esri</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
 
-export function VisitorMap({ points }: { points: VisitPoint[] }) {
+/** Titik yang dikunjungi dalam rentang ini diberi denyut: kota yang sedang aktif. */
+const LIVE_WINDOW_MS = 30 * 60 * 1000
+
+export function VisitorMap({
+  points,
+  notice,
+}: {
+  points: VisitPoint[]
+  /** Pesan yang ditampilkan di atas peta — peta tetap digambar di bawahnya. */
+  notice?: string | null
+}) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'failed'>('loading')
 
@@ -60,10 +70,16 @@ export function VisitorMap({ points }: { points: VisitPoint[] }) {
           zoom: 4,
           minZoom: 2,
           maxZoom: 14,
+          zoomControl: false,
+          // Gulir halaman tidak boleh tersangkut di peta. Zoom lewat roda baru
+          // hidup setelah peta diklik, dan mati lagi begitu kursor keluar.
           scrollWheelZoom: false,
           attributionControl: true,
           worldCopyJump: true,
         })
+        L.control.zoom({ position: 'topright' }).addTo(map)
+        map.on('click', () => map.scrollWheelZoom.enable())
+        map.on('mouseout', () => map.scrollWheelZoom.disable())
 
         L.tileLayer(TILE_URL, {
           attribution: TILE_ATTRIBUTION,
@@ -77,28 +93,77 @@ export function VisitorMap({ points }: { points: VisitPoint[] }) {
 
         if (points.length > 0) {
           const busiest = Math.max(...points.map((p) => p.visits))
+          const now = Date.now()
 
-          for (const point of points) {
+          // Yang terbesar digambar lebih dulu supaya kota kecil di dekatnya
+          // tetap bisa diklik di atasnya.
+          const ordered = [...points].sort((a, b) => b.visits - a.visits)
+
+          for (const point of ordered) {
             const share = Math.sqrt(point.visits / busiest)
             const radius = 6 + share * 22
+            const where = [point.city, point.region, point.country].filter(Boolean).join(', ')
+            const lastSeen = new Date(point.lastSeen)
+            const live = now - lastSeen.getTime() < LIVE_WINDOW_MS
+
+            // Lingkaran luar yang pudar memberi kesan cahaya; titik inti yang
+            // padat menandai letak kotanya dengan tepat di zoom berapa pun.
+            L.circleMarker([point.latitude, point.longitude], {
+              radius: radius + 6,
+              stroke: false,
+              fillColor: MARKER_COLOR,
+              fillOpacity: 0.08,
+              interactive: false,
+            }).addTo(map)
 
             const marker = L.circleMarker([point.latitude, point.longitude], {
               radius,
               color: MARKER_COLOR,
               fillColor: MARKER_COLOR,
-              fillOpacity: 0.32,
+              fillOpacity: 0.3,
               weight: 1.5,
-              opacity: 0.85,
+              opacity: 0.9,
             }).addTo(map)
 
-            const where = [point.city, point.region, point.country]
-              .filter(Boolean)
-              .join(', ')
+            L.circleMarker([point.latitude, point.longitude], {
+              radius: 2.5,
+              stroke: false,
+              fillColor: '#ffd48a',
+              fillOpacity: 1,
+              interactive: false,
+            }).addTo(map)
+
+            if (live) {
+              L.marker([point.latitude, point.longitude], {
+                icon: L.divIcon({ className: 'vm-pulse', iconSize: [18, 18] }),
+                interactive: false,
+                keyboard: false,
+              }).addTo(map)
+            }
+
+            marker.bindTooltip(
+              `${escapeHtml(point.city)} · ${point.visits.toLocaleString('id-ID')}`,
+              { direction: 'top', offset: [0, -radius], className: 'vm-tooltip' },
+            )
 
             marker.bindPopup(
-              `<strong>${escapeHtml(where)}</strong><br>` +
-                `${point.visits.toLocaleString('id-ID')} kunjungan · ` +
-                `${point.visitors.toLocaleString('id-ID')} pengunjung`,
+              `<div class="vm-popup">` +
+                `<strong>${escapeHtml(where)}</strong>` +
+                `<div class="vm-popup-grid">` +
+                `<span>Kunjungan</span><b>${point.visits.toLocaleString('id-ID')}</b>` +
+                `<span>Pengunjung</span><b>${point.visitors.toLocaleString('id-ID')}</b>` +
+                `<span>Terakhir</span><b>${escapeHtml(
+                  lastSeen.toLocaleString('id-ID', {
+                    timeZone: 'Asia/Jakarta',
+                    day: 'numeric',
+                    month: 'short',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  }),
+                )}</b>` +
+                `</div>` +
+                (live ? `<span class="vm-popup-live">● aktif 30 menit terakhir</span>` : '') +
+                `</div>`,
             )
           }
 
@@ -106,7 +171,7 @@ export function VisitorMap({ points }: { points: VisitPoint[] }) {
           // secara membuta: situs yang pembacanya di Eropa tidak seharusnya
           // membuka peta pada laut Jawa.
           const bounds = L.latLngBounds(points.map((p) => [p.latitude, p.longitude]))
-          map.fitBounds(bounds, { padding: [40, 40], maxZoom: 8 })
+          map.fitBounds(bounds, { padding: [60, 60], maxZoom: 7 })
         }
 
         // Peta yang dibuat selagi bekasnya masih nol piksel — misalnya di dalam
@@ -141,6 +206,8 @@ export function VisitorMap({ points }: { points: VisitPoint[] }) {
           {status === 'loading' ? 'Memuat peta…' : 'Peta gagal dimuat.'}
         </div>
       )}
+
+      {status === 'ready' && notice && <div className="visitor-map-notice mono">{notice}</div>}
     </div>
   )
 }
