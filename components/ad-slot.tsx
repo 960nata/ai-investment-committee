@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import type { AdSettingsRow } from '@/lib/db/schema'
 import { IconExternalLink } from './icons'
+import { AdsenseUnit } from './adsense-unit'
+import { isAdsenseWithoutUnit, parseAdsenseSnippet } from '@/lib/ads/adsense'
 
 interface AdSlotProps {
   slot?: AdSettingsRow | null
@@ -17,6 +19,12 @@ export function AdSlot({ slot, className, style }: AdSlotProps) {
   if (!slot || !slot.isEnabled) {
     return null
   }
+
+  // Kode AdSense tanpa unit manual (cuma skrip Auto ads) tidak dipasang:
+  // memuatnya berarti menyalakan iklan otomatis di seluruh halaman ini.
+  if (isAdsenseWithoutUnit(slot.adCodeHtml)) return null
+
+  const adsense = parseAdsenseSnippet(slot.adCodeHtml)
 
   // Jika ada script / HTML mentah kustom (misal Google AdSense)
   if (slot.adCodeHtml && slot.adCodeHtml.trim().length > 0) {
@@ -45,7 +53,11 @@ export function AdSlot({ slot, className, style }: AdSlotProps) {
         >
           Sponsor / Ad
         </div>
-        <div dangerouslySetInnerHTML={{ __html: slot.adCodeHtml }} />
+        {adsense ? (
+          <AdsenseUnit config={adsense} />
+        ) : (
+          <div dangerouslySetInnerHTML={{ __html: slot.adCodeHtml }} />
+        )}
       </div>
     )
   }

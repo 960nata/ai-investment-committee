@@ -8,6 +8,7 @@ import { VisitBeacon } from "@/components/visit-beacon";
 import { MotionProvider } from "@/components/motion-kit";
 import { SiteTranslator } from "@/components/site-translator";
 import { SITE_NAME } from "@/lib/brand";
+import { ADSENSE_CLIENT } from "@/lib/ads/adsense";
 import "./globals.css";
 import "./mobile.css";
 
@@ -28,6 +29,10 @@ export const metadata: Metadata = {
     "Alat analisis data untuk saham IDX, saham AS, dan crypto. " +
     "Menampilkan peluang beserta dasarnya, bukan anjuran.",
   keywords: ["saham", "analisis", "IDX", "crypto", "investasi", "probabilistik"],
+  // Verifikasi kepemilikan situs untuk AdSense. Hanya tag meta — tidak memuat
+  // skrip apa pun, jadi tidak ada iklan otomatis. Skripnya dimuat oleh slot
+  // iklan saja (lihat lib/ads/adsense.ts).
+  other: { "google-adsense-account": ADSENSE_CLIENT },
 };
 
 export default function RootLayout({

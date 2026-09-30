@@ -83,6 +83,14 @@ const firebaseAuthOrigin = (() => {
 const ANALYTICS_ORIGINS =
   'https://*.google-analytics.com https://*.analytics.google.com https://www.google.com https://www.googletagmanager.com'
 
+/**
+ * Asal-asal Google AdSense. Skripnya sendiri lolos lewat 'strict-dynamic'
+ * (disisipkan oleh bundel bernonce); yang perlu didaftarkan adalah bingkai
+ * iklan, gambarnya, dan panggilan pengukurannya.
+ */
+const ADSENSE_ORIGINS =
+  'https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com https://*.adtrafficquality.google'
+
 const FIREBASE_API_ORIGINS =
   'https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com'
 
@@ -146,19 +154,19 @@ function contentSecurityPolicy(nonce: string): string {
     "style-src 'self' 'unsafe-inline'",
     // Ubin peta datang sebagai gambar dari CDN CARTO; tanpa asal ini peta
     // pengunjung di portal admin tergambar sebagai kotak kosong.
-    `img-src 'self' blob: data: ${MAP_TILE_ORIGIN}${imageOrigin ? ` ${imageOrigin}` : ''}`,
+    `img-src 'self' blob: data: ${MAP_TILE_ORIGIN} ${ADSENSE_ORIGINS} https://*.gstatic.com${imageOrigin ? ` ${imageOrigin}` : ''}`,
     "font-src 'self'",
     // Bursa dipanggil langsung dari peramban untuk harga bergerak; fungsi
     // serverless tidak bisa memegang koneksi WebSocket yang hidup lama.
     // Port 9443 disebut terang-terangan: sumber tanpa port hanya cocok dengan
     // port bawaan (443), dan aliran harga Binance tersambung lewat :9443.
     // Tanpa ini semua grafik "live" diam-diam membeku di harga pemuatan.
-    `connect-src 'self' https://api.binance.com wss://stream.binance.com wss://stream.binance.com:9443 ${FIREBASE_API_ORIGINS} ${ANALYTICS_ORIGINS}`,
+    `connect-src 'self' https://api.binance.com wss://stream.binance.com wss://stream.binance.com:9443 ${FIREBASE_API_ORIGINS} ${ANALYTICS_ORIGINS} ${ADSENSE_ORIGINS}`,
     // Tantangan Turnstile di halaman daftar tampil sebagai bingkai dari
     // Cloudflare. Skripnya sendiri tidak perlu didaftarkan: ia dimuat oleh
     // bundel bernonce, dan 'strict-dynamic' sudah mempercayainya.
     // Iframe Firebase Auth menerima hasil popup Google — lihat `firebaseAuthOrigin`.
-    `frame-src 'self' https://challenges.cloudflare.com${firebaseAuthOrigin ? ` ${firebaseAuthOrigin}` : ''}`,
+    `frame-src 'self' https://challenges.cloudflare.com ${ADSENSE_ORIGINS}${firebaseAuthOrigin ? ` ${firebaseAuthOrigin}` : ''}`,
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
