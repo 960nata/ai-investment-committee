@@ -55,7 +55,7 @@
   }
 
   /* Padding 24px di tiap sisi menyisakan kolom baca ~270px di layar 360px. */
-  .warta-layout > article.panel {
+  .warta-article-panel {
     padding: var(--space-4) !important;
   }
 }

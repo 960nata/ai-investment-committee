@@ -28,6 +28,8 @@ interface NewsSidebarProps {
   currentSlug?: string
   activeTag?: string | null
   onSelectTag?: (tag: string) => void
+  /** 'public' menautkan ke /warta (tanpa login); bawaannya ke terminal /berita. */
+  variant?: 'terminal' | 'public'
 }
 
 export function NewsSidebar({
@@ -35,7 +37,14 @@ export function NewsSidebar({
   currentSlug,
   activeTag,
   onSelectTag,
+  variant = 'terminal',
 }: NewsSidebarProps) {
+  const articleHref = (slug: string) =>
+    variant === 'public' ? `/warta/${slug}` : `/berita/${slug}`
+  const tagHref = (tag: string) =>
+    variant === 'public'
+      ? `/warta?q=${encodeURIComponent(tag)}`
+      : `/berita?tag=${encodeURIComponent(tag)}`
   return (
     <aside className="news-sidebar">
       {/* --- Widget 1: Berita Terkini --- */}
@@ -57,7 +66,7 @@ export function NewsSidebar({
               return (
                 <Link
                   key={art.id}
-                  href={`/berita/${art.slug}`}
+                  href={articleHref(art.slug)}
                   className={`sidebar-recent-item ${isCurrent ? 'active' : ''}`}
                   style={isCurrent ? { opacity: 0.65 } : undefined}
                 >
@@ -114,7 +123,7 @@ export function NewsSidebar({
             ) : (
               <Link
                 key={tag}
-                href={`/berita?tag=${encodeURIComponent(clean)}`}
+                href={tagHref(clean)}
                 className={`sidebar-tag-pill ${isSelected ? 'active' : ''}`}
               >
                 {tag}

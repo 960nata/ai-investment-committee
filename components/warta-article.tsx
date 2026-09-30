@@ -36,8 +36,8 @@ import { AdSlot } from '@/components/ad-slot'
 import { LandingNav } from '@/components/landing-nav'
 import { LandingFooter } from '@/components/landing-footer'
 import { PublicTerminalCta } from '@/components/public-news-portal'
-import { LanguageSwitch } from '@/components/language-switch'
-import { IconEye } from '@/components/icons'
+import { NewsSidebar } from '@/components/news-sidebar'
+import { IconEye, IconNews } from '@/components/icons'
 import { SITE_NAME } from '@/lib/brand'
 
 const baseUrl = () => process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
@@ -103,6 +103,7 @@ export async function WartaArticle({ slug, locale }: { slug: string; locale: Loc
 
   const headerAd = adSlots.find((s) => s.slotName === 'header_leaderboard')
   const midAd = adSlots.find((s) => s.slotName === 'in_article_mid')
+  const sidebarAd = adSlots.find((s) => s.slotName === 'sidebar_widget')
   const footerAd = adSlots.find((s) => s.slotName === 'footer_banner')
 
   const related = allNews.filter((a) => a.slug !== slug).slice(0, 3)
@@ -175,14 +176,13 @@ export async function WartaArticle({ slug, locale }: { slug: string; locale: Loc
               <span>&larr;</span>
               <span>{ui.back}</span>
             </Link>
-            {available.length > 1 && (
-              <LanguageSwitch current={locale} path={path} available={available} label={ui.language} />
-            )}
           </div>
 
-          {/* Artikel di kiri, tiga warta terkait di kolom kanan. */}
-          <div className="warta-layout">
-          <article className="panel" style={{ padding: 'var(--space-5)', minWidth: 0 }}>
+          {/* Tata letak sama dengan /berita/[slug] di terminal: artikel dan
+              warta terkait di kiri, widget berita di kolom kanan. */}
+          <div className="news-layout-with-sidebar">
+          <div className="news-main-column">
+          <article className="panel warta-article-panel" style={{ padding: 'var(--space-5)', minWidth: 0 }}>
             <AdSlot slot={headerAd} />
 
             <header className="article-header">
@@ -341,37 +341,65 @@ export async function WartaArticle({ slug, locale }: { slug: string; locale: Loc
           </article>
 
           {related.length > 0 && (
-            <aside className="warta-aside">
-              <div className="sidebar-widget">
-                <div className="sidebar-widget-head">
-                  <span className="sidebar-widget-title">{ui.related}</span>
-                </div>
-                <div className="warta-related-list">
-                  {related.map((item) => (
-                    <Link
-                      key={item.id}
-                      href={localePath(locale, `/warta/${item.slug}`)}
-                      className="warta-related-item"
-                    >
-                      {item.featuredImage?.url && (
-                        <div className="warta-related-img">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={item.featuredImage.url} alt={item.featuredImage.alt ?? item.title} />
-                        </div>
+            <section>
+              <h3
+                style={{
+                  fontSize: 'var(--t-body)',
+                  fontWeight: 700,
+                  color: 'var(--ink)',
+                  marginBottom: 'var(--space-3)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                }}
+              >
+                <IconNews size={16} />
+                <span>{ui.related}</span>
+              </h3>
+              <div className="news-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>
+                {related.map((rel) => (
+                  <Link key={rel.id} href={localePath(locale, `/warta/${rel.slug}`)} className="news-card">
+                    <div className="news-card-img-wrap" style={{ height: 140 }}>
+                      {rel.featuredImage?.url && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={rel.featuredImage.url}
+                          alt={rel.featuredImage.alt ?? rel.title}
+                          className="news-card-img"
+                        />
                       )}
-                      <div className="sidebar-recent-meta">
-                        <span>{item.category.replace(/-/g, ' ').toUpperCase()}</span>
-                        <span>·</span>
-                        <span>{date(item.publishedAt, false)}</span>
+                    </div>
+                    <div className="news-card-body">
+                      <div
+                        className="mono"
+                        style={{ fontSize: 'var(--t-micro)', color: 'var(--ink-mute)', fontWeight: 600, marginBottom: 4 }}
+                      >
+                        {rel.category.replace(/-/g, ' ').toUpperCase()}
                       </div>
-                      <h3 className="warta-related-title">{item.title}</h3>
-                      <span className="news-read-link">{ui.readMore} &rarr;</span>
-                    </Link>
-                  ))}
-                </div>
+                      <h4 style={{ fontSize: 'var(--t-small)', fontWeight: 700, margin: '0 0 6px 0', lineHeight: 1.4 }}>
+                        {rel.title}
+                      </h4>
+                      <div style={{ fontSize: 'var(--t-micro)', color: 'var(--ink-mute)', marginTop: 'auto' }}>
+                        {date(rel.publishedAt, false)}
+                      </div>
+                    </div>
+                  </Link>
+                ))}
               </div>
-            </aside>
+            </section>
           )}
+          </div>
+
+          {/* Widget berbahasa Indonesia: ditandai begitu supaya penerjemah
+              halaman tetap menerjemahkannya di versi bahasa lain. */}
+          <div
+            lang={LOCALE_INFO[SOURCE_LOCALE].htmlLang}
+            data-native-locale={SOURCE_LOCALE}
+            style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}
+          >
+            <AdSlot slot={sidebarAd} />
+            <NewsSidebar recentArticles={allNews} currentSlug={slug} variant="public" />
+          </div>
           </div>
         </div>
       </section>

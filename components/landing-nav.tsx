@@ -1082,15 +1082,6 @@ export function LandingNav({
             </div>
 
             <div className="mobile-drawer-body">
-              <div className="mobile-menu-section">
-                <div className="mobile-menu-title mono">BAHASA · LANGUAGE</div>
-                <LanguageMenu
-                  variant="drawer"
-                  available={languages}
-                  onNavigate={() => setMobileOpen(false)}
-                />
-              </div>
-
               {/* Section: Alat gratis — bisa dipakai tanpa akun */}
               <div className="mobile-menu-section">
                 <div className="mobile-menu-title mono">ALAT GRATIS</div>
