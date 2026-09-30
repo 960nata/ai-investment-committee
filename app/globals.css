@@ -19929,3 +19929,118 @@ body.rail-lock {
   .calc-card { padding: 16px; }
   .calc-page { padding-top: 32px; }
 }
+
+/* --- Analitik: pemberitahuan terlipat & realtime ------------------------- */
+
+.ga-notice-fold {
+  display: block;
+  padding: 10px 14px;
+}
+
+.ga-notice-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 11px;
+  color: var(--ink-mute);
+}
+
+.ga-notice-summary::-webkit-details-marker {
+  display: none;
+}
+
+.ga-notice-more {
+  margin-left: auto;
+  color: var(--signal);
+  white-space: nowrap;
+}
+
+.ga-notice-fold[open] .ga-notice-summary {
+  margin-bottom: 12px;
+}
+
+.ga-live-refresh {
+  font-size: 10px;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+
+.ga-live-card {
+  display: grid;
+  grid-template-columns: minmax(180px, 240px) 1fr;
+  gap: 24px;
+  margin-bottom: 12px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+}
+
+.ga-live-figures {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.ga-live-figures > div,
+.ga-live-chart-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ga-live-label {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+.ga-live-number {
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--green);
+}
+
+.ga-live-number.small {
+  font-size: 26px;
+  color: var(--ink);
+}
+
+.ga-live-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 120px;
+  padding-top: 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.ga-live-bar {
+  flex: 1;
+  min-width: 0;
+  border-radius: 2px 2px 0 0;
+  background: var(--signal);
+}
+
+.ga-live-axis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--ink-faint);
+}
+
+@media (max-width: 640px) {
+  .ga-live-card {
+    grid-template-columns: 1fr;
+  }
+
+  .ga-live-figures {
+    flex-direction: row;
+    gap: 24px;
+  }
+}

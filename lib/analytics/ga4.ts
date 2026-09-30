@@ -434,3 +434,91 @@ export async function getGa4Overview(range: Ga4Range): Promise<Ga4Overview> {
     empty: currentSummary.sessions === 0 && pageRows.length === 0,
   }
 }
+
+// ---------------------------------------------------------------------------
+// Realtime — padanan kartu "Realtime" di antarmuka GA4
+// ---------------------------------------------------------------------------
+
+export interface Ga4Realtime {
+  activeLast30: number
+  activeLast5: number
+  /** Indeks 0 = menit ini, indeks 29 = 29 menit lalu. Selalu 30 butir. */
+  perMinute: number[]
+  /** `null` berarti laporan itu ditolak Google, bukan kosong. */
+  sources: Ga4Slice[] | null
+  audiences: Ga4Slice[] | null
+  screens: Ga4Slice[] | null
+  events: Ga4Slice[] | null
+  keyEvents: Ga4Slice[] | null
+  devices: Ga4Slice[] | null
+  countries: Ga4Slice[] | null
+}
+
+/**
+ * Tarik laporan realtime 30 menit terakhir.
+ *
+ * Tiap rincian dibiarkan gagal sendiri-sendiri. Skema dimensi realtime jauh
+ * lebih sempit daripada laporan biasa dan berubah dari waktu ke waktu —
+ * `firstUserSource`, misalnya, belum tentu diterima di setiap properti — jadi
+ * satu dimensi yang ditolak cukup mengosongkan panelnya sendiri, tidak
+ * seluruh bagian realtime.
+ */
+export async function getGa4Realtime(): Promise<Ga4Realtime> {
+  const config = getGa4Config()
+  if (!config) throw new Error('Kredensial GA4 Data API belum dikonfigurasi.')
+
+  const realtime = (body: Record<string, unknown>) =>
+    callReport(config, 'runRealtimeReport', body)
+
+  const breakdown = (dimension: string, metric: string, limit = 10) =>
+    realtime({
+      dimensions: [{ name: dimension }],
+      metrics: [{ name: metric }],
+      orderBys: [{ metric: { metricName: metric }, desc: true }],
+      limit,
+    })
+      .then((report) => toSlices(report.rows))
+      .catch(() => null)
+
+  const [last30, last5, minutes, sources, audiences, screens, events, keyEvents, devices, countries] =
+    await Promise.all([
+      realtime({ metrics: [{ name: 'activeUsers' }] }),
+      realtime({
+        metrics: [{ name: 'activeUsers' }],
+        minuteRanges: [{ startMinutesAgo: 4, endMinutesAgo: 0 }],
+      }).catch(() => null),
+      realtime({
+        dimensions: [{ name: 'minutesAgo' }],
+        metrics: [{ name: 'activeUsers' }],
+        limit: 30,
+      }).catch(() => null),
+      breakdown('firstUserSource', 'activeUsers'),
+      breakdown('audienceName', 'activeUsers'),
+      breakdown('unifiedScreenName', 'screenPageViews'),
+      breakdown('eventName', 'eventCount'),
+      breakdown('eventName', 'keyEvents').then(
+        (rows) => rows?.filter((row) => row.value > 0) ?? null,
+      ),
+      breakdown('deviceCategory', 'activeUsers'),
+      breakdown('country', 'activeUsers'),
+    ])
+
+  const perMinute = Array.from({ length: 30 }, () => 0)
+  for (const row of minutes?.rows ?? []) {
+    const ago = Number(dim(row, 0))
+    if (Number.isInteger(ago) && ago >= 0 && ago < 30) perMinute[ago] = num(row, 0)
+  }
+
+  return {
+    activeLast30: num(last30.rows?.[0], 0),
+    activeLast5: num(last5?.rows?.[0], 0),
+    perMinute,
+    sources,
+    audiences,
+    screens,
+    events,
+    keyEvents,
+    devices,
+    countries,
+  }
+}

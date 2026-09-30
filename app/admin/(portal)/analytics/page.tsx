@@ -45,12 +45,14 @@ import {
 } from '@/components/icons'
 import {
   getGa4Overview,
+  getGa4Realtime,
   getMeasurementId,
   isGa4Configured,
   parseRange,
   RANGE_LABELS,
   type Ga4Overview,
   type Ga4Range,
+  type Ga4Realtime,
   type Ga4Slice,
 } from '@/lib/analytics/ga4'
 import {
@@ -60,6 +62,7 @@ import {
   type VisitWindow,
 } from '@/lib/db/visit-queries'
 import { VisitorMap } from '@/components/visitor-map'
+import { RealtimeRefresh } from './realtime-refresh'
 
 export const dynamic = 'force-dynamic'
 
@@ -84,13 +87,18 @@ export default async function AdminAnalyticsPage({ searchParams }: AnalyticsPage
 
   let data: Ga4Overview | null = null
   let error: string | null = null
+  let live: Ga4Realtime | null = null
 
   if (configured) {
-    try {
-      data = await getGa4Overview(range)
-    } catch (err) {
-      error = err instanceof Error ? err.message : String(err)
-    }
+    // Realtime ditarik terpisah dan kegagalannya ditelan: laporan harian yang
+    // sehat tidak boleh ikut hilang hanya karena kuota realtime sedang habis.
+    const [overview, realtime] = await Promise.allSettled([
+      getGa4Overview(range),
+      getGa4Realtime(),
+    ])
+    if (overview.status === 'fulfilled') data = overview.value
+    else error = overview.reason instanceof Error ? overview.reason.message : String(overview.reason)
+    if (realtime.status === 'fulfilled') live = realtime.value
   }
 
   // Sebaran pengunjung dibaca dari catatan kunjungan milik aplikasi sendiri,
@@ -170,6 +178,8 @@ export default async function AdminAnalyticsPage({ searchParams }: AnalyticsPage
 
       {!configured && <SetupNotice measurementId={measurementId} />}
 
+      {live && <RealtimeSection live={live} />}
+
       {configured && error && (
         <div className="ga-notice ga-notice-error">
           <IconAlert size={18} />
@@ -185,7 +195,7 @@ export default async function AdminAnalyticsPage({ searchParams }: AnalyticsPage
         </div>
       )}
 
-      {data?.empty && (
+      {data?.empty && !live?.activeLast30 && (
         <div className="ga-notice">
           <IconActivity size={18} />
           <div>
@@ -352,6 +362,94 @@ function Report({ data }: { data: Ga4Overview }) {
             </tbody>
           </table>
         </div>
+      </div>
+    </>
+  )
+}
+
+/**
+ * Padanan kartu "Realtime" di GA4: pengguna aktif 30 & 5 menit, grafik per
+ * menit, lalu rincian sumber, audiens, halaman, peristiwa, dan perangkat.
+ */
+function RealtimeSection({ live }: { live: Ga4Realtime }) {
+  // Grafik dibaca kiri ke kanan: -29 menit sampai menit ini.
+  const bars = [...live.perMinute].reverse()
+  const peak = Math.max(1, ...bars)
+
+  return (
+    <>
+      <div className="admin-section-header mono" suppressHydrationWarning>
+        <span className="admin-section-title">REALTIME · 30 MENIT TERAKHIR</span>
+        <span className="admin-section-line" />
+        <RealtimeRefresh seconds={60} />
+      </div>
+
+      <div className="ga-live-card" suppressHydrationWarning>
+        <div className="ga-live-figures">
+          <div>
+            <span className="ga-live-label mono">Pengguna aktif · 30 menit</span>
+            <span className="ga-live-number mono">{formatCount(live.activeLast30)}</span>
+          </div>
+          <div>
+            <span className="ga-live-label mono">Pengguna aktif · 5 menit</span>
+            <span className="ga-live-number small mono">{formatCount(live.activeLast5)}</span>
+          </div>
+        </div>
+
+        <div className="ga-live-chart-wrap">
+          <span className="ga-live-label mono">Pengguna aktif per menit</span>
+          <div className="ga-live-chart" role="img" aria-label="Pengguna aktif per menit, 30 menit terakhir">
+            {bars.map((value, index) => (
+              <div
+                key={index}
+                className="ga-live-bar"
+                style={{ height: `${Math.max(value > 0 ? 6 : 2, (value / peak) * 100)}%` }}
+                title={`${29 - index === 0 ? 'menit ini' : `-${29 - index} menit`}: ${value} pengguna`}
+              />
+            ))}
+          </div>
+          <div className="ga-live-axis mono">
+            <span>-30 mnt</span>
+            <span>-15 mnt</span>
+            <span>sekarang</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="ga-bars-grid" suppressHydrationWarning>
+        <BarPanel
+          title="Judul halaman & layar"
+          icon={<IconEye size={14} />}
+          rows={live.screens}
+          unit="tayangan"
+        />
+        <BarPanel
+          title="Perangkat"
+          icon={<IconDeviceDesktop size={14} />}
+          rows={live.devices}
+          renderIcon={deviceIcon}
+          unit="pengguna"
+        />
+        <BarPanel
+          title="Sumber pengguna pertama"
+          icon={<IconRadar size={14} />}
+          rows={live.sources}
+          unit="pengguna"
+        />
+        <BarPanel title="Negara" icon={<IconGlobe size={14} />} rows={live.countries} unit="pengguna" />
+        <BarPanel title="Audiens" icon={<IconUser size={14} />} rows={live.audiences} unit="pengguna" />
+        <BarPanel
+          title="Jumlah peristiwa"
+          icon={<IconActivity size={14} />}
+          rows={live.events}
+          unit="peristiwa"
+        />
+        <BarPanel
+          title="Peristiwa utama"
+          icon={<IconLayers size={14} />}
+          rows={live.keyEvents}
+          unit="peristiwa"
+        />
       </div>
     </>
   )
@@ -549,11 +647,14 @@ function BarPanel({
   icon,
   rows,
   renderIcon,
+  unit = 'sesi',
 }: {
   title: string
   icon: React.ReactNode
-  rows: Ga4Slice[]
+  /** `null` berarti Google menolak laporannya, bukan belum ada data. */
+  rows: Ga4Slice[] | null
   renderIcon?: (label: string) => React.ReactNode
+  unit?: string
 }) {
   return (
     <div className="ga-bar-panel">
@@ -562,9 +663,10 @@ function BarPanel({
         <span>{title}</span>
       </div>
 
-      {rows.length === 0 && <p className="ga-bar-empty mono">belum ada data</p>}
+      {rows === null && <p className="ga-bar-empty mono">tidak tersedia di laporan realtime</p>}
+      {rows?.length === 0 && <p className="ga-bar-empty mono">belum ada data</p>}
 
-      {rows.map((row) => (
+      {rows?.map((row) => (
         <div key={row.label} className="ga-bar-row">
           <div className="ga-bar-label mono">
             {renderIcon?.(row.label)}
@@ -574,22 +676,36 @@ function BarPanel({
           <div className="ga-bar-track">
             <div className="ga-bar-fill" style={{ width: `${Math.round(row.share * 100)}%` }} />
           </div>
-          <span className="ga-bar-count mono">{formatCount(row.value)} sesi</span>
+          <span className="ga-bar-count mono">{formatCount(row.value)} {unit}</span>
         </div>
       ))}
     </div>
   )
 }
 
+/**
+ * Petunjuk pemasangan, dilipat.
+ *
+ * Tag yang sudah terpasang membuat GA4 di situs Google terlihat "sudah
+ * tersambung", dan panel lebar berisi langkah-langkah terasa seperti galat.
+ * Jadi ia diringkas jadi satu baris; langkahnya baru terbuka kalau diklik.
+ */
 function SetupNotice({ measurementId }: { measurementId: string | null }) {
   return (
-    <div className="ga-notice">
-      <IconAlert size={18} />
+    <details className="ga-notice ga-notice-fold">
+      <summary className="ga-notice-summary mono">
+        <IconAlert size={14} />
+        <span>
+          {measurementId
+            ? `Tag ${measurementId} aktif · angka di halaman ini butuh kredensial Data API`
+            : 'Tag GA4 & kredensial Data API belum diisi'}
+        </span>
+        <span className="ga-notice-more">cara menghubungkan</span>
+      </summary>
       <div>
-        <h2 className="ga-notice-title">Data API GA4 belum dikonfigurasi</h2>
         <p className="ga-notice-body">
           {measurementId
-            ? `Tag ${measurementId} sudah terpasang, jadi kunjungan sudah mengalir ke Google. Yang belum ada adalah kredensial untuk membacanya balik ke halaman ini.`
+            ? `Tag ${measurementId} sudah mengirim kunjungan ke Google, jadi dasbor GA4 di situs Google sudah terisi. Halaman ini membaca angka yang sama lewat Data API, dan untuk itu perlu service account terpisah.`
             : 'Belum ada tag maupun kredensial. Keduanya diisi lewat variabel lingkungan berikut.'}
         </p>
 
@@ -633,7 +749,7 @@ GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\\n...\\n-----END
           <span>Dokumentasi GA4 Data API</span>
         </a>
       </div>
-    </div>
+    </details>
   )
 }
 
