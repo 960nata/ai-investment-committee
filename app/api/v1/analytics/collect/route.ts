@@ -21,7 +21,8 @@ import {
   hashVisitor,
   lookupGeo,
 } from '@/lib/analytics/geo'
-import { recordVisit } from '@/lib/db/visit-queries'
+import { recordClicks, recordVisit } from '@/lib/db/visit-queries'
+import { browserOf, osOf, referrerHost } from '@/lib/analytics/user-agent'
 import { maybeRunAutoNews } from '@/lib/news/auto-tick'
 
 export const dynamic = 'force-dynamic'
@@ -32,13 +33,37 @@ export const dynamic = 'force-dynamic'
  */
 export const maxDuration = 300
 
+// Hanya jalur relatif. Halaman yang mengaku beralamat di situs lain tidak
+// menambah apa pun selain baris sampah di tabel.
+const Path = z
+  .string()
+  .max(255)
+  .refine((value) => value.startsWith('/') && !value.startsWith('//'), 'Jalur tidak sah')
+
+const Fraction = z.number().finite().min(0).max(1)
+
+/** Klik dikirim berkelompok per halaman; lihat VisitBeacon. */
+const ClickSchema = z.object({
+  type: z.literal('click'),
+  path: Path,
+  clicks: z
+    .array(
+      z.object({
+        x: Fraction,
+        y: Fraction,
+        label: z.string().max(200).nullable().optional(),
+        href: z.string().max(500).nullable().optional(),
+        tag: z.string().max(16).nullable().optional(),
+      }),
+    )
+    .min(1)
+    .max(50),
+})
+
 const BeaconSchema = z.object({
-  // Hanya jalur relatif. Halaman yang mengaku beralamat di situs lain tidak
-  // menambah apa pun selain baris sampah di tabel.
-  path: z
-    .string()
-    .max(255)
-    .refine((value) => value.startsWith('/') && !value.startsWith('//'), 'Jalur tidak sah'),
+  type: z.literal('view').optional(),
+  path: Path,
+  referrer: z.string().max(1000).nullable().optional(),
 })
 
 export async function POST(req: NextRequest) {
@@ -49,12 +74,37 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false }, { status: 400 })
   }
 
+  const userAgent = req.headers.get('user-agent')
+
+  const clicks = ClickSchema.safeParse(body)
+  if (clicks.success) {
+    const device = deviceClass(userAgent)
+    if (device === 'bot') return NextResponse.json({ ok: true, skipped: 'bot' })
+    try {
+      const visitorHash = hashVisitor(clientIp(req), userAgent)
+      await recordClicks(
+        clicks.data.clicks.map((c) => ({
+          visitorHash,
+          path: clicks.data.path.slice(0, 255),
+          label: c.label?.trim().slice(0, 80) || null,
+          // Hanya jalur atau host tujuan; kueri tautan tidak disimpan.
+          href: c.href ? c.href.split(/[?#]/)[0].slice(0, 255) : null,
+          tag: c.tag?.slice(0, 16) ?? null,
+          xPct: c.x,
+          yPct: c.y,
+          deviceClass: device,
+        })),
+      )
+    } catch (err) {
+      console.error('[analytics/collect] klik', err)
+    }
+    return NextResponse.json({ ok: true })
+  }
+
   const parsed = BeaconSchema.safeParse(body)
   if (!parsed.success) {
     return NextResponse.json({ ok: false }, { status: 400 })
   }
-
-  const userAgent = req.headers.get('user-agent')
 
   // Perayap mesin telusur bukan pengunjung yang sedang dianalisis, dan
   // memasukkannya membuat kota tempat pusat data Google berdiri tampak seperti
@@ -91,6 +141,9 @@ export async function POST(req: NextRequest) {
       longitude: geo.longitude,
       deviceClass: device,
       geoSource: geo.source,
+      browser: browserOf(userAgent),
+      os: osOf(userAgent),
+      referrer: referrerHost(parsed.data.referrer, req.nextUrl.hostname),
     })
 
     return NextResponse.json({ ok: true })

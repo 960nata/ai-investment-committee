@@ -20044,3 +20044,696 @@ body.rail-lock {
     gap: 24px;
   }
 }
+
+/* ===========================================================================
+   ANALITIK — LAPORAN TRAFIK INTERNAL (tr-*)
+   =========================================================================== */
+
+.tr {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.tr-card {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  min-width: 0;
+}
+
+.tr-card.tr-flush {
+  padding: 0;
+  overflow: hidden;
+}
+
+.tr-card-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+.tr-muted {
+  margin: 0;
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+
+.tr-empty {
+  margin: 0;
+  padding: 28px 16px;
+  font-size: 12px;
+  line-height: 1.6;
+  text-align: center;
+  color: var(--ink-mute);
+}
+
+/* --- Pengunjung aktif --------------------------------------------------- */
+
+.tr-live {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  overflow: hidden;
+  border: 1px solid rgba(79, 157, 142, 0.35);
+  border-radius: var(--radius-md);
+  background:
+    radial-gradient(120% 140% at 0% 0%, rgba(79, 157, 142, 0.16), transparent 55%),
+    var(--surface-1);
+}
+
+.tr-live-main {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.tr-live-dot {
+  position: relative;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 0 0 rgba(79, 157, 142, 0.6);
+  animation: tr-pulse 1.8s ease-out infinite;
+}
+
+@keyframes tr-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(79, 157, 142, 0.55); }
+  100% { box-shadow: 0 0 0 16px rgba(79, 157, 142, 0); }
+}
+
+.tr-live-number {
+  margin: 0;
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--green);
+}
+
+.tr-live-number.small {
+  font-size: 22px;
+  color: var(--ink);
+}
+
+.tr-live-label {
+  margin: 4px 0 0;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+.tr-live-sep {
+  width: 1px;
+  height: 36px;
+  background: var(--line);
+}
+
+.tr-live-pages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tr-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  padding: 4px 9px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-2);
+  font-size: 11px;
+  color: var(--ink-soft);
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tr-chip b {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.tr-chip.active,
+a.tr-chip:hover {
+  border-color: var(--signal);
+  background: var(--signal-dim);
+  color: var(--signal);
+}
+
+/* --- Angka utama -------------------------------------------------------- */
+
+.tr-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+}
+
+.tr-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.tr-kpi:hover {
+  border-color: rgba(224, 161, 60, 0.45);
+  transform: translateY(-1px);
+}
+
+.tr-kpi.is-hero {
+  background:
+    linear-gradient(160deg, rgba(224, 161, 60, 0.12), transparent 60%),
+    var(--surface-1);
+  border-color: rgba(224, 161, 60, 0.3);
+}
+
+.tr-kpi-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+.tr-kpi-head svg {
+  color: var(--signal);
+}
+
+.tr-kpi-value {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.tr-kpi.is-hero .tr-kpi-value {
+  font-size: 34px;
+}
+
+.tr-kpi-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 10.5px;
+  color: var(--ink-faint);
+}
+
+.tr-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.tr-delta.up {
+  background: rgba(79, 157, 142, 0.14);
+  color: var(--green);
+}
+
+.tr-delta.down {
+  background: var(--halted-dim);
+  color: var(--halted);
+}
+
+/* --- Grafik tren -------------------------------------------------------- */
+
+.tr-legend {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 8px;
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+
+.tr-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tr-key {
+  display: inline-block;
+  width: 14px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.tr-key.area {
+  height: 8px;
+  background: linear-gradient(var(--signal), rgba(224, 161, 60, 0.2));
+}
+
+.tr-key.line {
+  background: var(--ink-soft);
+}
+
+.tr-trend {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.tr-grid-line {
+  stroke: var(--line);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+}
+
+.tr-axis {
+  font-family: var(--mono);
+  font-size: 10px;
+  fill: var(--ink-faint);
+}
+
+.tr-line-views {
+  fill: none;
+  stroke: var(--signal);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.tr-line-visitors {
+  fill: none;
+  stroke: var(--ink-soft);
+  stroke-width: 2;
+  stroke-dasharray: 5 4;
+  stroke-linejoin: round;
+}
+
+.tr-peak {
+  fill: var(--signal);
+  stroke: var(--surface-1);
+  stroke-width: 2;
+}
+
+.tr-peak-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  fill: var(--ink);
+}
+
+.tr-hit {
+  fill: transparent;
+}
+
+.tr-hit:hover {
+  fill: rgba(224, 161, 60, 0.08);
+}
+
+/* --- Tabel -------------------------------------------------------------- */
+
+.tr-table td {
+  padding-top: 7px;
+  padding-bottom: 7px;
+  vertical-align: middle;
+}
+
+.tr-rank {
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+
+.tr-page {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.tr-page-name {
+  overflow: hidden;
+  font-size: 13px;
+  color: var(--ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tr-page-path {
+  overflow: hidden;
+  font-size: 10.5px;
+  color: var(--ink-faint);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tr-bar {
+  display: block;
+  height: 4px;
+  margin-top: 3px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--surface-3);
+}
+
+.tr-bar.thick {
+  height: 7px;
+}
+
+.tr-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgba(224, 161, 60, 0.55), var(--signal));
+}
+
+.tr-last-path {
+  max-width: 220px;
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tr-table-note {
+  padding: 10px 16px 14px;
+}
+
+/* --- Perangkat & daftar peringkat -------------------------------------- */
+
+.tr-devices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.tr-device {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+}
+
+.tr-device-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: var(--signal-dim);
+  color: var(--signal);
+}
+
+.tr-device-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.tr-device-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.tr-device-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.tr-device-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.tr-device-share {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--signal);
+}
+
+.tr-device-foot {
+  font-size: 10.5px;
+  color: var(--ink-faint);
+}
+
+.tr-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.tr-rank-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tr-rank-card .tr-card-head {
+  margin-bottom: 0;
+}
+
+.tr-rank-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.tr-rank-name {
+  overflow: hidden;
+  color: var(--ink-soft);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tr-rank-name.mono {
+  font-size: 11px;
+}
+
+.tr-rank-value {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.tr-device-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+
+/* --- Jam ramai ---------------------------------------------------------- */
+
+.tr-heat {
+  overflow-x: auto;
+}
+
+.tr-heat-grid {
+  display: grid;
+  grid-template-columns: 34px repeat(24, minmax(14px, 1fr));
+  grid-auto-rows: 20px;
+  gap: 3px;
+  min-width: 520px;
+}
+
+.tr-heat-hour,
+.tr-heat-day {
+  font-size: 9.5px;
+  color: var(--ink-faint);
+}
+
+.tr-heat-day {
+  display: flex;
+  align-items: center;
+}
+
+.tr-heat-cell {
+  border-radius: 3px;
+  background: rgba(224, 161, 60, var(--a, 0));
+  box-shadow: inset 0 0 0 1px rgba(233, 236, 233, 0.04);
+  transition: transform 0.1s ease;
+}
+
+.tr-heat-cell:hover {
+  outline: 1px solid var(--signal);
+  transform: scale(1.15);
+}
+
+.tr-heat-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 10px;
+  color: var(--ink-faint);
+}
+
+.tr-heat-scale {
+  width: 90px;
+  height: 7px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgba(224, 161, 60, 0.12), var(--signal));
+}
+
+.tr-heat-note {
+  margin-left: auto;
+  color: var(--ink-soft);
+}
+
+/* --- Klik --------------------------------------------------------------- */
+
+.tr-clicks {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.tr-heat-pages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.tr-page-frame {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-0);
+}
+
+.tr-page-frame-bar {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+}
+
+.tr-page-frame-bar i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--surface-3);
+}
+
+.tr-page-frame-bar span {
+  margin-left: 8px;
+  overflow: hidden;
+  font-size: 10px;
+  color: var(--ink-faint);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tr-page-canvas {
+  position: relative;
+  height: 460px;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 46px, rgba(233, 236, 233, 0.025) 46px 47px),
+    var(--surface-0);
+}
+
+.tr-click-dot {
+  position: absolute;
+  width: var(--s, 20px);
+  height: var(--s, 20px);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(229, 89, 79, var(--a, 0.5)) 0%, rgba(224, 161, 60, calc(var(--a, 0.5) * 0.6)) 40%, transparent 70%);
+  transform: translate(-50%, -50%);
+  mix-blend-mode: screen;
+  pointer-events: auto;
+}
+
+/* --- Pengunjung --------------------------------------------------------- */
+
+.tr-visitor {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  color: var(--ink);
+}
+
+.tr-avatar {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  background: hsl(var(--h, 30) 45% 32%);
+  font-size: 9px;
+  font-weight: 700;
+  color: hsl(var(--h, 30) 70% 85%);
+}
+
+.tr-badge {
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.tr-badge.new {
+  background: var(--signal-dim);
+  color: var(--signal);
+}
+
+.tr-badge.back {
+  background: rgba(79, 157, 142, 0.14);
+  color: var(--green);
+}
+
+@media (max-width: 900px) {
+  .tr-clicks {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .tr-live-number {
+    font-size: 28px;
+  }
+
+  .tr-kpi-value,
+  .tr-kpi.is-hero .tr-kpi-value {
+    font-size: 26px;
+  }
+
+  .tr-heat-note {
+    margin-left: 0;
+  }
+}

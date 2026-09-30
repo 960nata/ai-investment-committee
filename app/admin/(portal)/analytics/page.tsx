@@ -56,11 +56,14 @@ import {
   type Ga4Slice,
 } from '@/lib/analytics/ga4'
 import {
+  getVisitAnalytics,
   getVisitSummary,
   parseVisitWindow,
+  type VisitAnalytics,
   type VisitSummary,
   type VisitWindow,
 } from '@/lib/db/visit-queries'
+import { TrafficReport } from './traffic-report'
 import { VisitorMap } from '@/components/visitor-map'
 import { RealtimeRefresh } from './realtime-refresh'
 
@@ -75,11 +78,11 @@ export const metadata: Metadata = {
 const RANGES: Ga4Range[] = ['24h', '7d', '30d']
 
 interface AnalyticsPageProps {
-  searchParams: Promise<{ range?: string }>
+  searchParams: Promise<{ range?: string; heat?: string }>
 }
 
 export default async function AdminAnalyticsPage({ searchParams }: AnalyticsPageProps) {
-  const { range: rawRange } = await searchParams
+  const { range: rawRange, heat } = await searchParams
   const range = parseRange(rawRange)
 
   const measurementId = getMeasurementId()
@@ -108,12 +111,20 @@ export default async function AdminAnalyticsPage({ searchParams }: AnalyticsPage
   const visitWindow = toVisitWindow(range)
   let visits: VisitSummary | null = null
   let visitsError: string | null = null
+  let traffic: VisitAnalytics | null = null
+  let trafficError: string | null = null
 
-  try {
-    visits = await getVisitSummary(visitWindow)
-  } catch (err) {
-    visitsError = err instanceof Error ? err.message : String(err)
-  }
+  // Laporan trafik internal berjalan bersama peta. Dibatasi waktunya: pooler
+  // basis data sesekali macet, dan halaman admin yang menggantung selamanya
+  // lebih buruk daripada satu kotak berisi "muat ulang".
+  const [summaryResult, trafficResult] = await Promise.allSettled([
+    getVisitSummary(visitWindow),
+    withTimeout(getVisitAnalytics(visitWindow, heat), 20_000),
+  ])
+  if (summaryResult.status === 'fulfilled') visits = summaryResult.value
+  else visitsError = errorText(summaryResult.reason)
+  if (trafficResult.status === 'fulfilled') traffic = trafficResult.value
+  else trafficError = errorText(trafficResult.reason)
 
   return (
     <div className="admin-page-content" suppressHydrationWarning>
@@ -124,7 +135,7 @@ export default async function AdminAnalyticsPage({ searchParams }: AnalyticsPage
         <div className="admin-page-hero-main">
           <div className="admin-eyebrow mono">
             <span className="badge-live-pulse" style={{ width: '6px', height: '6px' }} />
-            <span>TELEMETRI GOOGLE ANALYTICS 4</span>
+            <span>TELEMETRI PENGUNJUNG</span>
           </div>
 
           <h1 className="admin-page-headline">
@@ -132,8 +143,9 @@ export default async function AdminAnalyticsPage({ searchParams }: AnalyticsPage
           </h1>
 
           <p className="admin-page-standfirst">
-            Dibaca langsung dari properti GA4 lewat Data API setiap halaman ini dimuat. Tidak ada
-            angka contoh di sini &mdash; kalau satu bagian kosong, memang belum ada datanya.
+            Dicatat sendiri oleh aplikasi &mdash; halaman, perangkat, sumber, klik, dan pengunjung
+            &mdash; lalu dibaca langsung di server. Tidak ada API publik yang membuka angka ini, dan
+            tidak ada angka contoh: kalau satu bagian kosong, memang belum ada datanya.
           </p>
 
           <nav className="ga-range-nav mono" aria-label="Rentang waktu">
@@ -157,6 +169,14 @@ export default async function AdminAnalyticsPage({ searchParams }: AnalyticsPage
           </div>
 
           <div className="admin-hero-chip">
+            <span className={`chip-indicator ${traffic ? 'ok' : 'warn'}`} />
+            <span className="admin-hero-chip-name">Pencatat internal</span>
+            <span className={`admin-hero-chip-value ${traffic ? 'ok' : 'warn'}`}>
+              {traffic ? 'Aktif' : 'Galat'}
+            </span>
+          </div>
+
+          <div className="admin-hero-chip">
             <span className={`chip-indicator ${measurementId ? 'ok' : 'warn'}`} />
             <span className="admin-hero-chip-name">Tag gtag.js</span>
             <span className={`admin-hero-chip-value ${measurementId ? 'ok' : 'warn'}`}>
@@ -176,6 +196,20 @@ export default async function AdminAnalyticsPage({ searchParams }: AnalyticsPage
         </div>
       </div>
 
+      {traffic && <TrafficReport data={traffic} range={range} />}
+
+      {trafficError && (
+        <div className="ga-notice ga-notice-error">
+          <IconAlert size={18} />
+          <div>
+            <h2 className="ga-notice-title">Laporan trafik gagal dimuat</h2>
+            <p className="ga-notice-body mono">{trafficError}</p>
+            <p className="ga-notice-body">Biasanya sementara. Muat ulang halaman ini.</p>
+          </div>
+        </div>
+      )}
+
+      {/* GA4 jadi pelengkap: hanya tampil kalau kredensial Data API diisi. */}
       {!configured && <SetupNotice measurementId={measurementId} />}
 
       {live && <RealtimeSection live={live} />}
@@ -464,6 +498,19 @@ function RealtimeSection({ live }: { live: Ga4Realtime }) {
  */
 function toVisitWindow(range: Ga4Range): VisitWindow {
   return parseVisitWindow(range)
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`Basis data tidak menjawab dalam ${ms / 1000} detik.`)), ms),
+    ),
+  ])
+}
+
+function errorText(err: unknown): string {
+  return err instanceof Error ? err.message : String(err)
 }
 
 /**

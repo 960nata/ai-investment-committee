@@ -846,6 +846,10 @@ export const visitLog = pgTable(
     longitude: doublePrecision('longitude'),
     deviceClass: varchar('device_class', { length: 16 }).notNull().default('unknown'),
     geoSource: varchar('geo_source', { length: 16 }).notNull().default('unknown'),
+    browser: varchar('browser', { length: 32 }),
+    os: varchar('os', { length: 32 }),
+    /** Host rujukan dari luar situs; null berarti langsung atau dari dalam. */
+    referrer: varchar('referrer', { length: 128 }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -857,6 +861,35 @@ export const visitLog = pgTable(
 
 export type VisitLogRow = typeof visitLog.$inferSelect
 export type NewVisitLog = typeof visitLog.$inferInsert
+
+/**
+ * Satu baris per klik di halaman.
+ *
+ * Posisinya disimpan sebagai pecahan lebar dan tinggi dokumen (0..1), bukan
+ * piksel, supaya klik dari ponsel dan desktop bisa ditumpuk di peta panas yang
+ * sama. `label` hanya teks tombol/tautan yang diklik, dipotong 80 karakter.
+ */
+export const clickLog = pgTable(
+  'click_log',
+  {
+    id: serial('id').primaryKey(),
+    visitorHash: varchar('visitor_hash', { length: 32 }).notNull(),
+    path: varchar('path', { length: 255 }).notNull(),
+    label: varchar('label', { length: 80 }),
+    href: varchar('href', { length: 255 }),
+    tag: varchar('tag', { length: 16 }),
+    xPct: doublePrecision('x_pct').notNull(),
+    yPct: doublePrecision('y_pct').notNull(),
+    deviceClass: varchar('device_class', { length: 16 }).notNull().default('unknown'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('click_log_created_at_idx').on(t.createdAt),
+    index('click_log_path_idx').on(t.path),
+  ],
+)
+
+export type NewClickLog = typeof clickLog.$inferInsert
 
 // ---------------------------------------------------------------------------
 // Pengaturan Iklan & AdSense (4 Slot Strategis, Default Hidden)

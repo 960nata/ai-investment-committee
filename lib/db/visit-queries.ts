@@ -9,7 +9,7 @@
 
 import { sql } from 'drizzle-orm'
 import { db } from './client'
-import { visitLog, type NewVisitLog } from './schema'
+import { clickLog, visitLog, type NewClickLog, type NewVisitLog } from './schema'
 
 let tableReady = false
 
@@ -34,6 +34,28 @@ export async function ensureVisitTable(): Promise<void> {
     CREATE INDEX IF NOT EXISTS visit_log_created_at_idx ON visit_log (created_at DESC);
     CREATE INDEX IF NOT EXISTS visit_log_visitor_idx ON visit_log (visitor_hash);
     CREATE INDEX IF NOT EXISTS visit_log_country_idx ON visit_log (country);
+
+    -- Kolom yang datang belakangan. ADD COLUMN IF NOT EXISTS supaya basis data
+    -- yang sudah berjalan ikut naik tanpa migrasi terpisah.
+    ALTER TABLE visit_log ADD COLUMN IF NOT EXISTS browser VARCHAR(32);
+    ALTER TABLE visit_log ADD COLUMN IF NOT EXISTS os VARCHAR(32);
+    ALTER TABLE visit_log ADD COLUMN IF NOT EXISTS referrer VARCHAR(128);
+
+    CREATE TABLE IF NOT EXISTS click_log (
+      id SERIAL PRIMARY KEY,
+      visitor_hash VARCHAR(32) NOT NULL,
+      path VARCHAR(255) NOT NULL,
+      label VARCHAR(80),
+      href VARCHAR(255),
+      tag VARCHAR(16),
+      x_pct DOUBLE PRECISION NOT NULL,
+      y_pct DOUBLE PRECISION NOT NULL,
+      device_class VARCHAR(16) NOT NULL DEFAULT 'unknown',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS click_log_created_at_idx ON click_log (created_at DESC);
+    CREATE INDEX IF NOT EXISTS click_log_path_idx ON click_log (path);
   `)
 
   tableReady = true
@@ -43,6 +65,13 @@ export async function ensureVisitTable(): Promise<void> {
 export async function recordVisit(visit: NewVisitLog): Promise<void> {
   await ensureVisitTable()
   await db.insert(visitLog).values(visit)
+}
+
+/** Simpan sekumpulan klik dari satu halaman. */
+export async function recordClicks(clicks: NewClickLog[]): Promise<void> {
+  if (clicks.length === 0) return
+  await ensureVisitTable()
+  await db.insert(clickLog).values(clicks)
 }
 
 export interface VisitPoint {
@@ -178,5 +207,416 @@ export async function getVisitSummary(window: VisitWindow = '30d'): Promise<Visi
     totalVisits: Number(summary?.visits ?? 0),
     totalVisitors: Number(summary?.visitors ?? 0),
     withoutLocation: Number(summary?.without_location ?? 0),
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Laporan lengkap untuk halaman analitik admin
+// ---------------------------------------------------------------------------
+
+/**
+ * Halaman portal admin tidak ikut dihitung. Pengelola membuka dasbornya
+ * sendiri berkali-kali sehari, dan kunjungan itu bukan trafik situs.
+ */
+const PUBLIC_ONLY = sql`path NOT LIKE '/admin%'`
+
+/** Zona waktu tampilan: jam dan hari di laporan mengikuti WIB. */
+const TZ = 'Asia/Jakarta'
+
+export interface CountRow {
+  label: string
+  views: number
+  visitors: number
+}
+
+export interface TrendPoint {
+  /** Awal ember waktu, ISO. */
+  at: string
+  views: number
+  visitors: number
+}
+
+export interface PageRow {
+  path: string
+  views: number
+  visitors: number
+  lastSeen: string
+}
+
+export interface VisitorRow {
+  id: string
+  views: number
+  pages: number
+  sessions: number
+  city: string | null
+  country: string | null
+  device: string
+  browser: string | null
+  os: string | null
+  lastPath: string
+  firstSeen: string
+  lastSeen: string
+  returning: boolean
+}
+
+export interface ClickTarget {
+  label: string
+  href: string | null
+  path: string
+  clicks: number
+  visitors: number
+}
+
+export interface ClickDot {
+  x: number
+  y: number
+  weight: number
+}
+
+export interface VisitAnalytics {
+  window: VisitWindow
+  totals: {
+    views: number
+    visitors: number
+    sessions: number
+    returning: number
+    clicks: number
+    bounceSessions: number
+  }
+  previous: { views: number; visitors: number }
+  live: { last5: number; last30: number; pagesNow: CountRow[] }
+  trend: { unit: 'hour' | 'day'; points: TrendPoint[] }
+  pages: PageRow[]
+  entryPages: CountRow[]
+  devices: CountRow[]
+  browsers: CountRow[]
+  os: CountRow[]
+  referrers: CountRow[]
+  /** [hari 0=Minggu][jam 0..23] jumlah tayangan, jam WIB. */
+  heatmap: number[][]
+  visitors: VisitorRow[]
+  clickTargets: ClickTarget[]
+  clickPages: CountRow[]
+  heatPath: string | null
+  clickDots: ClickDot[]
+}
+
+const n = (v: unknown) => Number(v ?? 0)
+
+/**
+ * Seluruh angka halaman analitik, dibaca langsung dari `visit_log` dan
+ * `click_log`. Dipanggil dari Server Component saja — tidak ada rute API yang
+ * mengembalikan data ini, jadi tidak ada yang bisa membacanya dari luar.
+ */
+export async function getVisitAnalytics(
+  window: VisitWindow = '7d',
+  heatPathWanted?: string,
+): Promise<VisitAnalytics> {
+  await ensureVisitTable()
+
+  const days = VISIT_WINDOWS[window]
+  const interval = `${days} days`
+  const since = sql`NOW() - ${interval}::interval`
+  const prevSince = sql`NOW() - (${interval}::interval * 2)`
+  const unit: 'hour' | 'day' = days <= 1 ? 'hour' : 'day'
+
+  const scoped = sql`created_at >= ${since} AND ${PUBLIC_ONLY}`
+
+  // Satu kueri untuk empat rincian sekaligus. Tiap perjalanan ke pooler
+  // Supabase adalah satu kesempatan macet, jadi jumlahnya ditekan.
+  const breakdownPart = (dim: string, column: string, fallback: string) => sql`
+    SELECT ${dim}::text AS dim,
+           COALESCE(NULLIF(${sql.raw(column)}, ''), ${fallback}) AS label,
+           COUNT(*)::int AS views,
+           COUNT(DISTINCT visitor_hash)::int AS visitors
+    FROM visit_log
+    WHERE ${scoped}
+    GROUP BY 2
+  `
+
+  const [
+    totals,
+    sessions,
+    pagesNow,
+    trend,
+    pages,
+    entryPages,
+    breakdowns,
+    heat,
+    visitors,
+    clickTargets,
+    clickPages,
+  ] = await Promise.all([
+    // Semua angka tunggal dalam satu perjalanan: periode ini, periode
+    // sebelumnya, pengunjung aktif, dan jumlah klik.
+    db.execute<{
+      views: number
+      visitors: number
+      returning: number
+      prev_views: number
+      prev_visitors: number
+      last5: number
+      last30: number
+      clicks: number
+    }>(sql`
+      WITH w AS (SELECT DISTINCT visitor_hash FROM visit_log WHERE ${scoped})
+      SELECT
+        (SELECT COUNT(*) FROM visit_log WHERE ${scoped})::int AS views,
+        (SELECT COUNT(*) FROM w)::int AS visitors,
+        (SELECT COUNT(*) FROM w WHERE EXISTS (
+          SELECT 1 FROM visit_log p
+          WHERE p.visitor_hash = w.visitor_hash AND p.created_at < ${since}
+        ))::int AS returning,
+        (SELECT COUNT(*) FROM visit_log
+          WHERE created_at >= ${prevSince} AND created_at < ${since} AND ${PUBLIC_ONLY})::int AS prev_views,
+        (SELECT COUNT(DISTINCT visitor_hash) FROM visit_log
+          WHERE created_at >= ${prevSince} AND created_at < ${since} AND ${PUBLIC_ONLY})::int AS prev_visitors,
+        (SELECT COUNT(DISTINCT visitor_hash) FROM visit_log
+          WHERE created_at >= NOW() - INTERVAL '5 minutes' AND ${PUBLIC_ONLY})::int AS last5,
+        (SELECT COUNT(DISTINCT visitor_hash) FROM visit_log
+          WHERE created_at >= NOW() - INTERVAL '30 minutes' AND ${PUBLIC_ONLY})::int AS last30,
+        (SELECT COUNT(*) FROM click_log WHERE ${scoped})::int AS clicks
+    `),
+
+    // Sesi = rangkaian kunjungan satu pengunjung tanpa jeda lebih dari 30 menit.
+    db.execute<{ sessions: number; bounces: number }>(sql`
+      WITH v AS (
+        SELECT visitor_hash, created_at,
+          CASE WHEN LAG(created_at) OVER w IS NULL
+                 OR created_at - LAG(created_at) OVER w > INTERVAL '30 minutes'
+               THEN 1 ELSE 0 END AS starts
+        FROM visit_log
+        WHERE ${scoped}
+        WINDOW w AS (PARTITION BY visitor_hash ORDER BY created_at)
+      ),
+      s AS (
+        SELECT visitor_hash, SUM(starts) OVER (PARTITION BY visitor_hash ORDER BY created_at) AS sid
+        FROM v
+      )
+      SELECT
+        (SELECT COUNT(*) FROM (SELECT DISTINCT visitor_hash, sid FROM s) x)::int AS sessions,
+        (SELECT COUNT(*) FROM (SELECT visitor_hash, sid FROM s GROUP BY 1, 2 HAVING COUNT(*) = 1) y)::int AS bounces
+    `),
+
+    db.execute<{ label: string; views: number; visitors: number }>(sql`
+      SELECT path AS label, COUNT(*)::int AS views, COUNT(DISTINCT visitor_hash)::int AS visitors
+      FROM visit_log
+      WHERE created_at >= NOW() - INTERVAL '30 minutes' AND ${PUBLIC_ONLY}
+      GROUP BY path ORDER BY views DESC LIMIT 6
+    `),
+
+    db.execute<{ at: string; views: number; visitors: number }>(sql`
+      WITH buckets AS (
+        SELECT generate_series(
+          date_trunc(${unit}, (NOW() - ${interval}::interval) AT TIME ZONE ${TZ}),
+          date_trunc(${unit}, NOW() AT TIME ZONE ${TZ}),
+          ${unit === 'hour' ? '1 hour' : '1 day'}::interval
+        ) AS at
+      ),
+      agg AS (
+        SELECT date_trunc(${unit}, created_at AT TIME ZONE ${TZ}) AS at,
+               COUNT(*)::int AS views,
+               COUNT(DISTINCT visitor_hash)::int AS visitors
+        FROM visit_log
+        WHERE ${scoped}
+        GROUP BY 1
+      )
+      SELECT to_char(b.at, 'YYYY-MM-DD"T"HH24:MI:SS') AS at,
+             COALESCE(a.views, 0)::int AS views,
+             COALESCE(a.visitors, 0)::int AS visitors
+      FROM buckets b LEFT JOIN agg a ON a.at = b.at
+      ORDER BY b.at
+    `),
+
+    db.execute<{ path: string; views: number; visitors: number; last_seen: Date }>(sql`
+      SELECT path, COUNT(*)::int AS views, COUNT(DISTINCT visitor_hash)::int AS visitors,
+             MAX(created_at) AS last_seen
+      FROM visit_log
+      WHERE ${scoped}
+      GROUP BY path ORDER BY views DESC LIMIT 20
+    `),
+
+    // Halaman pertama tiap sesi: pintu masuk pengunjung ke situs.
+    db.execute<{ label: string; views: number; visitors: number }>(sql`
+      WITH v AS (
+        SELECT visitor_hash, path, created_at,
+          LAG(created_at) OVER (PARTITION BY visitor_hash ORDER BY created_at) AS prev
+        FROM visit_log WHERE ${scoped}
+      )
+      SELECT path AS label, COUNT(*)::int AS views, COUNT(DISTINCT visitor_hash)::int AS visitors
+      FROM v
+      WHERE prev IS NULL OR created_at - prev > INTERVAL '30 minutes'
+      GROUP BY path ORDER BY views DESC LIMIT 8
+    `),
+
+    db.execute<{ dim: string; label: string; views: number; visitors: number }>(sql`
+      ${breakdownPart('device', 'device_class', 'unknown')}
+      UNION ALL ${breakdownPart('browser', 'browser', 'Belum tercatat')}
+      UNION ALL ${breakdownPart('os', 'os', 'Belum tercatat')}
+      UNION ALL ${breakdownPart('referrer', 'referrer', 'Langsung / internal')}
+    `),
+
+    db.execute<{ dow: number; hour: number; views: number }>(sql`
+      SELECT EXTRACT(DOW FROM created_at AT TIME ZONE ${TZ})::int AS dow,
+             EXTRACT(HOUR FROM created_at AT TIME ZONE ${TZ})::int AS hour,
+             COUNT(*)::int AS views
+      FROM visit_log
+      WHERE ${scoped}
+      GROUP BY 1, 2
+    `),
+
+    db.execute<{
+      visitor_hash: string
+      views: number
+      pages: number
+      city: string | null
+      country: string | null
+      device: string
+      browser: string | null
+      os: string | null
+      last_path: string
+      first_seen: Date
+      last_seen: Date
+      returning: boolean
+      sessions: number
+    }>(sql`
+      WITH v AS (
+        SELECT *,
+          CASE WHEN LAG(created_at) OVER (PARTITION BY visitor_hash ORDER BY created_at) IS NULL
+                 OR created_at - LAG(created_at) OVER (PARTITION BY visitor_hash ORDER BY created_at) > INTERVAL '30 minutes'
+               THEN 1 ELSE 0 END AS starts
+        FROM visit_log WHERE ${scoped}
+      )
+      SELECT
+        visitor_hash,
+        COUNT(*)::int AS views,
+        COUNT(DISTINCT path)::int AS pages,
+        SUM(starts)::int AS sessions,
+        (ARRAY_AGG(city ORDER BY created_at DESC) FILTER (WHERE city IS NOT NULL))[1] AS city,
+        (ARRAY_AGG(country ORDER BY created_at DESC) FILTER (WHERE country IS NOT NULL))[1] AS country,
+        (ARRAY_AGG(device_class ORDER BY created_at DESC))[1] AS device,
+        (ARRAY_AGG(browser ORDER BY created_at DESC) FILTER (WHERE browser IS NOT NULL))[1] AS browser,
+        (ARRAY_AGG(os ORDER BY created_at DESC) FILTER (WHERE os IS NOT NULL))[1] AS os,
+        (ARRAY_AGG(path ORDER BY created_at DESC))[1] AS last_path,
+        MIN(created_at) AS first_seen,
+        MAX(created_at) AS last_seen,
+        EXISTS (
+          SELECT 1 FROM visit_log p
+          WHERE p.visitor_hash = v.visitor_hash AND p.created_at < ${since}
+        ) AS returning
+      FROM v
+      GROUP BY visitor_hash
+      ORDER BY MAX(created_at) DESC
+      LIMIT 40
+    `),
+
+    db.execute<{ label: string; href: string | null; path: string; clicks: number; visitors: number }>(sql`
+      SELECT label, MAX(href) AS href, path,
+             COUNT(*)::int AS clicks, COUNT(DISTINCT visitor_hash)::int AS visitors
+      FROM click_log
+      WHERE ${scoped} AND label IS NOT NULL
+      GROUP BY label, path
+      ORDER BY clicks DESC
+      LIMIT 15
+    `),
+
+    db.execute<{ label: string; views: number; visitors: number }>(sql`
+      SELECT path AS label, COUNT(*)::int AS views, COUNT(DISTINCT visitor_hash)::int AS visitors
+      FROM click_log
+      WHERE ${scoped}
+      GROUP BY path ORDER BY views DESC LIMIT 12
+    `),
+  ])
+
+  const toCount = (rows: { label: string; views: number; visitors: number }[]): CountRow[] =>
+    rows.map((r) => ({ label: r.label, views: n(r.views), visitors: n(r.visitors) }))
+
+  const clickPageRows = toCount(clickPages)
+  const heatPath =
+    (heatPathWanted && clickPageRows.some((p) => p.label === heatPathWanted) ? heatPathWanted : null) ??
+    clickPageRows[0]?.label ??
+    null
+
+  // Titik peta panas dikelompokkan ke kisi 2% supaya ribuan klik tidak
+  // dikirim satu per satu ke peramban.
+  const dots = heatPath
+    ? await db.execute<{ x: number; y: number; weight: number }>(sql`
+        SELECT ROUND((x_pct * 50)::numeric) / 50 AS x,
+               ROUND((y_pct * 50)::numeric) / 50 AS y,
+               COUNT(*)::int AS weight
+        FROM click_log
+        WHERE ${scoped} AND path = ${heatPath}
+        GROUP BY 1, 2
+        ORDER BY weight DESC
+        LIMIT 400
+      `)
+    : []
+
+  const heatmap = Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => 0))
+  for (const cell of heat) heatmap[n(cell.dow)][n(cell.hour)] = n(cell.views)
+
+  const t = totals[0]
+  const s = sessions[0]
+  const dim = (name: string, limit = 8) =>
+    toCount(
+      breakdowns
+        .filter((r) => r.dim === name)
+        .sort((a, b) => n(b.views) - n(a.views))
+        .slice(0, limit),
+    )
+
+  return {
+    window,
+    totals: {
+      views: n(t?.views),
+      visitors: n(t?.visitors),
+      sessions: n(s?.sessions),
+      returning: n(t?.returning),
+      clicks: n(t?.clicks),
+      bounceSessions: n(s?.bounces),
+    },
+    previous: { views: n(t?.prev_views), visitors: n(t?.prev_visitors) },
+    live: { last5: n(t?.last5), last30: n(t?.last30), pagesNow: toCount(pagesNow) },
+    trend: {
+      unit,
+      points: trend.map((r) => ({ at: r.at, views: n(r.views), visitors: n(r.visitors) })),
+    },
+    pages: pages.map((r) => ({
+      path: r.path,
+      views: n(r.views),
+      visitors: n(r.visitors),
+      lastSeen: new Date(r.last_seen).toISOString(),
+    })),
+    entryPages: toCount(entryPages),
+    devices: dim('device', 6),
+    browsers: dim('browser'),
+    os: dim('os'),
+    referrers: dim('referrer'),
+    heatmap,
+    visitors: visitors.map((r) => ({
+      id: r.visitor_hash.slice(0, 8).toUpperCase(),
+      views: n(r.views),
+      pages: n(r.pages),
+      sessions: n(r.sessions),
+      city: r.city,
+      country: r.country,
+      device: r.device,
+      browser: r.browser,
+      os: r.os,
+      lastPath: r.last_path,
+      firstSeen: new Date(r.first_seen).toISOString(),
+      lastSeen: new Date(r.last_seen).toISOString(),
+      returning: Boolean(r.returning),
+    })),
+    clickTargets: clickTargets.map((r) => ({
+      label: r.label,
+      href: r.href,
+      path: r.path,
+      clicks: n(r.clicks),
+      visitors: n(r.visitors),
+    })),
+    clickPages: clickPageRows,
+    heatPath,
+    clickDots: dots.map((d) => ({ x: n(d.x), y: n(d.y), weight: n(d.weight) })),
   }
 }
