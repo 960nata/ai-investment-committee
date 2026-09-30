@@ -125,14 +125,19 @@ export function CommitteeSessionStage({
     }
   }, [play, playKey])
 
-  const done = shown >= total
-  const current = script[Math.max(0, shown - 1)]
-  const next = script[shown]
+  // `shown` bisa tertinggal dari saham sebelumnya: transkrip lima baris yang
+  // sudah selesai diputar, lalu saham berikutnya cuma punya tiga. Tanpa
+  // dijepit, `script[shown - 1]` kosong dan `current.kind` menjatuhkan halaman.
+  // Effect di atas memutar ulang dari nol begitu naskah barunya terlihat.
+  const at = Math.min(shown, total)
+  const done = at >= total
+  const current: Line | undefined = script[Math.max(0, at - 1)]
+  const next: Line | undefined = script[at]
   const agentOf = (line: Line | undefined): AgentId | null =>
     !line ? null : line.kind === 'message' ? line.agent : line.kind === 'verdict' ? 'ketua' : null
-  const speaking = typing ? agentOf(next) : shown > 0 ? agentOf(current) : null
-  const spoken = new Set(script.slice(0, shown).map(agentOf).filter(Boolean))
-  const factsLit = shown > 0 && current.kind === 'message' && current.withFacts === true
+  const speaking = typing ? agentOf(next) : at > 0 ? agentOf(current) : null
+  const spoken = new Set(script.slice(0, at).map(agentOf).filter(Boolean))
+  const factsLit = at > 0 && current?.kind === 'message' && current.withFacts === true
 
   return (
     <div ref={ref} className="dlb is-embedded">
@@ -175,7 +180,7 @@ export function CommitteeSessionStage({
           <div className="dlb-transcript" aria-live="polite">
             {!started && <p className="dlb-waiting">Memutar transkrip sidang…</p>}
 
-            {script.slice(0, shown).map((line, i) => (
+            {script.slice(0, at).map((line, i) => (
               <TranscriptLine
                 key={`${playKey}-${i}`}
                 line={line}

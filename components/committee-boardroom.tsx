@@ -360,6 +360,9 @@ export function CommitteeBoardroom({ symbol, market, name, onClose }: Props) {
       {!deliberating && session && (
         <div className="boardroom-body">
           <CommitteeSessionStage
+            // Komponen baru per sidang: posisi putar saham sebelumnya tidak
+            // boleh terbawa ke naskah saham berikutnya yang panjangnya beda.
+            key={session.id}
             symbol={symbol}
             facts={stage.facts}
             analis={stage.analis}
