@@ -120,6 +120,10 @@ export async function ensureMemberTables(): Promise<void> {
         FOREIGN KEY (user_id) REFERENCES app_user(id) ON DELETE CASCADE
     );
     CREATE INDEX IF NOT EXISTS user_notification_user_idx ON user_notification (user_id, created_at);
+
+    -- Preferensi email (lib/member/email.ts). Sengaja di luar skema Drizzle.
+    ALTER TABLE app_user ADD COLUMN IF NOT EXISTS email_opt_out BOOLEAN NOT NULL DEFAULT FALSE;
+    ALTER TABLE app_user ADD COLUMN IF NOT EXISTS digest_sent_at TIMESTAMPTZ;
   `)
 
   tablesReady = true

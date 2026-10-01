@@ -16,7 +16,7 @@
  */
 
 import { NextResponse } from 'next/server'
-import { chunk, isDue } from '@/lib/jobs/due'
+import { batchSizeFor, chunk, isDue, WHOLE_SOURCE_JOBS } from '@/lib/jobs/due'
 import {
   listEnabledSchedules,
   listInstruments,
@@ -27,28 +27,6 @@ import { publishJob, type JobPayload } from '@/lib/queue/qstash'
 import { requireCron } from '@/lib/http/auth'
 import { failure, unauthorized, NO_STORE } from '@/lib/http/errors'
 import { fromDbMarket } from '@/lib/db/schema'
-
-/** Batas 25–50 instrumen per batch menjaga tiap worker jauh di bawah batas waktu. */
-const BATCH_SIZE = 25
-
-/**
- * Rapat komite jauh lebih mahal per simbol daripada ingest: empat panggilan
- * model berurutan, bukan satu panggilan HTTP. Dua simbol per batch menjaga tiap
- * worker tetap di bawah batas waktu function meski satu penyedia lambat
- * menjawab dan registry harus turun ke penyedia cadangan.
- */
-const COMMITTEE_BATCH_SIZE = 2
-
-/**
- * Job yang bekerja atas seluruh sumbernya sekaligus, bukan per simbol: satu
- * berkas KSEI memuat semua saham, satu deret makro tidak punya simbol. Dibagi
- * per batch, job ini akan jalan berulang kali untuk pekerjaan yang sama.
- */
-const WHOLE_SOURCE_JOBS = new Set(['ingest-ksei-monthly', 'ingest-macro', 'ingest-external', 'warta-otomatis', 'warta-terjemah', 'evaluasi-alert'])
-
-function batchSizeFor(jobName: string): number {
-  return jobName.startsWith('komite-') ? COMMITTEE_BATCH_SIZE : BATCH_SIZE
-}
 
 export const dynamic = 'force-dynamic'
 

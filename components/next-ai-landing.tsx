@@ -117,7 +117,7 @@ export function NextAiLanding({
             <div className="nextai-pill">
               <span className="nextai-pill-dot">✦</span>
               <span className="nextai-pill-text">
-                Analisis AI Multi-Agen <span className="nextai-pill-tag">Zero Hallucination</span>
+                Gratis · IDX, AS, kripto, emas <span className="nextai-pill-tag">Data, bukan anjuran</span>
               </span>
             </div>
           </div>
@@ -125,20 +125,21 @@ export function NextAiLanding({
           {/* Main Hero Headline: 2 baris di desktop, 3 baris dengan pemenggalan tetap di mobile */}
           <h1 className="nextai-hero-title">
             <span className="title-desktop">
-              <span className="title-line">Keputusan Investasi Presisi Lewat</span>
-              <span className="title-line">Deliberasi Multi-Agen AI</span>
+              <span className="title-line">Seberapa Besar Peluang</span>
+              <span className="title-line">Saham Anda Naik?</span>
             </span>
             <span className="title-mobile">
-              <span className="title-line">Keputusan Investasi</span>
-              <span className="title-line">Presisi Lewat Deliberasi</span>
-              <span className="title-line">Multi-Agen AI</span>
+              <span className="title-line">Seberapa Besar</span>
+              <span className="title-line">Peluang Saham</span>
+              <span className="title-line">Anda Naik?</span>
             </span>
           </h1>
 
           {/* Subtitle */}
           <p className="nextai-hero-desc">
-            Bukan ramalan harga klenik. Sistem analisis probabilistik independen yang mempertemukan
-            analis kuantitatif, pakar strategi, dan pengawas risiko berveto untuk membedah saham IDX, kripto, dan komoditas secara matematis.
+            Lihat skor peluang saham, kripto, atau emas untuk sepekan, sekuartal, dan setahun ke depan —
+            apa yang mendorongnya, apa yang menahannya, dan seberapa sering sinyal serupa terbukti benar dulu.
+            Diperdebatkan empat agen AI, dihitung oleh kode yang bisa Anda periksa.
           </p>
 
           {/* Dual Action CTAs without glow pool */}
@@ -146,8 +147,9 @@ export function NextAiLanding({
             <Link href={terminalHref} className="nextai-btn-white">
               {terminalLabel}
             </Link>
-            <Link href="/metodologi" className="nextai-btn-ghost">
-              Baca Metodologi
+            {/* Contoh publik tanpa daftar: pengunjung melihat hasilnya dulu, baru diminta akun. */}
+            <Link href="/analisis/BBCA.JK" className="nextai-btn-ghost">
+              Coba tanpa daftar: BBCA
             </Link>
           </div>
         </div>

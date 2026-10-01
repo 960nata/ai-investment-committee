@@ -425,7 +425,7 @@ export function LandingNav({
                       <Link
                         href={
                           topLosers[0]
-                            ? `/ringkasan?symbol=${encodeURIComponent(topLosers[0].symbol)}`
+                            ? `/analisis/${encodeURIComponent(topLosers[0].symbol)}`
                             : '/ringkasan'
                         }
                         className="mega-item"
@@ -495,7 +495,7 @@ export function LandingNav({
                           {topGainers.map((g) => (
                             <Link
                               key={g.id}
-                              href={`/ringkasan?symbol=${g.symbol}`}
+                              href={`/analisis/${encodeURIComponent(g.symbol)}`}
                               className="radar-item"
                               onClick={() => setActiveMenu(null)}
                             >
@@ -513,7 +513,7 @@ export function LandingNav({
                           {topLosers.map((l) => (
                             <Link
                               key={l.id}
-                              href={`/ringkasan?symbol=${l.symbol}`}
+                              href={`/analisis/${encodeURIComponent(l.symbol)}`}
                               className="radar-item"
                               onClick={() => setActiveMenu(null)}
                             >
@@ -985,7 +985,7 @@ export function LandingNav({
                   return (
                     <Link
                       key={asset.id}
-                      href={`/ringkasan?symbol=${asset.symbol}`}
+                      href={`/analisis/${encodeURIComponent(asset.symbol)}`}
                       className="command-result-item"
                       onClick={closeSearch}
                     >

@@ -24,6 +24,7 @@ import { runMacroJob, macroAssumptions } from '../lib/macro/job'
 import { runAutoNewsJob } from '../lib/agents/auto-news'
 import { translateMissingNews } from '../lib/agents/news-translator'
 import { evaluateAlerts } from '../lib/member/alerts'
+import { sendWeeklyDigests } from '../lib/member/digest'
 import type { MarketCode } from '../lib/db/schema'
 
 const JOBS = [
@@ -49,6 +50,7 @@ const JOBS = [
   'warta-otomatis',
   'warta-terjemah',
   'evaluasi-alert',
+  'ringkasan-mingguan',
 ] as const
 
 type JobName = (typeof JOBS)[number]
@@ -162,6 +164,14 @@ async function main(): Promise<void> {
   if (job === 'evaluasi-alert') {
     const r = await evaluateAlerts()
     console.log(`\n${job} · ${r.checked} alert aktif, ${r.fired} terpicu, ${r.primed} dicatat putusan awalnya\n`)
+    return
+  }
+
+  if (job === 'ringkasan-mingguan') {
+    const r = await sendWeeklyDigests()
+    console.log(`\n${job} · pengiriman ${r.delivery}, ${r.sent} terkirim, ${r.skipped} dilewati, ${r.failed} gagal`)
+    for (const e of r.errors) console.log(`  ! ${e}`)
+    console.log('')
     return
   }
 

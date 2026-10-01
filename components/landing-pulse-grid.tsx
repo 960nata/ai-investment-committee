@@ -133,7 +133,7 @@ export function LandingPulseGrid({
           <Link
             // Indeks slot, bukan id aset. Lihat catatan di kepala berkas.
             key={index}
-            href={`/ringkasan?symbol=${encodeURIComponent(asset.symbol)}`}
+            href={`/analisis/${encodeURIComponent(asset.symbol)}`}
             className="landing-ticker-card pulse-card"
             data-phase={slot.phase}
           >

@@ -21,8 +21,16 @@ import {
   type AlertKind,
 } from '@/lib/db/member-queries'
 import { resolveScoreVersion } from './market-view'
+import { emailAlert } from './email'
 import { formatPriceIn } from '@/lib/format/market'
 import { verdictLabel } from '@/lib/format/verdict'
+
+/** Alert terpicu juga dikirim lewat email, supaya terbaca tanpa harus membuka situs. */
+async function fireAndEmail(...args: Parameters<typeof fireAlert>): Promise<boolean> {
+  const ok = await fireAlert(...args)
+  if (ok) await emailAlert(args[0].userId, args[1])
+  return ok
+}
 
 export interface EvaluationReport {
   checked: number
@@ -59,7 +67,7 @@ export async function evaluateAlerts(userId?: number): Promise<EvaluationReport>
       if (price === null || threshold === null) continue
       const hit = kind === 'harga_di_atas' ? price >= threshold : price <= threshold
       if (!hit) continue
-      const ok = await fireAlert(
+      const ok = await fireAndEmail(
         alert,
         {
           title: `${quote.symbol} ${kind === 'harga_di_atas' ? 'menembus ke atas' : 'turun ke bawah'} ${formatPriceIn(threshold, quote.currency)}`,
@@ -77,7 +85,7 @@ export async function evaluateAlerts(userId?: number): Promise<EvaluationReport>
       if (score === undefined || threshold === null) continue
       const hit = kind === 'skor_di_atas' ? score >= threshold : score <= threshold
       if (!hit) continue
-      const ok = await fireAlert(
+      const ok = await fireAndEmail(
         alert,
         {
           title: `Skor ${alert.horizon ?? 'menengah'} ${quote.symbol} ${kind === 'skor_di_atas' ? 'naik ke' : 'turun ke'} ${score.toFixed(2)}`,
@@ -100,7 +108,7 @@ export async function evaluateAlerts(userId?: number): Promise<EvaluationReport>
         continue
       }
       if (latest.verdict === alert.lastVerdict) continue
-      const ok = await fireAlert(
+      const ok = await fireAndEmail(
         alert,
         {
           title: `Putusan komite ${quote.symbol} berubah: ${verdictLabel(alert.lastVerdict)} → ${verdictLabel(latest.verdict)}`,

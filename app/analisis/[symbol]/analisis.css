@@ -1,0 +1,154 @@
+/* Halaman analisis publik per instrumen. Memakai token .lp dari beranda. */
+
+.an-hero {
+  padding-top: 120px;
+}
+
+.an-title {
+  margin: 0;
+  font-size: clamp(34px, 5vw, 60px);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+}
+
+.an-title span {
+  display: block;
+  margin-top: 6px;
+  font-size: clamp(16px, 2vw, 22px);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--lp-mute);
+}
+
+.an-quote {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 16px;
+  margin: 24px 0 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.an-quote strong {
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.an-quote .pos {
+  color: var(--lp-pos);
+  font-weight: 700;
+}
+
+.an-quote .neg {
+  color: var(--lp-neg);
+  font-weight: 700;
+}
+
+.an-asof {
+  font-size: 13px;
+  color: var(--lp-faint);
+}
+
+.an-chart {
+  height: 340px;
+  margin: 28px 0 0;
+  border: 1px solid var(--lp-line);
+  border-radius: 10px;
+  background: var(--lp-card);
+  overflow: hidden;
+}
+
+.an-cta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin: 28px 0 0;
+  padding: 24px;
+  border: 1px solid rgba(250, 134, 42, 0.35);
+  border-radius: 10px;
+  background: rgba(250, 134, 42, 0.06);
+}
+
+.an-cta h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.an-cta p {
+  margin: 0;
+  max-width: 620px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--lp-mute);
+}
+
+.an-cta .nextai-btn-white {
+  flex-shrink: 0;
+  text-decoration: none;
+}
+
+.an-verdict .lp-title {
+  font-size: clamp(24px, 3vw, 36px);
+  margin-bottom: 14px;
+}
+
+.an-verdict .lp-sub {
+  max-width: 720px;
+  margin-bottom: 16px;
+}
+
+.an-related {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.an-related a {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border: 1px solid var(--lp-line);
+  border-radius: 8px;
+  color: var(--lp-ink);
+  text-decoration: none;
+  transition: border-color 0.2s ease;
+}
+
+.an-related a:hover {
+  border-color: var(--lp-orange);
+}
+
+.an-related span {
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--lp-mute);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 720px) {
+  .an-hero {
+    padding: 96px 16px 32px;
+  }
+
+  .an-chart {
+    height: 260px;
+  }
+
+  .an-cta {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: left;
+  }
+
+  .an-cta .nextai-btn-white {
+    text-align: center;
+  }
+}

@@ -117,11 +117,21 @@ tutup sore WIB, bursa AS buka malam WIB, crypto tidak pernah tidur.
 
 | Job | Jadwal | Status |
 | --- | --- | --- |
-| `ingest-crypto-daily` | tiap jam | aktif |
-| `compute-features-crypto` | 01.00 UTC | aktif |
-| `ingest-idx-daily` | 17.00 WIB, hari bursa | menunggu adaptor IDX |
-| `compute-features-idx` | 18.00 WIB, hari bursa | menunggu adaptor IDX |
-| `ingest-us-daily` | 05.00 WIB, hari bursa | menunggu adaptor Finnhub |
+| `ingest-*-daily` | crypto tiap jam; IDX 17.00, AS 05.00, global 07.00 WIB | aktif |
+| `compute-features-*`, `score-*` | satu dan dua jam setelah ingest pasarnya | aktif |
+| `evaluasi-alert` | tiap jam | aktif, alert terpicu juga dikirim lewat email |
+| `ringkasan-mingguan` | 07.00 WIB, tiap pengguna maks. sekali per 6 hari | aktif bila `RESEND_API_KEY` diisi |
+
+Tanpa QStash atau cron per jam, job tetap jalan: beacon kunjungan memicu
+`lib/jobs/auto-pipeline.ts` lewat `after()`, yang mengejar slot jadwal yang
+terlewat (tertua lebih dulu) dan mengklaim tiap batch lewat `job_run`, sehingga
+tidak pernah bentrok dengan dispatcher.
+
+### Email
+
+Alert dan ringkasan mingguan dikirim lewat Resend bila `RESEND_API_KEY` diisi
+(`EMAIL_FROM` opsional, mis. `AI Investdesk <noreply@domainanda.com>` setelah
+domain diverifikasi). Tanpa kunci itu, alert tetap tercatat di kotak notifikasi.
 
 ## Aturan yang tidak bisa ditawar
 

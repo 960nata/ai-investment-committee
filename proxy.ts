@@ -34,6 +34,7 @@ import { bannedInMemory, punish } from '@/lib/http/blocklist'
 import { BLOCK_MESSAGE, inspect } from '@/lib/http/shield'
 import { readSessionToken, USER_SESSION_COOKIE } from '@/lib/auth/session'
 import { isRequestAdminAuthenticated } from '@/lib/auth/admin-token'
+import { PROTECTED_PAGE_PREFIXES } from '@/lib/auth/protected-pages'
 
 const isProduction = process.env.NODE_ENV === 'production'
 
@@ -284,22 +285,7 @@ function blocked(headers: Record<string, string>, isApi: boolean): NextResponse 
  * halaman masuk dan daftar sengaja tidak ada di sini: itulah wajah situs untuk
  * pengunjung yang belum punya akun.
  */
-const PROTECTED_PREFIXES = [
-  '/ringkasan',
-  '/instruments',
-  '/berita',
-  '/pipeline',
-  '/backtest',
-  '/watchlist',
-  '/portofolio',
-  '/alert',
-  '/screener',
-  '/bandingkan',
-  '/tanya-komite',
-  '/rekam-jejak',
-  '/kepemilikan',
-  '/makro',
-]
+const PROTECTED_PREFIXES = PROTECTED_PAGE_PREFIXES
 
 function isProtectedPage(pathname: string): boolean {
   return PROTECTED_PREFIXES.some(

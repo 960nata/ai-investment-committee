@@ -22,12 +22,12 @@ export const metadata: Metadata = {
   // Alamat dasar untuk canonical, hreflang, dan Open Graph. Tanpa ini Next
   // menulis alamat relatif, dan Google menolak hreflang yang tidak absolut.
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"),
-  title: { default: `${SITE_NAME} — analisis probabilistik`, template: `%s — ${SITE_NAME}` },
+  title: { default: `${SITE_NAME} — peluang naik saham IDX, kripto & emas`, template: `%s — ${SITE_NAME}` },
   applicationName: SITE_NAME,
   openGraph: { siteName: SITE_NAME },
   description:
-    "Alat analisis data untuk saham IDX, saham AS, dan crypto. " +
-    "Menampilkan peluang beserta dasarnya, bukan anjuran.",
+    "Skor peluang saham IDX, saham AS, kripto, dan emas untuk sepekan sampai setahun, " +
+    "beserta penggerak dan rekam jejaknya. Gratis. Data, bukan anjuran.",
   keywords: ["saham", "analisis", "IDX", "crypto", "investasi", "probabilistik"],
   // Verifikasi kepemilikan situs untuk AdSense. Hanya tag meta — tidak memuat
   // skrip apa pun, jadi tidak ada iklan otomatis. Skripnya dimuat oleh slot

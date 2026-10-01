@@ -1,0 +1,79 @@
+.wl-onboard {
+  margin-bottom: 20px;
+  border-color: rgba(250, 134, 42, 0.4);
+}
+
+.wl-onboard-step {
+  margin: 0 0 8px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: #fa862a;
+}
+
+.wl-onboard-title {
+  margin: 0 0 6px;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.wl-onboard-lead {
+  margin: 0 0 16px;
+  max-width: 720px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ink-soft);
+}
+
+.wl-onboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.wl-onboard-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.wl-onboard-chip span {
+  width: 100%;
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.wl-onboard-chip.on {
+  border-color: #fa862a;
+  background: rgba(250, 134, 42, 0.1);
+}
+
+.wl-onboard-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.wl-onboard-hint {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.wl-onboard-error {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: #d0655b;
+}

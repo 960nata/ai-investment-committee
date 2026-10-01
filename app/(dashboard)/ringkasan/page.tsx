@@ -38,6 +38,7 @@ import { isQStashConfigured } from '@/lib/queue/qstash'
 import { cache } from '@/lib/cache/redis'
 import { requireUser } from '@/lib/auth/user-auth'
 import { listWatchlistIds } from '@/lib/db/member-queries'
+import { WatchlistOnboarding } from '@/components/member/watchlist-onboarding'
 import { CHART_HISTORY_YEARS } from '@/lib/format/chart-range'
 
 export const dynamic = 'force-dynamic'
@@ -177,6 +178,10 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
       {/* Analitik pengunjung sengaja tidak ada di sini, bahkan untuk admin:
           terminal pengguna hanya untuk data pasar. Laporan GA4 dan peta
           pengunjung ada di portal admin (/admin/analytics). */}
+
+      {data && data.watchlistIds.length === 0 && (
+        <WatchlistOnboarding options={onboardingOptions(data.instruments)} />
+      )}
 
       {data && (
         <InstrumentExplorer
@@ -352,6 +357,19 @@ async function load({
     cacheAvailable: cache.isAvailable(),
     watchlistIds,
   }
+}
+
+/** Nama yang paling mungkin dipegang investor Indonesia, didahulukan di onboarding. */
+const ONBOARDING_SYMBOLS = [
+  'BBCA.JK', 'BBRI.JK', 'BMRI.JK', 'TLKM.JK', 'ASII.JK', 'BBNI.JK', 'GOTO.JK', 'ANTM.JK',
+  'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'PAXGUSDT', 'GC=F', '^JKSE', 'NVDA', 'AAPL',
+]
+
+function onboardingOptions(instruments: { id: number; symbol: string; name: string; candleCount: number }[]) {
+  const bySymbol = new Map(instruments.map((i) => [i.symbol, i]))
+  return ONBOARDING_SYMBOLS.map((s) => bySymbol.get(s))
+    .filter((i): i is NonNullable<typeof i> => !!i && i.candleCount > 0)
+    .map(({ id, symbol, name }) => ({ id, symbol, name }))
 }
 
 type AdapterStatus = Awaited<ReturnType<typeof listAdapterHealth>>[number]['status']

@@ -169,7 +169,7 @@ export default async function LandingPage() {
   // ke terminal yang akan memantulkannya balik ke halaman masuk.
   const signedIn = Boolean(session) || isAdmin
   const terminalHref = signedIn ? '/ringkasan' : '/daftar'
-  const terminalLabel = signedIn ? 'Terminal' : 'Buka Terminal'
+  const terminalLabel = signedIn ? 'Terminal' : 'Daftar Gratis'
 
   const freshnessLabel = freshness?.freshness === 'fresh' ? 'DATA SEGAR · TERHUBUNG' : 'DATA TERCATAT'
 

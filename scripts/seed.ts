@@ -69,6 +69,9 @@ const SCHEDULES: ScheduleSeed[] = [
   // ingest, skor, atau rapat komite pasar mana pun selesai. Hanya membaca
   // basis data, jadi biayanya kecil.
   { jobName: 'evaluasi-alert', hoursOfDay: EVERY_HOUR, timezone: 'UTC', tradingDaysOnly: false, market: null, enabled: true, note: 'tiap jam, alert harga, skor, dan putusan' },
+  // Ringkasan mingguan lewat email. Dicek tiap pagi; tiap pengguna paling banyak
+  // menerima satu email per enam hari (lib/member/digest.ts).
+  { jobName: 'ringkasan-mingguan', hoursOfDay: [7], timezone: 'Asia/Jakarta', tradingDaysOnly: false, market: null, enabled: true, note: '07.00 WIB, email ringkasan watchlist mingguan' },
 ]
 
 async function seedSchedules(): Promise<void> {

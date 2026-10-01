@@ -113,6 +113,28 @@ export function isDue(plan: SchedulePlan, now: Date): DueDecision {
   return { due: true, slot: current.slot }
 }
 
+/** Batas 25–50 instrumen per batch menjaga tiap worker jauh di bawah batas waktu. */
+export const BATCH_SIZE = 25
+
+/**
+ * Rapat komite jauh lebih mahal per simbol daripada ingest: empat panggilan
+ * model berurutan, bukan satu panggilan HTTP. Dua simbol per batch menjaga tiap
+ * worker tetap di bawah batas waktu function meski satu penyedia lambat
+ * menjawab dan registry harus turun ke penyedia cadangan.
+ */
+export const COMMITTEE_BATCH_SIZE = 2
+
+/**
+ * Job yang bekerja atas seluruh sumbernya sekaligus, bukan per simbol: satu
+ * berkas KSEI memuat semua saham, satu deret makro tidak punya simbol. Dibagi
+ * per batch, job ini akan jalan berulang kali untuk pekerjaan yang sama.
+ */
+export const WHOLE_SOURCE_JOBS = new Set(['ingest-ksei-monthly', 'ingest-macro', 'ingest-external', 'warta-otomatis', 'warta-terjemah', 'evaluasi-alert', 'ringkasan-mingguan'])
+
+export function batchSizeFor(jobName: string): number {
+  return jobName.startsWith('komite-') ? COMMITTEE_BATCH_SIZE : BATCH_SIZE
+}
+
 /** Pecah daftar simbol jadi batch kecil agar tiap worker selesai di bawah batas waktu. */
 export function chunk<T>(items: T[], size: number): T[][] {
   if (size < 1) throw new Error('Ukuran batch harus minimal 1')
@@ -121,4 +143,32 @@ export function chunk<T>(items: T[], size: number): T[][] {
     batches.push(items.slice(i, i + size))
   }
   return batches
+}
+
+/**
+ * Slot terjadwal terakhir dalam 72 jam ke belakang (cukup untuk melompati akhir pekan), dan apakah job belum
+ * menjalankannya.
+ *
+ * Berbeda dari `isDue`, yang hanya benar tepat pada jam terjadwal. Pemicu
+ * kunjungan (lib/jobs/auto-pipeline.ts) datang kapan saja ada pengunjung —
+ * di situs sepi, bisa saja tidak ada satu pun yang datang tepat pukul 17 WIB.
+ * Yang ditanyakan di sini: "adakah jadwal yang terlewat sejak terakhir jalan?"
+ * Hanya slot terakhir yang dikejar; jadwal yang terlewat berkali-kali cukup
+ * dijalankan sekali, karena tiap job selalu mengambil data sampai hari ini.
+ */
+export function catchUpSlot(
+  plan: SchedulePlan,
+  now: Date,
+): { due: boolean; slot: string; at: Date } | null {
+  const HOUR = 3_600_000
+  const top = Math.floor(now.getTime() / HOUR) * HOUR
+  for (let back = 0; back < 72; back++) {
+    const at = new Date(top - back * HOUR)
+    const local = localSlot(at, plan.timezone)
+    if (!plan.hoursOfDay.includes(local.hour)) continue
+    if (plan.tradingDaysOnly && (local.weekday === 0 || local.weekday === 6)) continue
+    const due = !plan.lastRunAt || plan.lastRunAt.getTime() < at.getTime()
+    return { due, slot: local.slot, at }
+  }
+  return null
 }

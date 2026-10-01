@@ -24,6 +24,7 @@ import {
 import { recordClicks, recordVisit } from '@/lib/db/visit-queries'
 import { browserOf, osOf, referrerHost } from '@/lib/analytics/user-agent'
 import { maybeRunAutoNews } from '@/lib/news/auto-tick'
+import { maybePumpPipeline } from '@/lib/jobs/auto-pipeline'
 
 export const dynamic = 'force-dynamic'
 /**
@@ -39,6 +40,12 @@ const Path = z
   .string()
   .max(255)
   .refine((value) => value.startsWith('/') && !value.startsWith('//'), 'Jalur tidak sah')
+
+/** Alamat rahasia formulir masuk admin (lihat proxy.ts) — tidak boleh tercatat. */
+function isAdminLoginPath(path: string): boolean {
+  const slug = process.env.ADMIN_LOGIN_SLUG?.trim().replace(/^\/+|\/+$/g, '')
+  return !!slug && path === `/${slug}`
+}
 
 const Fraction = z.number().finite().min(0).max(1)
 
@@ -120,6 +127,14 @@ export async function POST(req: NextRequest) {
       console.error('[analytics/collect] warta otomatis:', err instanceof Error ? err.message : err),
     ),
   )
+  // Pipeline harga, fitur, skor, dan alert — lihat lib/jobs/auto-pipeline.ts.
+  after(() => maybePumpPipeline())
+
+  // Halaman admin dipicu (di atas) tetapi tidak dicatat: kunjungan pengelola
+  // sendiri bukan pengunjung, dan mencampurnya mengaburkan angka retensi.
+  if (parsed.data.path === '/admin' || parsed.data.path.startsWith('/admin/') || isAdminLoginPath(parsed.data.path)) {
+    return NextResponse.json({ ok: true, skipped: 'admin' })
+  }
 
   try {
     const ip = clientIp(req)

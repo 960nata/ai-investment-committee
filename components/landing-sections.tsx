@@ -194,11 +194,21 @@ export function ScoreCardSection({
   name,
   scores,
   modelVersion,
+  more = { href: `/analisis/${encodeURIComponent(symbol)}`, label: `Analisis lengkap ${symbol}` },
+  head = {
+    label: 'Contoh keluaran',
+    title: 'Beginilah bentuk penilaiannya',
+    sub: 'Kartu di bawah adalah data sungguhan dari basis data, bukan tangkapan layar yang dirapikan.',
+  },
 }: {
   symbol: string
   name: string
   scores: LatestScore[]
   modelVersion: string
+  /** Judul seksi; halaman analisis per instrumen memakai judulnya sendiri. */
+  head?: { label: string; title: string; sub: string }
+  /** Tautan di bawah catatan; bawaannya halaman analisis publik instrumen ini. */
+  more?: { href: string; label: string }
 }) {
   if (scores.length === 0) return null
 
@@ -213,11 +223,7 @@ export function ScoreCardSection({
   return (
     <section className="lp lp-alt" id="contoh">
       <div className="lp-inner">
-        <SectionHead
-          label="Contoh keluaran"
-          title="Beginilah bentuk penilaiannya"
-          sub="Kartu di bawah adalah data sungguhan dari basis data, bukan tangkapan layar yang dirapikan."
-        />
+        <SectionHead label={head.label} title={head.title} sub={head.sub} />
 
         <div className="lp-specimen">
           <article className="lp-score lp-reveal">
@@ -291,8 +297,8 @@ export function ScoreCardSection({
               </li>
             ))}
             <li className="lp-notes-link lp-reveal">
-              <Link href={`/ringkasan?symbol=${encodeURIComponent(symbol)}`} className="lp-link">
-                Lihat {symbol} di terminal
+              <Link href={more.href} className="lp-link">
+                {more.label}
               </Link>
             </li>
           </ol>
