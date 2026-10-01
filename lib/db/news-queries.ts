@@ -16,7 +16,7 @@ import {
   type AppUserRow,
   type NewAppUser,
 } from './schema'
-import { desc, eq, and, inArray, isNull, sql, type SQL } from 'drizzle-orm'
+import { desc, eq, and, inArray, sql, type SQL } from 'drizzle-orm'
 import { SOURCE_LOCALE, TRANSLATED_LOCALES, type Locale } from '@/lib/i18n/locales'
 
 let tablesInitialized = false
@@ -434,9 +434,8 @@ export async function getAppUserByEmail(email: string): Promise<AppUserRow | nul
  * "sudah ada atau belum" yang terpisah dari penyisipan selalu punya celah waktu
  * di antaranya.
  *
- * Akun yang pernah dibuat admin tanpa kata sandi boleh mengklaim kata sandinya
- * di sini — itulah cara undangan berubah jadi akun yang bisa dipakai. Akun yang
- * kata sandinya sudah terisi tetap ditolak.
+ * Semua alamat yang sudah terdaftar ditolak, termasuk undangan tanpa sandi.
+ * Klaim undangan memerlukan bukti kepemilikan email, bukan sekadar mengetahui alamatnya.
  */
 export async function registerAppUser(input: {
   email: string
@@ -459,17 +458,7 @@ export async function registerAppUser(input: {
       country: input.country ?? null,
       lastLoginAt: new Date(),
     })
-    .onConflictDoUpdate({
-      target: appUser.email,
-      set: {
-        name: input.name,
-        passwordHash: input.passwordHash,
-        country: sql`COALESCE(${appUser.country}, excluded.country)`,
-        lastLoginAt: new Date(),
-      },
-      // Hanya baris undangan — yang belum punya kata sandi — yang boleh terisi.
-      setWhere: isNull(appUser.passwordHash),
-    })
+    .onConflictDoNothing({ target: appUser.email })
     .returning(PUBLIC_USER_COLUMNS)
 
   if (rows.length === 0) return { ok: false, reason: 'taken' }

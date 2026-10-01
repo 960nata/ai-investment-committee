@@ -1,3 +1,4 @@
+import { requireAdmin } from '@/lib/auth/admin-auth'
 import { getAdSettings } from '@/lib/db/news-queries'
 import { IconTarget } from '@/components/icons'
 import { AdsManagerClient } from './ads-manager-client'
@@ -5,6 +6,7 @@ import { AdsManagerClient } from './ads-manager-client'
 export const dynamic = 'force-dynamic'
 
 export default async function AdminAdsPage() {
+  await requireAdmin()
   const slots = await getAdSettings()
 
   return (

@@ -7,6 +7,8 @@
  * yang di bawah jaring pengaman berbayar.
  */
 
+import { openAiAdapter } from './providers/openai'
+import { cloudflareAdapter } from './providers/cloudflare'
 import { geminiAdapter } from './providers/gemini'
 import {
   cerebrasAdapter,
@@ -21,6 +23,8 @@ import type { LlmAdapter } from './types'
 
 export const LLM_ADAPTERS: LlmAdapter[] = [
   cerebrasAdapter, // latensi ultra-cepat (~100ms) Wafer-Scale Engine untuk agen & komite
+  cloudflareAdapter,
+  openAiAdapter,
   groqAdapter, // latensi terendah, sangat cepat (~300ms) untuk terjemahan & komite
   geminiAdapter, // kolam kunci cadangan terbesar
   openRouterAdapter, // model gratis, kuota harian

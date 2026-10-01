@@ -393,7 +393,8 @@ export async function proxy(request: NextRequest, event?: NextFetchEvent) {
     pathname !== '/admin/login' &&
     !isRequestAdminAuthenticated(request)
   ) {
-    rewriteTo = '/__tidak-ditemukan'
+    const ticket = readSessionToken(request.cookies.get(USER_SESSION_COOKIE)?.value)
+    if (ticket?.role !== 'admin') rewriteTo = '/__tidak-ditemukan'
   }
 
   // --- Halaman --------------------------------------------------------------

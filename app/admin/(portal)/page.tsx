@@ -1,3 +1,4 @@
+import { requireAdmin } from '@/lib/auth/admin-auth'
 import Link from 'next/link'
 import {
   IconNews,
@@ -24,6 +25,7 @@ import { isSupabaseStorageConfigured } from '@/lib/storage/supabase-storage'
 export const dynamic = 'force-dynamic'
 
 export default async function AdminOverviewPage() {
+  await requireAdmin()
   const [news, ads, users] = await Promise.all([
     getMarketNewsList({ limit: 10 }),
     getAdSettings(),

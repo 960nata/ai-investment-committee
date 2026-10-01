@@ -24,6 +24,7 @@ export const metadata = { title: 'Backtest' }
 
 interface Metrics {
   horizons: Record<string, EvaluationResult>
+  assumed?: Record<string, EvaluationResult>
   featureIc: Record<string, FeatureIc[]>
   byRegime: Record<string, Record<string, EvaluationResult>>
 }
@@ -80,11 +81,12 @@ export default async function BacktestPage() {
             </span>
           </div>
 
+          {!metrics.assumed && <p role="status">Laporan lama belum menyimpan evaluasi skor produksi. Jalankan ulang backtest untuk melihat hasilnya.</p>}
           <section className="panel">
             <div className="panel-head">
               <span className="panel-title">
                 <IconGauge size={14} />
-                Kesimpulan per horizon
+                Skor yang dipakai produksi · per horizon
               </span>
             </div>
             <div className="scroll-x">
@@ -102,7 +104,7 @@ export default async function BacktestPage() {
                 </thead>
                 <tbody>
                   {HORIZONS.map(({ id, label, days }) => {
-                    const m = metrics.horizons[id]
+                    const m = metrics.assumed?.[id]
                     if (!m) return null
                     return (
                       <tr key={id}>
@@ -125,7 +127,7 @@ export default async function BacktestPage() {
               </table>
             </div>
 
-            {Object.values(metrics.horizons).some((m) => m.verdict.kind === 'belum teruji') && (
+            {Object.values(metrics.assumed ?? {}).some((m) => m.verdict.kind === 'belum teruji') && (
               <div className="caveat">
                 <IconAlert size={14} />
                 <span>
@@ -173,7 +175,7 @@ export default async function BacktestPage() {
             <div className="panel-head">
               <span className="panel-title">
                 <IconGauge size={14} />
-                Per kondisi pasar
+                Eksperimen kalibrasi · per kondisi pasar
               </span>
               <span className="panel-meta">horizon menengah</span>
             </div>
@@ -202,7 +204,7 @@ export default async function BacktestPage() {
             <div className="caveat">
               <IconAlert size={14} />
               <span>
-                Banyak sinyal terlihat hebat karena kebetulan diuji di periode pasar naik saja.
+                Kalibrasi arah fitur ini masih eksperimen dan belum dipakai oleh scoring produksi. Banyak sinyal terlihat hebat karena kebetulan diuji di periode pasar naik saja.
                 Baris pasar turun yang mengungkap mana yang sekadar mengikuti arus.
               </span>
             </div>

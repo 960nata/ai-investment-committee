@@ -38,14 +38,10 @@ export function UserMenu({
 }: UserMenuProps) {
   const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
-  const [imgError, setImgError] = useState(false)
+  const [failedAvatar, setFailedAvatar] = useState<string | null>(null)
+  const imgError = Boolean(user?.avatarUrl && failedAvatar === user.avatarUrl)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const menuRef = useRef<HTMLDivElement | null>(null)
-
-  // Reset error state if avatarUrl changes
-  useEffect(() => {
-    setImgError(false)
-  }, [user?.avatarUrl])
 
   // Tutup dropdown saat klik di luar atau tekan tombol Escape
   useEffect(() => {
@@ -118,7 +114,7 @@ export function UserMenu({
               src={user!.avatarUrl!}
               alt={displayName}
               className="user-avatar-img"
-              onError={() => setImgError(true)}
+              onError={() => setFailedAvatar(user?.avatarUrl ?? null)}
             />
           ) : (
             <span className="user-avatar-initials mono">{initials}</span>

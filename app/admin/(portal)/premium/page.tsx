@@ -1,3 +1,4 @@
+import { requireAdmin } from '@/lib/auth/admin-auth'
 import { getPremiumSettings, getPremiumStats, listRecentOrders } from '@/lib/db/premium-queries'
 import { isTripayConfigured, tripayConfig } from '@/lib/payment/tripay'
 import { IconCrown } from '@/components/icons'
@@ -6,6 +7,7 @@ import { PremiumManagerClient } from './premium-manager-client'
 export const dynamic = 'force-dynamic'
 
 export default async function AdminPremiumPage() {
+  await requireAdmin()
   const [settings, orders, stats] = await Promise.all([
     getPremiumSettings(),
     listRecentOrders(),

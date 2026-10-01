@@ -1,9 +1,11 @@
+import { requireAdmin } from '@/lib/auth/admin-auth'
 import { IconNews } from '@/components/icons'
 import { NewsForm } from '../news-form'
 
 export const dynamic = 'force-dynamic'
 
-export default function AdminNewArticlePage() {
+export default async function AdminNewArticlePage() {
+  await requireAdmin()
   return (
     <div className="admin-page-content" suppressHydrationWarning>
       <div className="admin-page-hero" suppressHydrationWarning>

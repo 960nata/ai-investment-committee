@@ -1,3 +1,4 @@
+import { requireAdmin } from '@/lib/auth/admin-auth'
 import Link from 'next/link'
 import { IconPlus, IconNews } from '@/components/icons'
 import { getMarketNewsList } from '@/lib/db/news-queries'
@@ -7,6 +8,7 @@ import { AiGeneratorClient } from './ai-generator-client'
 export const dynamic = 'force-dynamic'
 
 export default async function AdminNewsListPage() {
+  await requireAdmin()
   const news = await getMarketNewsList({ limit: 100 })
 
   return (

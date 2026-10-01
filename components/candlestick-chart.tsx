@@ -15,7 +15,7 @@
  */
 
 import { useEffect, useRef } from 'react'
-import type { IChartApi } from 'lightweight-charts'
+import type { IChartApi, ISeriesApi, IPriceLine, UTCTimestamp } from 'lightweight-charts'
 import { CHART_RANGES, type ChartRangeId } from '@/lib/format/chart-range'
 
 export interface Candle {
@@ -93,14 +93,14 @@ export function CandlestickChart({
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
-  const candleSeriesRef = useRef<any>(null)
-  const volumeSeriesRef = useRef<any>(null)
-  const priceLineRef = useRef<any>(null)
+  const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
+  const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null)
+  const priceLineRef = useRef<IPriceLine | null>(null)
   const sortedRef = useRef<Candle[]>([])
   const lastCandleRef = useRef<Candle | null>(null)
   const rangeRef = useRef(range)
   const livePriceRef = useRef(livePrice)
-  livePriceRef.current = livePrice
+  useEffect(() => { livePriceRef.current = livePrice }, [livePrice])
 
   useEffect(() => {
     const container = containerRef.current
@@ -318,7 +318,7 @@ function intradayVolumes(sorted: IntradayCandle[]) {
   const median = nonZero.length ? nonZero[Math.floor(nonZero.length / 2)] : 0
   const cap = median > 0 ? median * 4 : Infinity
   return sorted.map((d) => ({
-    time: d.time as any,
+    time: d.time as UTCTimestamp,
     value: Math.min(d.volume, cap),
     color: d.close >= d.open ? UP_SOFT : DOWN_SOFT,
   }))
@@ -349,13 +349,13 @@ export function IntradayChart({
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
-  const candleSeriesRef = useRef<any>(null)
-  const volumeSeriesRef = useRef<any>(null)
-  const priceLineRef = useRef<any>(null)
+  const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
+  const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null)
+  const priceLineRef = useRef<IPriceLine | null>(null)
   const sortedRef = useRef<IntradayCandle[]>([])
   const lastCandleRef = useRef<IntradayCandle | null>(null)
   const livePriceRef = useRef(livePrice)
-  livePriceRef.current = livePrice
+  useEffect(() => { livePriceRef.current = livePrice }, [livePrice])
 
   // Inisialisasi chart hanya sekali saat container siap
   useEffect(() => {
@@ -427,7 +427,7 @@ export function IntradayChart({
           try {
             candleSeries.setData(
               sorted.map((d) => ({
-                time: d.time as any,
+                time: d.time as UTCTimestamp,
                 open: d.open,
                 high: d.high,
                 low: d.low,
@@ -490,7 +490,7 @@ export function IntradayChart({
     try {
       candleSeriesRef.current.setData(
         sorted.map((d) => ({
-          time: d.time as any,
+          time: d.time as UTCTimestamp,
           open: d.open,
           high: d.high,
           low: d.low,
@@ -515,7 +515,7 @@ export function IntradayChart({
 
     try {
       candleSeriesRef.current.update({
-        time: last.time as any,
+        time: last.time as UTCTimestamp,
         open: last.open,
         high: last.high,
         low: last.low,

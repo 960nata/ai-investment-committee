@@ -98,9 +98,7 @@ let localCursor = new Map<string, number>()
 async function isCoolingDown(providerId: string, fp: string): Promise<boolean> {
   const key = cooldownKey(providerId, fp)
 
-  if (cache.isAvailable()) {
-    return (await cache.get<number>(key)) !== null
-  }
+  if (cache.isAvailable() && (await cache.get<number>(key)) !== null) return true
 
   const until = localCooldowns.get(key)
   if (until === undefined) return false
@@ -130,9 +128,8 @@ export async function penalise(
 
   if (cache.isAvailable()) {
     await cache.set(redisKey, Date.now(), seconds)
-  } else {
-    localCooldowns.set(redisKey, Date.now() + seconds * 1000)
   }
+  localCooldowns.set(redisKey, Date.now() + seconds * 1000)
 
   console.warn(
     `[Keyring] ${providerId} kunci #${key.index} (${key.fingerprint}) ` +

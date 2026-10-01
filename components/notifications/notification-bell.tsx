@@ -2,33 +2,27 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import Link from 'next/link'
+import { useReadState } from './use-read-state'
 import { useRouter } from 'next/navigation'
 import { IconBell, IconNews, IconMegaphone, IconCheck } from '@/components/icons'
 import type { NotificationItem } from '@/lib/notifications/types'
 import {
-  getReadIds,
-  getLastMarkAllReadTime,
   isItemRead,
   markItemRead,
   markAllRead,
   formatTimeAgo,
-  NOTIFICATIONS_UPDATED_EVENT,
 } from '@/lib/notifications/storage'
 
 export function NotificationBell() {
   const router = useRouter()
   const [items, setItems] = useState<NotificationItem[]>([])
   const [isOpen, setIsOpen] = useState(false)
-  const [readIds, setReadIds] = useState<Set<string>>(new Set())
-  const [lastAllTime, setLastAllTime] = useState(0)
+  const { readIds, lastAllTime } = useReadState()
   const [isLoading, setIsLoading] = useState(true)
   const menuRef = useRef<HTMLDivElement | null>(null)
 
   // Baca status terbaca dari localStorage
-  const refreshReadState = useCallback(() => {
-    setReadIds(getReadIds())
-    setLastAllTime(getLastMarkAllReadTime())
-  }, [])
+
 
   // Muat data notifikasi dari API
   const loadNotifications = useCallback(async () => {
@@ -47,8 +41,8 @@ export function NotificationBell() {
   }, [])
 
   useEffect(() => {
-    refreshReadState()
-    loadNotifications()
+    let active = true
+    void Promise.resolve().then(() => { if (active) void loadNotifications() })
 
     // Polling setiap 60 detik saat tab aktif
     const timer = setInterval(() => {
@@ -57,17 +51,12 @@ export function NotificationBell() {
       }
     }, 60_000)
 
-    // Dengarkan event pembaruan antar komponen (misal saat membaca di halaman /notifikasi)
-    function handleUpdate() {
-      refreshReadState()
-    }
-    window.addEventListener(NOTIFICATIONS_UPDATED_EVENT, handleUpdate)
 
     return () => {
+      active = false
       clearInterval(timer)
-      window.removeEventListener(NOTIFICATIONS_UPDATED_EVENT, handleUpdate)
     }
-  }, [loadNotifications, refreshReadState])
+  }, [loadNotifications])
 
   // Tutup dropdown saat klik di luar atau tombol Escape ditekan
   useEffect(() => {
@@ -105,12 +94,10 @@ export function NotificationBell() {
 
   function handleMarkAllRead() {
     markAllRead(items)
-    refreshReadState()
   }
 
   function handleItemClick(item: NotificationItem) {
     markItemRead(item.id)
-    refreshReadState()
     setIsOpen(false)
     router.push(item.linkUrl)
   }

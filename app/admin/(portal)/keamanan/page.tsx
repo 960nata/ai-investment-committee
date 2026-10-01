@@ -1,3 +1,4 @@
+import { requireAdmin } from '@/lib/auth/admin-auth'
 /**
  * Pemantau serangan.
  *
@@ -72,6 +73,7 @@ function countByReason(events: SecurityEvent[]): Array<[string, number]> {
 }
 
 export default async function AdminSecurityPage() {
+  await requireAdmin()
   const persistent = shieldIsPersistent()
 
   const [events, history, budget, translate] = await Promise.all([

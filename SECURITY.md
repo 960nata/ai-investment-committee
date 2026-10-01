@@ -5,7 +5,21 @@ yang belum terlindungi. Bagian terakhir sama pentingnya dengan dua yang pertama:
 daftar keamanan yang hanya memuat kabar baik tidak bisa dipakai siapa pun untuk
 mengambil keputusan.
 
-## Tindakan mendesak: rotasi kredensial
+## Pembaruan 1 Oktober 2026
+
+Sesi akun sekarang membaca status aktif dan role terkini dari database. Semua
+halaman admin melakukan pemeriksaan sebelum mengambil data, termasuk request
+prefetch yang melewati proxy. Login akun tidak lagi mendapat cookie master PIN.
+Cookie PIN baru memiliki kedaluwarsa yang diperiksa server; cookie PIN format
+lama tidak berlaku dan pemegangnya perlu masuk kembali.
+
+Pendaftaran publik tidak dapat mengambil alih akun undangan yang belum punya
+password. Klaim undangan memerlukan alur verifikasi email tersendiri.
+
+## Catatan insiden terdahulu: rotasi kredensial
+
+Pernyataan di bawah adalah catatan historis. Penyelesaian rotasi belum diverifikasi;
+jumlah kunci di bawah tidak boleh dianggap inventaris saat ini.
 
 Berkas `.env.local` memuat 84 kredensial aktif. Seluruhnya pernah ditempel ke
 percakapan, jadi semuanya harus dianggap bocor dan diganti, bukan dipertahankan

@@ -152,6 +152,8 @@ export async function POST(request: Request) {
 
   try {
     const response = await complete({
+        feature: 'committee-ask',
+        prefer: ['openai', 'cloudflare'],
       messages: [
         { role: 'system', content: `${SYSTEM}${entitlement.isPremium ? PREMIUM_NOTE : ''}\n\n=== FAKTA ===\n${factsText}\n\n=== PUTUSAN KOMITE ===\n${committeeText}\n\n=== BERITA ===\n${sourcesToPrompt(sources)}` },
         ...(history ?? []),

@@ -60,6 +60,7 @@ const hashOf = (text: string) => createHash('sha1').update(text).digest('hex')
 async function translateBatch(texts: string[], locale: Locale): Promise<string[] | null> {
   const language = LOCALE_INFO[locale].english
   const response = await complete({
+        feature: 'ui-translation',
     messages: [
       {
         role: 'system',

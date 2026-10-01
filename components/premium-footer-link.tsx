@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { connection } from 'next/server'
 import { getPublicPremiumSettings } from '@/lib/db/premium-queries'
 
 /**
@@ -6,6 +7,7 @@ import { getPublicPremiumSettings } from '@/lib/db/premium-queries'
  * Pasangan `DonationFooterLink`, dengan alasan yang sama.
  */
 export async function PremiumFooterLink({ className }: { className?: string }) {
+  await connection()
   const settings = await getPublicPremiumSettings()
   if (!settings) return null
   return (

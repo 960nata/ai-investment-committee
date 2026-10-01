@@ -80,6 +80,7 @@ Balas JSON murni:
 {"publish": true, "picks": [3, 7], "topic": "...", "category": "saham-idx", "targetSymbols": ["BBRI.JK"], "reason": "..."}`
 
   const response = await complete({
+        feature: 'auto-news',
     messages: [
       { role: 'system', content: 'Anda redaktur berita keuangan. Balas hanya JSON yang valid.' },
       { role: 'user', content: prompt },

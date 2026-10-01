@@ -20,6 +20,9 @@ import { ALL_LLM_ADAPTERS } from './adapters'
 import { collectKeys, poolStatus } from './keyring'
 
 export interface LlmCallEvent {
+  requestId?: string
+  feature?: string
+  attempt?: number
   providerId: string
   model: string
   keyIndex: number
@@ -40,6 +43,8 @@ type Granularity = 'hour' | 'day'
 type Metric = 'req' | 'ok' | 'r429' | 'err' | 'tin' | 'tout' | 'lat'
 
 const KEY_PREFIX = 'telemetry:ai:v2'
+const RECENT_KEY = `${KEY_PREFIX}:recent`
+let lastWriteFailed = false
 const LAST_USED_KEY = `${KEY_PREFIX}:last`
 /** Ember jam cukup hidup sedikit di atas rentang terpanjang yang memakainya (24 jam). */
 const HOUR_TTL_SECONDS = 60 * 60 * 50
@@ -95,17 +100,15 @@ function field(providerId: string, fp: string, model: string, metric: Metric): s
  * gagal tidak boleh menggagalkan jawaban model.
  */
 export async function recordLlmCall(event: LlmCallEvent): Promise<void> {
-  const evt: LlmCallEvent = { ...event, timestamp: event.timestamp || Date.now() }
+  const evt: LlmCallEvent = { ...event, timestamp: event.timestamp ?? Date.now() }
   const ts = evt.timestamp!
 
-  if (!cache.isAvailable()) {
-    memoryEvents.push(evt)
-    if (memoryEvents.length > MEMORY_EVENTS_LIMIT) memoryEvents.shift()
-    return
-  }
+  memoryEvents.push(evt)
+  if (memoryEvents.length > MEMORY_EVENTS_LIMIT) memoryEvents.shift()
+  if (!cache.isAvailable()) return
 
   const metrics = Object.entries(eventMetrics(evt)) as [Metric, number][]
-  await cache.pipeline((p) => {
+  const result = await cache.pipeline((p) => {
     for (const [granularity, ttl] of [
       ['hour', HOUR_TTL_SECONDS],
       ['day', DAY_TTL_SECONDS],
@@ -117,7 +120,11 @@ export async function recordLlmCall(event: LlmCallEvent): Promise<void> {
       p.expire(key, ttl)
     }
     p.hset(LAST_USED_KEY, { [`${evt.providerId}|${evt.keyFingerprint}`]: ts })
+    p.lpush(RECENT_KEY, JSON.stringify(evt))
+    p.ltrim(RECENT_KEY, 0, 99)
+    p.expire(RECENT_KEY, DAY_TTL_SECONDS)
   })
+  lastWriteFailed = result === null
 }
 
 // ---------------------------------------------------------------------------
@@ -164,7 +171,7 @@ export interface KeyAnalyticsItem {
   index: number
   fingerprint: string
   /** `retired`: kunci pernah tercatat tapi sudah tidak ada di env. */
-  status: 'ready' | 'cooldown' | 'retired'
+  status: 'ready' | 'cooldown' | 'retired' | 'blocked'
   lastUsedAt?: string
   totals: UsageTotals
   series: UsageSeries
@@ -193,7 +200,9 @@ export interface AiTokensDashboardData {
   range: TimeRange
   granularity: Granularity
   /** `memory` berarti Redis belum dikonfigurasi dan angkanya hanya milik instance ini. */
-  storage: 'redis' | 'memory'
+  storage: 'redis' | 'memory' | 'degraded'
+  recentCalls: LlmCallEvent[]
+  configuration: { id: string; name: string; model: string; configured: boolean; issue: string | null }[]
   generatedAt: string
   categories: string[]
   timestamps: string[]
@@ -298,11 +307,12 @@ function rangeBuckets(range: TimeRange, now: number): { granularity: Granularity
 async function loadBuckets(
   granularity: Granularity,
   buckets: Bucket[],
-): Promise<{ cells: Record<string, number>[]; lastUsed: Record<string, number> }> {
+): Promise<{ cells: Record<string, number>[]; lastUsed: Record<string, number>; storage: AiTokensDashboardData['storage']; recentCalls: LlmCallEvent[] }> {
   if (cache.isAvailable()) {
     const results = await cache.pipeline((p) => {
       for (const b of buckets) p.hgetall(bucketKey(granularity, b.id))
       p.hgetall(LAST_USED_KEY)
+      p.lrange(RECENT_KEY, 0, 99)
     })
     const toNumbers = (raw: unknown): Record<string, number> => {
       const out: Record<string, number> = {}
@@ -314,10 +324,16 @@ async function loadBuckets(
       }
       return out
     }
-    const rows = results ?? []
+    if (results !== null) {
+    const rows = results
     return {
+      storage: lastWriteFailed ? 'degraded' : 'redis',
+      recentCalls: ((rows[buckets.length + 1] ?? []) as (string | LlmCallEvent)[]).flatMap((entry) => {
+        try { return [typeof entry === 'string' ? JSON.parse(entry) as LlmCallEvent : entry] } catch { return [] }
+      }),
       cells: buckets.map((_, i) => toNumbers(rows[i])),
       lastUsed: toNumbers(rows[buckets.length]),
+    }
     }
   }
 
@@ -338,7 +354,7 @@ async function loadBuckets(
     }
   }
 
-  return { cells, lastUsed }
+  return { cells, lastUsed, storage: cache.isAvailable() ? 'degraded' : 'memory', recentCalls: memoryEvents.slice(-100).reverse() }
 }
 
 /**
@@ -347,7 +363,7 @@ async function loadBuckets(
 export async function getAiTokensDashboardData(range: TimeRange = '24h'): Promise<AiTokensDashboardData> {
   const { granularity, buckets } = rangeBuckets(range, Date.now())
   const n = buckets.length
-  const { cells, lastUsed } = await loadBuckets(granularity, buckets)
+  const { cells, lastUsed, storage, recentCalls } = await loadBuckets(granularity, buckets)
 
   // 1. Pecah field menjadi deret per kunci×model.
   //    keyModels: "penyedia|sidik" → model → deret
@@ -426,8 +442,9 @@ export async function getAiTokensDashboardData(range: TimeRange = '24h'): Promis
     if (pool.length === 0) continue
 
     const status = await poolStatus(adapter.id, pool)
+    const blocked = Boolean(adapter.configurationIssue?.())
     totalKeysCount += pool.length
-    readyKeysCount += status.available
+    readyKeysCount += blocked ? 0 : status.available
     coolingKeysCount += status.cooling.length
 
     for (const k of pool) {
@@ -438,7 +455,7 @@ export async function getAiTokensDashboardData(range: TimeRange = '24h'): Promis
           envName: k.envName,
           index: k.index,
           model: adapter.model,
-          status: cooling ? 'cooldown' : 'ready',
+          status: blocked ? 'blocked' : cooling ? 'cooldown' : 'ready',
         }),
       )
     }
@@ -449,7 +466,7 @@ export async function getAiTokensDashboardData(range: TimeRange = '24h'): Promis
       model: adapter.model,
       envPrefix: adapter.envPrefix,
       totalKeys: pool.length,
-      availableKeys: status.available,
+      availableKeys: blocked ? 0 : status.available,
       coolingKeys: status.cooling.length,
       ...finalise(emptyRaw(n)), // diisi ulang setelah kunci pensiunan ikut dihitung
     })
@@ -504,7 +521,13 @@ export async function getAiTokensDashboardData(range: TimeRange = '24h'): Promis
   return {
     range,
     granularity,
-    storage: cache.isAvailable() ? 'redis' : 'memory',
+    storage,
+    recentCalls: recentCalls.filter((event) => (event.timestamp ?? 0) >= Date.parse(buckets[0].timestamp)),
+    configuration: ALL_LLM_ADAPTERS.map((adapter) => ({
+      id: adapter.id, name: adapter.name, model: adapter.model,
+      configured: collectKeys(adapter.envPrefix).length > 0,
+      issue: adapter.configurationIssue?.() ?? null,
+    })),
     generatedAt: new Date().toISOString(),
     categories: buckets.map((b) => b.label),
     timestamps: buckets.map((b) => b.timestamp),

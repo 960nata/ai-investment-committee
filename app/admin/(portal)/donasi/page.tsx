@@ -1,3 +1,4 @@
+import { requireAdmin } from '@/lib/auth/admin-auth'
 import { getDonationSettings } from '@/lib/db/donation-queries'
 import { IconHeart } from '@/components/icons'
 import { DonationManagerClient } from './donation-manager-client'
@@ -5,6 +6,7 @@ import { DonationManagerClient } from './donation-manager-client'
 export const dynamic = 'force-dynamic'
 
 export default async function AdminDonationPage() {
+  await requireAdmin()
   const settings = await getDonationSettings()
 
   return (

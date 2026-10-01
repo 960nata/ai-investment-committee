@@ -1,3 +1,4 @@
+import { requireAdmin } from '@/lib/auth/admin-auth'
 /**
  * Analitik pengguna — dibaca langsung dari Google Analytics 4.
  *
@@ -81,6 +82,7 @@ interface AnalyticsPageProps {
 }
 
 export default async function AdminAnalyticsPage({ searchParams }: AnalyticsPageProps) {
+  await requireAdmin()
   const { range: rawRange, heat } = await searchParams
   const range = parseRange(rawRange)
 

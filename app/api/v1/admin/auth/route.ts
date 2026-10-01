@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { failure } from '@/lib/http/errors'
 import {
   verifyAdminPin,
   getAdminSessionCookieValue,
@@ -85,20 +86,8 @@ export async function POST(req: NextRequest) {
         message: 'Otorisasi administrator berhasil.',
       })
 
-      // Pasang cookie admin session — hanya bila rahasia admin diisi. Tanpanya
-      // cookie sesi pengguna ber-peran admin di bawah sudah cukup.
-      const adminCookie = getAdminSessionCookieValue()
-      if (adminCookie) {
-        response.cookies.set({
-          name: COOKIE_NAME,
-          value: adminCookie,
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          path: '/',
-          maxAge: SESSION_MAX_AGE_SECONDS,
-        })
-      }
+      // Account logins never receive a master-PIN cookie: role changes must revoke access.
+      response.cookies.set({ name: COOKIE_NAME, value: '', ...sessionCookieOptions(0) })
 
       // Pasang juga cookie user session dengan role admin
       response.cookies.set({
@@ -142,10 +131,7 @@ export async function POST(req: NextRequest) {
 
     return response
   } catch (err) {
-    return NextResponse.json(
-      { ok: false, error: err instanceof Error ? err.message : String(err) },
-      { status: 500 },
-    )
+    return failure('admin/auth', err)
   }
 }
 

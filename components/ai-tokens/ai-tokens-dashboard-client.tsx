@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import type { ApexOptions } from 'apexcharts'
 import type { AiTokensDashboardData, TimeRange } from '@/lib/ai/telemetry'
 import { ApexChartWrapper } from './apex-chart-wrapper'
@@ -45,20 +45,36 @@ export function AiTokensDashboardClient({ initialData }: AiTokensDashboardClient
   const [searchQuery, setSearchQuery] = useState('')
   const [modal, setModal] = useState<{ providerId: string; keyId?: string } | null>(null)
 
+  const [refreshError, setRefreshError] = useState<string | null>(null)
+  const requestRef = useRef<AbortController | null>(null)
   const timeRange = data.range
   const rangeLabel = RANGE_LABELS[timeRange]
 
-  async function refreshData(nextRange: TimeRange) {
+  const refreshData = useCallback(async (nextRange: TimeRange) => {
+    requestRef.current?.abort()
+    const controller = new AbortController()
+    requestRef.current = controller
     setLoading(true)
     try {
-      const res = await fetch(`/api/v1/admin/ai-tokens?range=${nextRange}`, { cache: 'no-store' })
-      if (res.ok) setData(await res.json())
+      const res = await fetch(`/api/v1/admin/ai-tokens?range=${nextRange}`, {
+        cache: 'no-store', signal: controller.signal,
+      })
+      if (!res.ok) throw new Error(res.status === 401 ? 'Sesi admin berakhir. Masuk kembali.' : 'Monitoring gagal diperbarui; data terakhir tetap ditampilkan.')
+      const next = await res.json() as AiTokensDashboardData
+      if (!controller.signal.aborted) { setData(next); setRefreshError(null) }
     } catch (err) {
-      console.error('Gagal memperbarui data AI Tokens:', err)
+      if (!controller.signal.aborted) setRefreshError(err instanceof Error ? err.message : 'Gagal memperbarui monitoring')
     } finally {
-      setLoading(false)
+      if (!controller.signal.aborted) setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible') void refreshData(timeRange)
+    }, 30_000)
+    return () => { clearInterval(timer); requestRef.current?.abort() }
+  }, [refreshData, timeRange])
 
   const filteredKeys = useMemo(() => {
     let result = data.keys
@@ -142,6 +158,27 @@ export function AiTokensDashboardClient({ initialData }: AiTokensDashboardClient
 
   return (
     <div className="admin-page-content ai-tokens-dashboard">
+      {refreshError && <p role="alert">{refreshError}</p>}
+      <p className="mono">Diperbarui {new Date(data.generatedAt).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB · otomatis setiap 30 detik</p>
+      {data.storage !== 'redis' && <p role="status">{data.storage === 'degraded' ? 'Redis bermasalah: riwayat dapat tidak lengkap.' : 'Redis belum dikonfigurasi: angka hanya dari proses server ini.'}</p>}
+      <section className="panel">
+        <div className="panel-head"><span className="panel-title">Alur API fitur</span></div>
+        <p>Komite: pengawas risiko → Cloudflare, ketua → GPT. Tanya Komite → GPT lalu Cloudflare. Preferensi dapat diatur lewat konfigurasi; saat gagal, provider lama tetap menjadi cadangan. Setiap baris di bawah adalah satu percobaan API, bukan satu permintaan pengguna.</p>
+        {data.configuration.filter((p) => p.id === 'openai' || p.id === 'cloudflare' || p.issue).map((p) => (
+          <p key={p.id}><strong>{p.name}</strong> · {p.model} · {!p.configured ? 'Kunci belum dikonfigurasi' : p.issue ?? 'Dikonfigurasi; keberhasilan panggilan terlihat pada riwayat'}</p>
+        ))}
+        <div className="scroll-x"><table className="grid">
+          <thead><tr><th>Waktu WIB</th><th>Fitur / Jejak</th><th>Provider / Model</th><th>Percobaan</th><th>Hasil</th><th>Token masuk / keluar</th><th>Latensi</th></tr></thead>
+          <tbody>{data.recentCalls.map((call, index) => <tr key={`${call.requestId}-${call.attempt}-${index}`}>
+            <td>{new Date(call.timestamp ?? 0).toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' })}</td>
+            <td>{call.feature ?? 'Tidak tercatat'}<br /><small>{call.requestId?.slice(0, 8)}</small></td>
+            <td>{call.providerId}<br /><small>{call.model}</small></td>
+            <td>{call.attempt ?? 1}{(call.attempt ?? 1) > 1 ? ' · fallback/retry' : ''}</td>
+            <td>{call.success ? 'Sukses' : `${call.errorKind ?? 'error'} (${call.status})`}</td>
+            <td>{call.inputTokens} / {call.outputTokens}</td><td>{call.latencyMs} ms</td>
+          </tr>)}</tbody>
+        </table>{data.recentCalls.length === 0 && <p>Belum ada panggilan tercatat dalam rentang ini.</p>}</div>
+      </section>
       {/* 1. HERO */}
       <div className="admin-page-hero">
         <span className="admin-hero-glow" aria-hidden="true" />
@@ -207,7 +244,7 @@ export function AiTokensDashboardClient({ initialData }: AiTokensDashboardClient
             <span className={`chip-indicator ${data.storage === 'redis' ? 'ok' : 'warn'}`} />
             <span className="admin-hero-chip-name">Penyimpanan</span>
             <span className={`admin-hero-chip-value ${data.storage === 'redis' ? 'ok' : 'warn'}`}>
-              {data.storage === 'redis' ? 'Redis' : 'Memori'}
+              {data.storage === 'redis' ? 'Redis' : data.storage === 'degraded' ? 'Terganggu' : 'Memori'}
             </span>
           </div>
         </div>
@@ -535,7 +572,7 @@ export function AiTokensDashboardClient({ initialData }: AiTokensDashboardClient
                         </span>
                       ) : (
                         <span className="key-status-pill warn mono">
-                          <span className="dot" /> {k.status === 'cooldown' ? 'Cooldown' : 'Dicabut'}
+                          <span className="dot" /> {k.status === 'cooldown' ? 'Cooldown' : k.status === 'blocked' ? 'Konfigurasi belum lengkap' : 'Dicabut'}
                         </span>
                       )}
                     </td>

@@ -1,3 +1,4 @@
+import { requireAdmin } from '@/lib/auth/admin-auth'
 import { getMarketNewsById } from '@/lib/db/news-queries'
 import { notFound } from 'next/navigation'
 import { IconNews } from '@/components/icons'
@@ -10,6 +11,7 @@ export default async function AdminEditArticlePage({
 }: {
   params: Promise<{ id: string }>
 }) {
+  await requireAdmin()
   const { id } = await params
   const numId = parseInt(id, 10)
   if (isNaN(numId)) {

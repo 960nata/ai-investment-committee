@@ -1,3 +1,4 @@
+import { requireAdmin } from '@/lib/auth/admin-auth'
 import { IconMegaphone } from '@/components/icons'
 import { countDismissals, listAnnouncements } from '@/lib/db/member-queries'
 import { AnnouncementManager } from './announcement-manager'
@@ -5,6 +6,7 @@ import { AnnouncementManager } from './announcement-manager'
 export const dynamic = 'force-dynamic'
 
 export default async function AdminAnnouncementsPage() {
+  await requireAdmin()
   const [rows, dismissals] = await Promise.all([listAnnouncements(), countDismissals()])
 
   return (

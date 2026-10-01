@@ -21,6 +21,10 @@ export interface LlmMessage {
 
 export interface LlmRequest {
   messages: LlmMessage[]
+  /** Stable feature name for operational tracing; never user input. */
+  feature?: string
+  /** End-to-end inference budget, propagated to each adapter. */
+  timeoutMs?: number
   /** Dibatasi agar satu giliran agen tidak menghabiskan kuota harian. */
   maxOutputTokens?: number
   temperature?: number
@@ -103,5 +107,6 @@ export interface LlmAdapter {
    * Kirim satu permintaan memakai kunci yang sudah dipilih keyring.
    * Melempar `LlmError` supaya registry bisa membedakan jenis kegagalan.
    */
+  configurationIssue?: () => string | null
   complete(request: LlmRequest, apiKey: string, keyIndex: number): Promise<LlmResponse>
 }

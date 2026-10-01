@@ -1,3 +1,4 @@
+import { requireAdmin } from '@/lib/auth/admin-auth'
 /**
  * Pusat Kendali & Peta Serangan Cyber Global (Cyber Threat Radar & Map).
  *
@@ -51,6 +52,7 @@ interface CyberThreatPageProps {
 }
 
 export default async function AdminCyberThreatPage({ searchParams }: CyberThreatPageProps) {
+  await requireAdmin()
   const { range: rawRange } = await searchParams
   const selectedRange = parseCyberRange(rawRange)
 

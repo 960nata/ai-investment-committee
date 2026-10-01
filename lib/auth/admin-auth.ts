@@ -7,8 +7,9 @@
  */
 
 import { cookies } from 'next/headers'
+import { notFound } from 'next/navigation'
 import { COOKIE_NAME, isValidAdminSignature } from './admin-token'
-import { USER_SESSION_COOKIE, readSessionToken } from './session'
+import { getCurrentUser } from './user-auth'
 
 export {
   COOKIE_NAME,
@@ -29,14 +30,13 @@ export async function verifyAdminSession(): Promise<boolean> {
       return true
     }
 
-    const userCookie = cookieStore.get(USER_SESSION_COOKIE)
-    if (userCookie?.value) {
-      const user = readSessionToken(userCookie.value)
-      if (user?.role === 'admin') return true
-    }
-
-    return false
+    return (await getCurrentUser())?.role === 'admin'
   } catch {
     return false
   }
+}
+
+/** Authorize before any admin page reads sensitive data, including prefetched RSC. */
+export async function requireAdmin(): Promise<void> {
+  if (!(await verifyAdminSession())) notFound()
 }

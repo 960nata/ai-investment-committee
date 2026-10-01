@@ -303,7 +303,7 @@ export async function applyTripayCallback(cb: TripayCallback): Promise<CallbackO
     if (cb.status === 'PAID') {
       // total_amount sudah termasuk biaya yang dibebankan ke pembeli, jadi
       // yang diperiksa hanya bahwa ia tidak kurang dari harga paket.
-      if (Number(cb.total_amount) < order.amount) return 'amount_mismatch'
+      if (!Number.isFinite(Number(cb.total_amount)) || Number(cb.total_amount) < order.amount) return 'amount_mismatch'
 
       await tx
         .update(premiumOrder)

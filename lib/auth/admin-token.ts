@@ -7,7 +7,6 @@
  */
 
 import crypto from 'crypto'
-import { USER_SESSION_COOKIE, readSessionToken } from './session'
 
 export const COOKIE_NAME = 'komite_admin_session'
 
@@ -31,7 +30,9 @@ if (!ADMIN_SECRET && process.env.NODE_ENV === 'production') {
  */
 export function createSessionSignature(): string | null {
   if (!ADMIN_SECRET) return null
-  return crypto.createHmac('sha256', ADMIN_SECRET).update('komite-admin-authenticated').digest('hex')
+  const expires = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60
+  const signature = crypto.createHmac('sha256', ADMIN_SECRET).update(`admin:${expires}`).digest('hex')
+  return `${expires}.${signature}`
 }
 
 function safeEqual(a: string, b: string): boolean {
@@ -42,8 +43,11 @@ function safeEqual(a: string, b: string): boolean {
 
 /** Cocokkan dengan tanda tangan sesi admin; selalu salah tanpa rahasia. */
 export function isValidAdminSignature(value: string | undefined | null): boolean {
-  const expected = createSessionSignature()
-  return Boolean(expected && value && safeEqual(value, expected))
+  if (!ADMIN_SECRET || !value) return false
+  const [expires, signature, extra] = value.split('.')
+  if (extra || !/^\d+$/.test(expires) || !signature || Number(expires) <= Date.now() / 1000) return false
+  const expected = crypto.createHmac('sha256', ADMIN_SECRET).update(`admin:${expires}`).digest('hex')
+  return safeEqual(signature, expected)
 }
 
 /**
@@ -73,13 +77,6 @@ export function isRequestAdminAuthenticated(req: Request): boolean {
     const match = cookieHeader.match(new RegExp(`(?:^|; )${COOKIE_NAME}=([^;]*)`))
     if (match && match[1]) {
       if (isValidAdminSignature(match[1])) return true
-    }
-
-    // Cek Cookie user session bila memiliki role admin
-    const userMatch = cookieHeader.match(new RegExp(`(?:^|; )${USER_SESSION_COOKIE}=([^;]*)`))
-    if (userMatch && userMatch[1]) {
-      const user = readSessionToken(decodeURIComponent(userMatch[1]))
-      if (user?.role === 'admin') return true
     }
 
     return false

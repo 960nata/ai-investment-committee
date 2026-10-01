@@ -694,6 +694,7 @@ CATATAN FOTO: Anda TIDAK membuat atau menggambar gambar apa pun. Sistem redaksi 
 foto asli di internet memakai "imageSearchQuery" Anda, mengunduhnya, dan menyimpannya sendiri.`
 
   const response = await complete({
+        feature: 'news-generator',
     messages: [
       {
         role: 'system',

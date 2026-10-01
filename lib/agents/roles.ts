@@ -114,7 +114,7 @@ export const RISIKO: AgentRole = {
   temperature: 0.3,
   maxOutputTokens: 420,
   facts: 'summary',
-  provider: 'nvidia',
+  provider: process.env.RISIKO_LLM_PROVIDER ?? 'cloudflare',
   system: [
     'Kamu pengawas risiko. Tugasmu MENYERANG tesis strateg, bukan menyeimbangkannya — tesis yang kuat akan bertahan; kalau kamu menahan diri, tidak ada yang menghentikan keputusan buruk.',
     'Hasilkan:',
@@ -133,7 +133,7 @@ export const KETUA: AgentRole = {
   temperature: 0.2,
   maxOutputTokens: 380,
   facts: 'summary',
-  provider: 'gemini',
+  provider: process.env.KETUA_LLM_PROVIDER ?? 'openai',
   json: true,
   system: [
     'Kamu ketua komite investasi. Timbang laporan analis, tesis strateg, dan keberatan pengawas risiko, lalu putuskan.',

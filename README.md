@@ -2,9 +2,9 @@
 
 Mesin analisis probabilistik untuk saham IDX, saham AS, dan crypto.
 
-Keluarannya berbentuk peluang, bukan ramalan harga: "peluang naik 61% dalam 1–3
-bulan, confidence sedang" — lengkap dengan data mentah yang bisa diperiksa dan
-rekam jejak seberapa sering sinyal serupa ternyata benar.
+Saat ini keluaran berupa skor relatif −10 sampai +10, kualitas data, dan penjelasan AI.
+Probabilitas belum ditampilkan: kalibrasi probabilitas masih belum tersedia.
+Backtest memisahkan evaluasi skor produksi dari eksperimen kalibrasi arah fitur.
 
 ## Yang bukan
 
@@ -155,15 +155,54 @@ angka yang dihasilkan sistem ini tidak berarti.
 
 | Fase | Isi | Status |
 | --- | --- | --- |
-| 0 | Fondasi: adaptor, dispatcher, worker, skema | selesai |
-| 1 | Fitur teknikal, engine skor, backtest | fitur selesai, skor berikutnya |
-| 2 | Masuk IDX: XBRL, KSEI, backfill | belum |
-| 3 | Lapisan penjelasan dan sentimen | belum |
-| 4 | Produk: auth, watchlist, track record | belum |
+| 0 | Adaptor, dispatcher, worker, skema | tersedia |
+| 1 | Fitur teknikal, engine skor, backtest | tersedia; probabilitas belum dikalibrasi |
+| 2 | Fundamental, KSEI, makro | tersedia; cakupan bergantung sumber |
+| 3 | Komite AI, berita, terjemahan | tersedia; GPT dan Workers AI terintegrasi |
+| 4 | Auth, watchlist, portfolio, alert, premium | tersedia; validasi produksi tetap diperlukan |
 
-Urutannya tidak boleh dibalik. Lapisan penjelasan yang dipasang di atas skor yang
-belum terbukti hanya menghasilkan omong kosong yang terdengar meyakinkan, dan itu
-lebih berbahaya daripada tidak ada penjelasan sama sekali.
+## Integrasi GPT, Cloudflare, dan monitoring
+
+Isi `OPENAI_API_KEY` dan `OPENAI_MODEL` untuk GPT. Cloudflare Workers AI memerlukan
+`CLOUDFLARE_API_TOKEN` dengan izin Workers AI serta `CLOUDFLARE_ACCOUNT_ID`;
+token Cloudflare untuk DNS saja tidak otomatis bisa menjalankan model.
+`CLOUDFLARE_AI_MODEL` memilih model Workers AI.
+
+Komite mendahulukan Cloudflare untuk pengawas risiko dan GPT untuk ketua.
+`RISIKO_LLM_PROVIDER` dan `KETUA_LLM_PROVIDER` dapat mengganti preferensi.
+Tanya Komite mendahulukan GPT lalu Cloudflare; fitur AI lain tetap memakai registry
+bersama dan provider lama tetap tersedia. Permintaan Premium masih mendahulukan
+provider Premium bila dikonfigurasi. Pemakaian provider dapat menimbulkan biaya.
+
+Halaman `/admin/ai-tokens` memperbarui data setiap 30 detik saat tab terlihat:
+jumlah percobaan, sukses/429/error, token, latensi, serta 100 percobaan terbaru
+dengan nama fitur, model, ID permintaan, dan urutan retry/fallback. Token dihitung
+sesuai usage yang dilaporkan provider. Jumlah percobaan bukan jumlah pengguna.
+Tidak ada prompt, jawaban, atau API key mentah dalam telemetry.
+
+Redis diperlukan agar telemetry dan cooldown dibagi antar-instance. Mode memori
+hanya menggambarkan proses saat ini; kegagalan Redis ditandai sebagai data tidak
+lengkap. Status konfigurasi bukan bukti bahwa provider telah berhasil merespons.
+
+`npm run check:ai` melakukan panggilan kecil berbayar ke GPT dan Cloudflare serta
+mencatat hasilnya. Opsi `-- --save-account` menyimpan Account ID ke `.env.local`
+hanya jika token menemukan tepat satu account. Skrip tidak mencetak kredensial.
+
+Rujukan API: [OpenAI Responses](https://developers.openai.com/api/reference/resources/responses/methods/create)
+dan [Cloudflare Workers AI](https://developers.cloudflare.com/workers-ai/configuration/open-ai-compatibility/).
+
+## Pemeriksaan sebelum rilis
+
+CI menjalankan lint, typecheck, tes regresi, build, dan tes HTTP produksi.
+`npm test` mencakup fitur, keamanan, backtest, fallback provider, telemetry, dan
+perubahan role/status akun. Setelah `npm run build`, jalankan `npm run test:http`
+untuk alur login admin, monitoring, akses anonim, prefetch admin, dan callback
+pembayaran tanpa tanda tangan. Tes HTTP memakai rahasia sementara tanpa database.
+
+Tes tersebut belum menggantikan validasi pembayaran sandbox end-to-end, kualitas
+analisis dengan data nyata, uji beban, backup/restore, dan pemeriksaan deployment.
+Skor produksi masih menggunakan arah fitur registry; hasil eksperimen kalibrasi
+tidak dipromosikan otomatis menjadi model produksi.
 
 ## Batasan yang diakui terbuka
 

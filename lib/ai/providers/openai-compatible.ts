@@ -57,7 +57,7 @@ export function createOpenAiCompatibleAdapter(config: OpenAiCompatibleConfig): L
       try {
         response = await fetchWithTimeout(`${config.baseUrl}/chat/completions`, {
           label: config.name,
-          timeoutMs: MODEL_TIMEOUT_MS,
+          timeoutMs: request.timeoutMs ?? MODEL_TIMEOUT_MS,
           method: 'POST',
           headers: {
             'content-type': 'application/json',
@@ -65,7 +65,7 @@ export function createOpenAiCompatibleAdapter(config: OpenAiCompatibleConfig): L
             ...config.extraHeaders,
           },
           body: JSON.stringify(body),
-          signal: AbortSignal.timeout(TIMEOUT_MS),
+          signal: AbortSignal.timeout(request.timeoutMs ?? TIMEOUT_MS),
         })
       } catch (err) {
         // Gagal jaringan dan kehabisan waktu sama-sama belum sampai ke penyedia,
@@ -78,11 +78,10 @@ export function createOpenAiCompatibleAdapter(config: OpenAiCompatibleConfig): L
       }
 
       if (!response.ok) {
-        const detail = (await response.text().catch(() => '')).slice(0, 400)
         throw new LlmError(
           config.id,
           classifyStatus(response.status),
-          `HTTP ${response.status}: ${detail}`,
+          `HTTP ${response.status}`,
           response.status,
         )
       }
@@ -97,7 +96,7 @@ export function createOpenAiCompatibleAdapter(config: OpenAiCompatibleConfig): L
       // model yang diminta sedang tidak tersedia. Tanpa pemeriksaan ini, agen
       // menerima teks kosong dan mengira panggilannya berhasil.
       if (payload.error) {
-        throw new LlmError(config.id, 'server', payload.error.message ?? 'galat tanpa pesan')
+        throw new LlmError(config.id, 'server', 'Penyedia mengembalikan galat dalam respons')
       }
 
       const text = payload.choices?.[0]?.message?.content?.trim()

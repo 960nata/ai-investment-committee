@@ -67,7 +67,7 @@ export const geminiAdapter: LlmAdapter = {
     try {
       response = await fetchWithTimeout(`${BASE_URL}/models/${MODEL}:generateContent`, {
         label: 'Gemini',
-        timeoutMs: MODEL_TIMEOUT_MS,
+        timeoutMs: request.timeoutMs ?? MODEL_TIMEOUT_MS,
         method: 'POST',
         headers: {
           'content-type': 'application/json',
@@ -90,8 +90,8 @@ export const geminiAdapter: LlmAdapter = {
         kind,
         // Penanda ini dibaca registry untuk memilih lama pendinginan.
         kind === 'rate_limited' && isDailyQuotaError(detail)
-          ? `[daily] HTTP ${response.status}: ${detail}`
-          : `HTTP ${response.status}: ${detail}`,
+          ? `[daily] HTTP ${response.status}`
+          : `HTTP ${response.status}`,
         response.status,
       )
     }

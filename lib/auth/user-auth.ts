@@ -12,6 +12,8 @@
  */
 
 import { cookies } from 'next/headers'
+import { cache } from 'react'
+import { verifyAccountSession } from './session-account'
 import { redirect } from 'next/navigation'
 import crypto from 'crypto'
 import { promisify } from 'util'
@@ -77,18 +79,19 @@ export async function verifyPassword(password: string, stored: string | null): P
 /**
  * Baca sesi pengguna dari cookie permintaan yang sedang berjalan.
  *
- * Tidak menyentuh basis data sama sekali. Tiketnya bertanda tangan, jadi isinya
- * sudah bisa dipercaya sejauh tanda tangannya cocok — dan kueri tambahan di
- * tiap muatan halaman hanya menambah beban tanpa menambah jaminan.
+ * Status aktif dan peran dibaca ulang dari database. Cache React hanya berlaku
+ * pada render saat ini; penonaktifan berlaku pada permintaan berikutnya.
  */
-export async function getCurrentUser(): Promise<UserSession | null> {
+export const getCurrentUser = cache(async (): Promise<UserSession | null> => {
   try {
     const store = await cookies()
-    return readSessionToken(store.get(USER_SESSION_COOKIE)?.value)
+    const session = readSessionToken(store.get(USER_SESSION_COOKIE)?.value)
+    if (!session) return null
+    return await verifyAccountSession(session)
   } catch {
     return null
   }
-}
+})
 
 /**
  * Penjaga halaman terkunci.

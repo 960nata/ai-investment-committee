@@ -10,6 +10,7 @@
  * latensinya paling rendah; yang di bawah adalah jaring pengaman berbayar.
  */
 
+import { randomUUID } from 'node:crypto'
 import { LLM_ADAPTERS, PREMIUM_LLM_ADAPTERS } from './adapters'
 import { collectKeys, nextKey, penalise, poolStatus, type PooledKey } from './keyring'
 import { recordLlmCall } from './telemetry'
@@ -52,7 +53,7 @@ function getEntries(): ProviderEntry[] {
     adapter,
     pool: collectKeys(adapter.envPrefix),
   })).filter((entry) => {
-    if (entry.pool.length === 0) {
+    if (entry.pool.length === 0 || entry.adapter.configurationIssue?.()) {
       console.warn(
         `[LLM] ${entry.adapter.id} dilewati — ${entry.adapter.envPrefix} belum diset.`,
       )
@@ -109,6 +110,9 @@ function preferred(chain: ProviderEntry[], prefer: string[] | undefined): Provid
  * yang sama empat kali.
  */
 export async function complete(request: LlmRequest): Promise<LlmResponse> {
+  const requestId = randomUUID()
+  const deadline = Date.now() + (request.timeoutMs ?? 60_000)
+  let attemptNumber = 0
   const attempts: AttemptLog[] = []
   const base = preferred(getEntries(), request.prefer)
   const chain = request.tier === 'premium' ? [...getPremiumEntries(), ...base] : base
@@ -116,9 +120,10 @@ export async function complete(request: LlmRequest): Promise<LlmResponse> {
   for (const entry of chain) {
     const { adapter, pool } = entry
     const tries = Math.min(MAX_KEYS_PER_PROVIDER, pool.length)
+    const tried = new Set<string>()
 
     for (let attempt = 0; attempt < tries; attempt++) {
-      const key = await nextKey(adapter.id, pool)
+      const key = await nextKey(adapter.id, pool.filter((candidate) => !tried.has(candidate.fingerprint)))
 
       if (!key) {
         attempts.push({
@@ -130,14 +135,20 @@ export async function complete(request: LlmRequest): Promise<LlmResponse> {
         break
       }
 
+      tried.add(key.fingerprint)
+      if (Date.now() >= deadline) break
       const startedAt = Date.now()
+      attemptNumber++
       try {
-        const response = await adapter.complete(request, key.value, key.index)
+        const response = await adapter.complete({ ...request, timeoutMs: Math.min(30_000, deadline - Date.now()) }, key.value, key.index)
         console.log(
           `[LLM] ${adapter.id} kunci #${key.index} berhasil (${response.latencyMs}ms, ` +
             `${response.outputTokens ?? '?'} token keluar)`,
         )
-        void recordLlmCall({
+        await recordLlmCall({
+          requestId,
+          feature: request.feature ?? 'unspecified',
+          attempt: attemptNumber,
           providerId: adapter.id,
           model: response.model,
           keyIndex: key.index,
@@ -155,7 +166,10 @@ export async function complete(request: LlmRequest): Promise<LlmResponse> {
             ? err
             : new LlmError(adapter.id, 'server', err instanceof Error ? err.message : String(err))
 
-        void recordLlmCall({
+        await recordLlmCall({
+          requestId,
+          feature: request.feature ?? 'unspecified',
+          attempt: attemptNumber,
           providerId: adapter.id,
           model: adapter.model,
           keyIndex: key.index,
@@ -172,7 +186,7 @@ export async function complete(request: LlmRequest): Promise<LlmResponse> {
           providerId: adapter.id,
           keyIndex: key.index,
           kind: llmError.kind,
-          message: llmError.message.slice(0, 200),
+          message: `${llmError.kind}${llmError.status ? ` HTTP ${llmError.status}` : ''}`,
         })
 
         if (llmError.kind === 'rate_limited') {
@@ -195,9 +209,8 @@ export async function complete(request: LlmRequest): Promise<LlmResponse> {
           throw llmError
         }
 
-        // server / network — kuncinya tidak bersalah, jadi tidak dihukum;
-        // coba kunci berikutnya sekali, lalu turun ke penyedia lain.
-        continue
+        // Server/network failures affect the provider; try the next provider immediately.
+        break
       }
     }
   }
@@ -207,7 +220,7 @@ export async function complete(request: LlmRequest): Promise<LlmResponse> {
 
 /** Ringkasan untuk halaman diagnostik: penyedia apa saja yang benar-benar siap. */
 export async function llmStatus() {
-  const configured = getEntries()
+  const configured = [...getEntries(), ...getPremiumEntries()]
 
   return Promise.all(
     configured.map(async (entry) => ({

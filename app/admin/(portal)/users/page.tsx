@@ -1,3 +1,4 @@
+import { requireAdmin } from '@/lib/auth/admin-auth'
 import { getAppUsers } from '@/lib/db/news-queries'
 import { IconUser } from '@/components/icons'
 import { UsersClient } from './users-client'
@@ -5,6 +6,7 @@ import { UsersClient } from './users-client'
 export const dynamic = 'force-dynamic'
 
 export default async function AdminUsersPage() {
+  await requireAdmin()
   const users = await getAppUsers()
 
   return (

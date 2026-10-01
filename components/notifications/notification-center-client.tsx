@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import Link from 'next/link'
+import { useReadState } from './use-read-state'
 import {
   IconBell,
   IconNews,
@@ -14,13 +15,10 @@ import {
 } from '@/components/icons'
 import type { NotificationItem } from '@/lib/notifications/types'
 import {
-  getReadIds,
-  getLastMarkAllReadTime,
   isItemRead,
   markItemRead,
   markAllRead,
   formatTimeAgo,
-  NOTIFICATIONS_UPDATED_EVENT,
 } from '@/lib/notifications/storage'
 
 type FilterTab = 'semua' | 'unread' | 'berita' | 'admin' | 'alert'
@@ -33,14 +31,10 @@ export function NotificationCenterClient({ initialItems }: Props) {
   const [items, setItems] = useState<NotificationItem[]>(initialItems)
   const [activeTab, setActiveTab] = useState<FilterTab>('semua')
   const [searchQuery, setSearchQuery] = useState('')
-  const [readIds, setReadIds] = useState<Set<string>>(new Set())
-  const [lastAllTime, setLastAllTime] = useState(0)
+  const { readIds, lastAllTime } = useReadState()
   const [isRefreshing, setIsRefreshing] = useState(false)
 
-  const refreshReadState = useCallback(() => {
-    setReadIds(getReadIds())
-    setLastAllTime(getLastMarkAllReadTime())
-  }, [])
+
 
   const reloadData = useCallback(async () => {
     setIsRefreshing(true)
@@ -58,16 +52,7 @@ export function NotificationCenterClient({ initialItems }: Props) {
     }
   }, [])
 
-  useEffect(() => {
-    refreshReadState()
-    function handleUpdate() {
-      refreshReadState()
-    }
-    window.addEventListener(NOTIFICATIONS_UPDATED_EVENT, handleUpdate)
-    return () => {
-      window.removeEventListener(NOTIFICATIONS_UPDATED_EVENT, handleUpdate)
-    }
-  }, [refreshReadState])
+
 
   // Hitung metrik
   const counts = useMemo(() => {
@@ -117,12 +102,10 @@ export function NotificationCenterClient({ initialItems }: Props) {
 
   function handleMarkAll() {
     markAllRead(items)
-    refreshReadState()
   }
 
   function handleToggleRead(id: string) {
     markItemRead(id)
-    refreshReadState()
   }
 
   return (

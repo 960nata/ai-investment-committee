@@ -79,7 +79,8 @@ export function HeaderNotifications() {
 
   // Inisialisasi data & polling saat jendela aktif
   useEffect(() => {
-    fetchNotifications()
+    let active = true
+    void Promise.resolve().then(() => { if (active) void fetchNotifications() })
 
     const timer = setInterval(() => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
@@ -95,6 +96,7 @@ export function HeaderNotifications() {
     window.addEventListener('focus', handleSync)
 
     return () => {
+      active = false
       clearInterval(timer)
       window.removeEventListener(NOTIF_STORAGE_KEYS.EVENT_CHANGED, handleSync)
       window.removeEventListener('focus', handleSync)

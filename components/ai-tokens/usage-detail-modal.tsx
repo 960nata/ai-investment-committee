@@ -168,6 +168,7 @@ export function UsageDetailModal({ data, providerId, initialKeyId, rangeLabel, o
                     ? 'Kunci siap'
                     : selectedKey.status === 'cooldown'
                       ? 'Sedang cooldown'
+                    : selectedKey.status === 'blocked' ? 'Konfigurasi belum lengkap'
                       : 'Sudah dicabut dari env'}
                 </span>
               ) : (

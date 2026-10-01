@@ -124,6 +124,7 @@ export async function POST(request: Request) {
 
   try {
     const response = await complete({
+        feature: 'calculator',
       messages: [
         { role: 'system', content: `${SYSTEM}\n\n=== KONTEKS HITUNGAN ===\n${contextText(context)}` },
         { role: 'user', content: question },

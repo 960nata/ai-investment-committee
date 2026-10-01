@@ -126,6 +126,7 @@ export async function translateNewsArticle(
   locale: Exclude<Locale, 'id'>,
 ): Promise<void> {
   const response = await complete({
+        feature: 'news-translation',
     messages: [
       {
         role: 'system',
