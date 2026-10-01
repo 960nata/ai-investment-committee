@@ -27,6 +27,7 @@ import { LanguageMenu } from './language-menu'
 import { useSidebar } from './sidebar-context'
 import { SITE_NAME } from '@/lib/brand'
 import { UserMenu, type UserMenuProfile } from './user-menu'
+import { NotificationBell } from './notifications/notification-bell'
 
 const TITLES = new Map(
   SECTIONS.flatMap((s) => s.links).map((l) => [l.href, l.label] as const),
@@ -106,6 +107,7 @@ export function Topbar({
       {action && <span className="topbar-action">{action}</span>}
 
       <div className="topbar-session">
+        <NotificationBell />
         <LanguageMenu />
         <UserMenu user={user} isAdmin={isAdmin} variant="dashboard" />
       </div>

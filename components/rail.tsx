@@ -80,6 +80,7 @@ export const SECTIONS: { label: string; links: RailLink[] }[] = [
   {
     label: 'Akun',
     links: [
+      { href: '/notifikasi', label: 'Notifikasi', icon: IconBell },
       { href: '/profil', label: 'Profil Saya', icon: IconUser },
     ],
   },

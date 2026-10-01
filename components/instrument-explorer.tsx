@@ -654,41 +654,20 @@ export function InstrumentExplorer({
           )}
 
           {/* Kolom Pencarian Simbol / Emiten */}
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ position: 'relative', minWidth: 210 }}>
+          <div className="explorer-search-wrap">
+            <div className="explorer-search-box">
               <input
                 type="text"
+                className="explorer-search-input"
                 placeholder="Cari simbol atau emiten..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '4px 26px 4px 10px',
-                  fontSize: 'var(--t-small)',
-                  borderRadius: 'var(--radius-sm)',
-                  border: '1px solid var(--line)',
-                  background: 'var(--bg-card)',
-                  color: 'var(--ink)',
-                  fontFamily: 'inherit',
-                }}
               />
               {query && (
                 <button
                   type="button"
+                  className="explorer-search-clear"
                   onClick={() => setQuery('')}
-                  style={{
-                    position: 'absolute',
-                    right: 6,
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: 'transparent',
-                    border: 'none',
-                    color: 'var(--ink-mute)',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    padding: '2px 4px',
-                    lineHeight: 1,
-                  }}
                   title="Kosongkan pencarian"
                 >
                   <IconClose size={12} />

@@ -19,4 +19,5 @@ export const PROTECTED_PAGE_PREFIXES = [
   '/rekam-jejak',
   '/kepemilikan',
   '/makro',
+  '/notifikasi',
 ] as const
