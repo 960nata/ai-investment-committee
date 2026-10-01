@@ -10,7 +10,7 @@ import { readFileSync, existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 interface KeyEntry {
-  provider: 'gemini' | 'groq' | 'openrouter' | 'mistral' | 'deepseek' | 'nvidia' | 'github'
+  provider: 'gemini' | 'groq' | 'openrouter' | 'mistral' | 'deepseek' | 'nvidia' | 'github' | 'cerebras' | 'cloudflare'
   envName: string
   key: string
 }
@@ -140,6 +140,21 @@ async function probeNvidia(key: string): Promise<{ status: ProbeResult['status']
   }
 }
 
+async function probeCerebras(key: string): Promise<{ status: ProbeResult['status']; code?: number; message: string }> {
+  try {
+    const res = await fetch('https://api.cerebras.ai/v1/models', {
+      headers: { Authorization: `Bearer ${key}` },
+      signal: AbortSignal.timeout(10000),
+    })
+    if (res.ok) return { status: 'ACTIVE', code: res.status, message: 'OK' }
+    if (res.status === 429) return { status: 'RATE_LIMITED', code: res.status, message: 'Rate Limited' }
+    if (res.status === 401 || res.status === 403) return { status: 'DEAD', code: res.status, message: 'Invalid / Expired' }
+    return { status: 'ERROR', code: res.status, message: `HTTP ${res.status}` }
+  } catch (err) {
+    return { status: 'ERROR', message: err instanceof Error ? err.message : String(err) }
+  }
+}
+
 async function probeGitHub(key: string): Promise<{ status: ProbeResult['status']; code?: number; message: string }> {
   try {
     const res = await fetch('https://api.github.com/user', {
@@ -160,6 +175,27 @@ async function probeGitHub(key: string): Promise<{ status: ProbeResult['status']
   }
 }
 
+async function probeCloudflare(key: string): Promise<{ status: ProbeResult['status']; code?: number; message: string }> {
+  try {
+    const res = await fetch('https://api.cloudflare.com/client/v4/user/tokens/verify', {
+      headers: { Authorization: `Bearer ${key}` },
+      signal: AbortSignal.timeout(10000),
+    })
+    if (res.ok) {
+      const data = (await res.json()) as { success?: boolean; messages?: { message?: string }[] }
+      if (data.success) {
+        return { status: 'ACTIVE', code: res.status, message: data.messages?.[0]?.message ?? 'Token valid and active' }
+      }
+      return { status: 'DEAD', code: res.status, message: 'Invalid Token' }
+    }
+    if (res.status === 401 || res.status === 403) return { status: 'DEAD', code: res.status, message: 'Bad Credentials / Expired' }
+    if (res.status === 429) return { status: 'RATE_LIMITED', code: res.status, message: 'Rate Limited' }
+    return { status: 'ERROR', code: res.status, message: `HTTP ${res.status}` }
+  } catch (err) {
+    return { status: 'ERROR', message: err instanceof Error ? err.message : String(err) }
+  }
+}
+
 async function main() {
   const envLocal = parseEnv(resolve(process.cwd(), '.env.local'))
   const envDefault = parseEnv(resolve(process.cwd(), '.env'))
@@ -168,7 +204,11 @@ async function main() {
 
   for (const [keyName, val] of Object.entries(env)) {
     if (!val || val.startsWith('<')) continue
-    if (keyName.startsWith('GEMINI_API_KEY')) {
+    if (keyName.startsWith('CEREBRAS_API_KEY')) {
+      entries.push({ provider: 'cerebras', envName: keyName, key: val })
+    } else if (keyName.startsWith('CLOUDFLARE_API_TOKEN') || keyName.startsWith('CLOUDFLARE_TOKEN') || keyName.startsWith('CF_API_TOKEN')) {
+      entries.push({ provider: 'cloudflare', envName: keyName, key: val })
+    } else if (keyName.startsWith('GEMINI_API_KEY')) {
       entries.push({ provider: 'gemini', envName: keyName, key: val })
     } else if (keyName.startsWith('GROQ_API_KEY')) {
       entries.push({ provider: 'groq', envName: keyName, key: val })
@@ -194,7 +234,9 @@ async function main() {
     const t0 = Date.now()
     let res: { status: ProbeResult['status']; code?: number; message: string }
 
-    if (entry.provider === 'gemini') res = await probeGemini(entry.key)
+    if (entry.provider === 'cerebras') res = await probeCerebras(entry.key)
+    else if (entry.provider === 'cloudflare') res = await probeCloudflare(entry.key)
+    else if (entry.provider === 'gemini') res = await probeGemini(entry.key)
     else if (entry.provider === 'groq') res = await probeGroq(entry.key)
     else if (entry.provider === 'openrouter') res = await probeOpenRouter(entry.key)
     else if (entry.provider === 'mistral') res = await probeMistral(entry.key)

@@ -118,6 +118,19 @@ export function createOpenAiCompatibleAdapter(config: OpenAiCompatibleConfig): L
   }
 }
 
+export const cerebrasAdapter = createOpenAiCompatibleAdapter({
+  id: 'cerebras',
+  name: 'Cerebras',
+  baseUrl: process.env.CEREBRAS_BASE_URL ?? 'https://api.cerebras.ai/v1',
+  model: process.env.CEREBRAS_MODEL ?? 'qwen-3.8-27b',
+  envPrefix: 'CEREBRAS_API_KEY',
+  // Tanpa 'none', model menghabiskan max_tokens pada reasoning tersembunyi sehingga
+  // jawaban terpotong. Nilai bawaan 'none' menghasilkan jawaban utuh dan kilat (~100ms).
+  extraBody: {
+    reasoning_effort: process.env.CEREBRAS_REASONING_EFFORT ?? 'none',
+  },
+})
+
 export const groqAdapter = createOpenAiCompatibleAdapter({
   id: 'groq',
   name: 'Groq',

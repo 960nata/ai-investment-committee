@@ -30,6 +30,7 @@ interface Turn {
 }
 
 const PROVIDER_NAMES: Record<string, string> = {
+  cerebras: 'Cerebras',
   gemini: 'Gemini',
   groq: 'Groq',
   openrouter: 'OpenRouter',

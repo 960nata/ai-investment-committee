@@ -9,6 +9,7 @@
 
 import { geminiAdapter } from './providers/gemini'
 import {
+  cerebrasAdapter,
   deepSeekAdapter,
   groqAdapter,
   mistralAdapter,
@@ -19,6 +20,7 @@ import {
 import type { LlmAdapter } from './types'
 
 export const LLM_ADAPTERS: LlmAdapter[] = [
+  cerebrasAdapter, // latensi ultra-cepat (~100ms) Wafer-Scale Engine untuk agen & komite
   groqAdapter, // latensi terendah, sangat cepat (~300ms) untuk terjemahan & komite
   geminiAdapter, // kolam kunci cadangan terbesar
   openRouterAdapter, // model gratis, kuota harian
