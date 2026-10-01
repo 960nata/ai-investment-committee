@@ -234,69 +234,6 @@ export function NewsPortalClient({
           Tidak ada telaah pasar yang cocok dengan filter saat ini.
         </div>
       )}
-
-
-      {/* --- Akses Terbuka untuk AI Lain --- */}
-      <section
-        style={{
-          marginTop: 'var(--space-4)',
-          padding: 'var(--space-4) var(--space-5)',
-          background: 'var(--bg-subtle)',
-          border: '1px solid var(--line)',
-          borderRadius: 'var(--radius-md)',
-          display: 'flex',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 16,
-        }}
-      >
-        <div>
-          <div
-            style={{
-              fontSize: 'var(--t-small)',
-              fontWeight: 600,
-              color: 'var(--ink)',
-              marginBottom: 4,
-            }}
-          >
-            Akses Mesin &amp; Umpan Terbuka (API / LLM Feed)
-          </div>
-          <p
-            style={{
-              fontSize: 'var(--t-small)',
-              color: 'var(--ink-mute)',
-              margin: 0,
-              lineHeight: 1.5,
-            }}
-          >
-            Data intelijen pasar ini dapat dikonsumsi langsung oleh agen AI atau bot
-            trading via endpoint:{' '}
-            <code style={{ color: 'var(--ink)', fontFamily: 'var(--mono)' }}>
-              /api/v1/news?format=llm
-            </code>
-          </p>
-        </div>
-
-        <div style={{ display: 'flex', gap: 8 }}>
-          <a
-            href="/api/v1/news?format=llm"
-            target="_blank"
-            rel="noreferrer"
-            className="seg"
-          >
-            Format LLM
-          </a>
-          <a
-            href="/api/v1/news"
-            target="_blank"
-            rel="noreferrer"
-            className="seg"
-          >
-            JSON Mentah
-          </a>
-        </div>
-      </section>
     </div>
   )
 }
