@@ -29,6 +29,9 @@ export const metadata: Metadata = {
     "Skor peluang saham IDX, saham AS, kripto, dan emas untuk sepekan sampai setahun, " +
     "beserta penggerak dan rekam jejaknya. Gratis. Data, bukan anjuran.",
   keywords: ["saham", "analisis", "IDX", "crypto", "investasi", "probabilistik"],
+  verification: {
+    google: "NtftDAwujuLQyXmxBa2q2cBv_wqnVO1h1TNUigXmVL0",
+  },
   // Verifikasi kepemilikan situs untuk AdSense. Hanya tag meta — tidak memuat
   // skrip apa pun, jadi tidak ada iklan otomatis. Skripnya dimuat oleh slot
   // iklan saja (lihat lib/ads/adsense.ts).
