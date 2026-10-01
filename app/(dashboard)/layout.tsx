@@ -21,7 +21,6 @@ import { IngestButton } from '@/components/ingest-button'
 import { Rail } from '@/components/rail'
 import { Topbar, type TopbarStatus } from '@/components/topbar'
 import { SidebarProvider } from '@/components/sidebar-context'
-import { NoticeStrip } from '@/components/member/notice-strip'
 import { describeAge, getDataFreshness } from '@/lib/db/queries'
 import { verifyAdminSession } from '@/lib/auth/admin-auth'
 import { getCurrentUser } from '@/lib/auth/user-auth'
@@ -60,7 +59,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <div className="shell" suppressHydrationWarning>
           <Rail />
           <main className="main" suppressHydrationWarning>
-            {session && <NoticeStrip />}
             {children}
           </main>
         </div>
