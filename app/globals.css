@@ -940,6 +940,13 @@ body.rail-lock {
   border-bottom: 1px solid var(--line);
 }
 
+@media (max-width: 768px) {
+  .panel-head {
+    flex-wrap: wrap;
+    row-gap: var(--space-2);
+  }
+}
+
 .panel-title {
   display: flex;
   align-items: center;
@@ -1561,6 +1568,89 @@ body.rail-lock {
    diserahkan ke Escape serta seleksi teks biasa. */
 .search::-webkit-search-cancel-button {
   appearance: none;
+}
+
+/* ---------------------------------------------------------------------------
+   Pencarian Emiten / Simbol pada Instrument Explorer
+   --------------------------------------------------------------------------- */
+
+.explorer-search-wrap {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+}
+
+.explorer-search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 250px;
+}
+
+.explorer-search-icon {
+  position: absolute;
+  left: 10px;
+  color: var(--ink-faint);
+  pointer-events: none;
+  z-index: 1;
+  flex-shrink: 0;
+  transition: color 150ms ease;
+}
+
+.explorer-search-box:focus-within .explorer-search-icon {
+  color: var(--signal);
+}
+
+.explorer-search-input {
+  width: 100%;
+  height: 32px;
+  padding: 0 28px 0 32px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: var(--t-small);
+  outline: none;
+  transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
+}
+
+.explorer-search-input::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.explorer-search-input:focus {
+  border-color: var(--signal);
+  background: var(--surface-3);
+  box-shadow: 0 0 0 1px var(--signal);
+}
+
+.explorer-search-input::placeholder {
+  color: var(--ink-faint);
+  font-family: var(--sans);
+  font-size: var(--t-small);
+}
+
+.explorer-search-clear {
+  position: absolute;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--ink-mute);
+  cursor: pointer;
+  border-radius: 50%;
+  transition: color 150ms ease, background 150ms ease;
+}
+
+.explorer-search-clear:hover {
+  color: var(--ink);
+  background: var(--surface-3);
 }
 
 .segmented {
@@ -2834,6 +2924,207 @@ body.rail-lock {
   background: rgba(0,0,0,.12);
   border-radius: var(--radius);
   border: 1px solid var(--line);
+}
+
+/* ── Penyesuaian Mobile: Rapat Komite & Pencarian Emiten ── */
+@media (max-width: 768px) {
+  /* -------------------------------------------------------------------------
+     Pencarian Emiten di Mobile:
+     Posisi di bawah, full width kiri-kanan, dan tinggi disesuaikan nyaman disentuh
+     ------------------------------------------------------------------------- */
+  .panel-head {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+
+  .explorer-search-wrap {
+    width: 100%;
+    margin-left: 0;
+    margin-top: 6px;
+    order: 10;
+  }
+
+  .explorer-search-box {
+    width: 100%;
+  }
+
+  .explorer-search-input {
+    height: 38px;
+    font-size: 13px;
+    padding: 0 32px 0 34px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+  }
+
+  .explorer-search-icon {
+    left: 11px;
+  }
+
+  .explorer-search-clear {
+    right: 8px;
+    width: 26px;
+    height: 26px;
+  }
+
+  /* Sembunyikan angka jumlah di tab segmented mobile agar tidak sempit/membungkus */
+  .seg-count {
+    display: none;
+  }
+
+  /* -------------------------------------------------------------------------
+     Transkrip Sidang Agen: "Baca jawaban lengkap tiap agen"
+     Hilangkan margin/padding timeline yang menghimpit ruang sehingga tidak kegenjet
+     ------------------------------------------------------------------------- */
+  .boardroom-body {
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .boardroom-decree-panel {
+    padding: 12px 14px;
+  }
+
+  .verdict-transcript {
+    border-radius: var(--radius-sm);
+  }
+
+  .verdict-transcript > summary {
+    padding: 10px 12px;
+    font-size: var(--t-micro);
+  }
+
+  .verdict-transcript > .turns-list {
+    padding: 0 6px 8px;
+  }
+
+  /* Hilangkan padding-left 28px timeline dan garis vertikal */
+  .turns-list {
+    padding-left: 0;
+  }
+
+  .turns-list::before {
+    display: none;
+  }
+
+  .turns-list .agent-card {
+    margin-left: 0;
+    width: 100%;
+    margin-bottom: 8px;
+  }
+
+  /* Hilangkan bulatan dan garis konektor horizontal timeline */
+  .turns-list .agent-card::before,
+  .turns-list .agent-card::after {
+    display: none;
+  }
+
+  /* Kepala kartu agen dibuat kompak dan proporsional */
+  .agent-card-head {
+    padding: 9px 10px;
+    gap: 8px;
+  }
+
+  .agent-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+  }
+
+  .agent-title {
+    font-size: 11px;
+  }
+
+  .agent-model {
+    font-size: 10px;
+    max-width: 120px;
+  }
+
+  .turn-latency {
+    font-size: 10px;
+    padding: 1px 6px;
+  }
+
+  /* Isi kartu agen: padding pas 10px 12px agar teks leluasa, tidak kegenjet */
+  .agent-card-content {
+    padding: 10px 12px 12px;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+
+  /* Grid indikator data analis kuantitatif: 2 kolom rapi di HP */
+  .analis-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+
+  .analis-stat-card {
+    padding: 6px 8px;
+    gap: 4px;
+  }
+
+  .analis-stat-label {
+    font-size: 9px;
+  }
+
+  .analis-stat-val {
+    font-size: 13px;
+  }
+
+  .analis-sample-info {
+    font-size: 11px;
+    padding: 6px 8px;
+    margin-bottom: 8px;
+  }
+
+  .data-guardrail-banner {
+    padding: 8px 10px;
+  }
+
+  .guardrail-title {
+    font-size: 9px;
+  }
+
+  /* Blok tesis bull dan risiko bear */
+  .thesis-callout,
+  .risk-worst-case {
+    padding: 8px 10px;
+    margin-bottom: 8px;
+  }
+
+  .thesis-callout-text,
+  .worst-case-body {
+    font-size: 12.5px;
+    line-height: 1.5;
+  }
+
+  .proof-pillars-grid,
+  .risk-attacks-grid {
+    grid-template-columns: 1fr;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+
+  .thesis-proof-item,
+  .risk-attack-item {
+    padding: 8px 10px;
+  }
+
+  .proof-description,
+  .attack-description {
+    font-size: 12px;
+  }
+
+  .cio-decree-box {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .cio-rationale-box {
+    padding: 10px;
+    font-size: 13px;
+    line-height: 1.55;
+  }
 }
 
 /* ── Arena Debat — Side-by-Side Symmetrical ── */

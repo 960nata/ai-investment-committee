@@ -20,7 +20,7 @@ import { useEffect, useMemo, useState, useTransition } from 'react'
 import { CandlestickChart, IntradayChart, type Candle, type IntradayCandle } from './candlestick-chart'
 import { CHART_HISTORY_YEARS, CHART_RANGES, type ChartRangeId } from '@/lib/format/chart-range'
 import { RegionFlag } from './flags'
-import { IconAlert, IconCandles, IconClose, IconCourt, IconRows } from './icons'
+import { IconAlert, IconCandles, IconClose, IconCourt, IconRows, IconSearch } from './icons'
 import { AssetIcon } from './asset-icons'
 import { Blank } from './ui'
 import { ScorePanel, type HorizonView } from './score-panel'
@@ -656,6 +656,7 @@ export function InstrumentExplorer({
           {/* Kolom Pencarian Simbol / Emiten */}
           <div className="explorer-search-wrap">
             <div className="explorer-search-box">
+              <IconSearch size={14} className="explorer-search-icon" />
               <input
                 type="text"
                 className="explorer-search-input"
