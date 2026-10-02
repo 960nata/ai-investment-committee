@@ -25,7 +25,11 @@ export function template(core: string): { key: string; values: string[] } {
 
 /** Pasang kembali angka ke terjemahan. Null kalau model menghilangkan placeholder. */
 export function fill(translated: string, values: string[]): string | null {
+  // Normalisasi kurung kurawal lebar (full-width ｛ ｝) dan spasi internal { 0 }
   let out = translated
+    .replace(/[\uFF5B](\d+)[\uFF5D]/g, '{$1}')
+    .replace(/\{\s+(\d+)\s+\}/g, '{$1}')
+
   for (let i = 0; i < values.length; i++) {
     if (!out.includes(`{${i}}`)) return null
     out = out.split(`{${i}}`).join(values[i])

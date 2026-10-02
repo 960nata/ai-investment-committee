@@ -31,10 +31,12 @@ const DEFAULTS = {
     'dan kuota model AI supaya terminal ini tetap terbuka gratis untuk semua orang.',
 }
 
-let tableReady = false
+declare global {
+  var __donationTableReady: boolean | undefined
+}
 
 async function ensureDonationTable(): Promise<void> {
-  if (tableReady) return
+  if (globalThis.__donationTableReady) return
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS donation_settings (
       id INTEGER PRIMARY KEY,
@@ -51,7 +53,7 @@ async function ensureDonationTable(): Promise<void> {
     VALUES (1, FALSE, ${DEFAULTS.title}, ${DEFAULTS.message})
     ON CONFLICT (id) DO NOTHING;
   `)
-  tableReady = true
+  globalThis.__donationTableReady = true
 }
 
 export async function getDonationSettings(): Promise<DonationSettings> {

@@ -31,10 +31,12 @@ import {
   type UserNotificationRow,
 } from './schema'
 
-let tablesReady = false
+declare global {
+  var __memberTablesReady: boolean | undefined
+}
 
 export async function ensureMemberTables(): Promise<void> {
-  if (tablesReady) return
+  if (globalThis.__memberTablesReady) return
 
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS announcement (
@@ -126,7 +128,7 @@ export async function ensureMemberTables(): Promise<void> {
     ALTER TABLE app_user ADD COLUMN IF NOT EXISTS digest_sent_at TIMESTAMPTZ;
   `)
 
-  tablesReady = true
+  globalThis.__memberTablesReady = true
 }
 
 // ---------------------------------------------------------------------------

@@ -9,6 +9,7 @@ import { MotionProvider } from "@/components/motion-kit";
 import { SiteTranslator } from "@/components/site-translator";
 import { SITE_NAME, SITE_DESCRIPTION, SITE_TAGLINE, getBaseUrl } from "@/lib/brand";
 import { ADSENSE_CLIENT } from "@/lib/ads/adsense";
+import { ExtensionErrorShield } from "@/components/extension-error-shield";
 import "./globals.css";
 import "./mobile.css";
 
@@ -89,6 +90,7 @@ export default function RootLayout({
   return (
     <html lang="id" suppressHydrationWarning className={fontSans.className}>
       <body suppressHydrationWarning className={fontSans.className}>
+        <ExtensionErrorShield />
         <MotionProvider>{children}</MotionProvider>
         {/*
          * `useSearchParams` di dalam VisitBeacon membuat seluruh pohon di

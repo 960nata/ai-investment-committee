@@ -131,61 +131,35 @@ export function SiteTranslator() {
 
     const cache = loadStore(locale)
     const inflight = new Set<string>()
-    // Teks yang gagal diterjemahkan menunggu makin lama sebelum dicoba lagi.
-    // Tanpa ini, halaman yang teksnya terus berganti (kisi harga) akan
-    // meminta ulang teks yang sama tiap beberapa detik.
+    // Teks yang gagal diterjemahkan menunggu sebentar sebelum dicoba lagi.
     const retryAt = new Map<string, { at: number; wait: number }>()
     let cancelled = false
     let timer: ReturnType<typeof setTimeout> | null = null
+    let isMutating = false
 
     /** Terapkan terjemahan yang sudah ada; kembalikan teks yang belum punya. */
     const apply = (): string[] => {
-      const missing = new Set<string>()
-      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
-        acceptNode(node) {
-          const parent = node.parentElement
-          if (!parent || SKIP_TAGS.has(parent.tagName) || parent.closest('svg')) return NodeFilter.FILTER_REJECT
-          return excluded(parent, locale) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT
-        },
-      })
+      isMutating = true
+      try {
+        const missing = new Set<string>()
+        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+          acceptNode(node) {
+            const parent = node.parentElement
+            if (!parent || SKIP_TAGS.has(parent.tagName) || parent.closest('svg')) return NodeFilter.FILTER_REJECT
+            return excluded(parent, locale) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT
+          },
+        })
 
-      for (let n = walker.nextNode(); n; n = walker.nextNode()) {
-        const node = n as Text
-        const value = node.nodeValue ?? ''
-        // Node yang sudah kita isi sendiri dilewati; yang diubah React sesudahnya
-        // (nilai berbeda) dianggap teks asli baru.
-        if (applied.current.get(node) === value) continue
-        const core = value.trim()
-        const { key, values } = template(core)
-        if (!translatable(key)) continue
-
-        const cached = cache.get(key)
-        if (cached === undefined) {
-          missing.add(key)
-          continue
-        }
-        const hit = fill(cached, values)
-        if (hit === null) continue
-        if (!originals.current.has(node) || applied.current.get(node) !== value) {
-          originals.current.set(node, value)
-        }
-        const lead = value.match(/^\s*/)?.[0] ?? ''
-        const trail = value.match(/\s*$/)?.[0] ?? ''
-        const next = lead + hit + trail
-        node.nodeValue = next
-        applied.current.set(node, next)
-        touched.current.add(new WeakRef(node))
-      }
-
-      for (const el of document.body.querySelectorAll(ATTRS.map((a) => `[${a}]`).join(','))) {
-        if (excluded(el, locale)) continue
-        let map = attrOriginals.current.get(el)
-        for (const attr of ATTRS) {
-          const current = el.getAttribute(attr)
-          if (!current) continue
-          const original = map?.get(attr) ?? current
-          const { key, values } = template(original.trim())
+        for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+          const node = n as Text
+          const value = node.nodeValue ?? ''
+          // Node yang sudah kita isi sendiri dilewati; yang diubah React sesudahnya
+          // (nilai berbeda) dianggap teks asli baru.
+          if (applied.current.get(node) === value) continue
+          const core = value.trim()
+          const { key, values } = template(core)
           if (!translatable(key)) continue
+
           const cached = cache.get(key)
           if (cached === undefined) {
             missing.add(key)
@@ -193,23 +167,56 @@ export function SiteTranslator() {
           }
           const hit = fill(cached, values)
           if (hit === null) continue
-          if (current === hit) continue
-          if (!map) {
-            map = new Map()
-            attrOriginals.current.set(el, map)
-            touchedEls.current.add(new WeakRef(el))
+          if (!originals.current.has(node) || applied.current.get(node) !== value) {
+            originals.current.set(node, value)
           }
-          if (!map.has(attr)) map.set(attr, current)
-          el.setAttribute(attr, hit)
+          const lead = value.match(/^\s*/)?.[0] ?? ''
+          const trail = value.match(/\s*$/)?.[0] ?? ''
+          const next = lead + hit + trail
+          node.nodeValue = next
+          applied.current.set(node, next)
+          touched.current.add(new WeakRef(node))
         }
-      }
 
-      const now = Date.now()
-      return [...missing].filter((t) => !inflight.has(t) && (retryAt.get(t)?.at ?? 0) <= now)
+        for (const el of document.body.querySelectorAll(ATTRS.map((a) => `[${a}]`).join(','))) {
+          if (excluded(el, locale)) continue
+          let map = attrOriginals.current.get(el)
+          for (const attr of ATTRS) {
+            const current = el.getAttribute(attr)
+            if (!current) continue
+            const original = map?.get(attr) ?? current
+            const { key, values } = template(original.trim())
+            if (!translatable(key)) continue
+            const cached = cache.get(key)
+            if (cached === undefined) {
+              missing.add(key)
+              continue
+            }
+            const hit = fill(cached, values)
+            if (hit === null) continue
+            if (current === hit) continue
+            if (!map) {
+              map = new Map()
+              attrOriginals.current.set(el, map)
+              touchedEls.current.add(new WeakRef(el))
+            }
+            if (!map.has(attr)) map.set(attr, current)
+            el.setAttribute(attr, hit)
+          }
+        }
+
+        const now = Date.now()
+        return [...missing].filter((t) => !inflight.has(t) && (retryAt.get(t)?.at ?? 0) <= now)
+      } finally {
+        queueMicrotask(() => {
+          isMutating = false
+        })
+      }
     }
 
     const backoff = (t: string) => {
-      const wait = Math.min((retryAt.get(t)?.wait ?? 7_500) * 2, 600_000)
+      const prev = retryAt.get(t)?.wait
+      const wait = prev ? Math.min(prev * 2, 300_000) : 2_000
       retryAt.set(t, { at: Date.now() + wait, wait })
     }
 
@@ -223,38 +230,52 @@ export function SiteTranslator() {
       announced = true
       if (loud) setBusy(true)
       for (const t of texts) inflight.add(t)
+
       try {
-        for (let i = 0; i < texts.length && !cancelled; ) {
+        const chunks: string[][] = []
+        for (let i = 0; i < texts.length; ) {
           const chunk: string[] = []
           let chars = 0
           while (i < texts.length && chunk.length < BATCH && chars + texts[i].length <= BATCH_CHARS) {
             chars += texts[i].length
             chunk.push(texts[i++])
           }
-          const res = await fetch('/api/v1/i18n/translate', {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ locale, texts: chunk }),
-          })
-          if (!res.ok) {
-            for (const t of texts.slice(i - chunk.length)) backoff(t)
-            break
-          }
-          const body = (await res.json()) as { translations: (string | null)[] }
-          chunk.forEach((t, j) => {
-            const tr = body.translations[j]
-            if (tr) {
-              cache.set(t, tr)
-              retryAt.delete(t)
-            } else backoff(t)
-          })
-          if (!cancelled) apply()
+          if (chunk.length > 0) chunks.push(chunk)
         }
-        saveStore(locale, cache)
-      } catch {
-        // Jaringan putus: teks yang belum diterjemahkan tetap tampil dalam
-        // bahasa sumber, dan dicoba lagi sesudah jeda.
-        for (const t of texts) if (!cache.has(t)) backoff(t)
+
+        // Eksekusi chunk secara paralel untuk kecepatan maksimal
+        await Promise.all(
+          chunks.map(async (chunk) => {
+            if (cancelled) return
+            try {
+              const res = await fetch('/api/v1/i18n/translate', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ locale, texts: chunk }),
+              })
+              if (!res.ok) {
+                for (const t of chunk) backoff(t)
+                return
+              }
+              const body = (await res.json()) as { translations: (string | null)[] }
+              chunk.forEach((t, j) => {
+                const tr = body.translations[j]
+                if (tr) {
+                  cache.set(t, tr)
+                  retryAt.delete(t)
+                } else {
+                  backoff(t)
+                }
+              })
+              if (!cancelled) {
+                apply()
+                saveStore(locale, cache)
+              }
+            } catch {
+              for (const t of chunk) if (!cache.has(t)) backoff(t)
+            }
+          })
+        )
       } finally {
         for (const t of texts) inflight.delete(t)
         if (!cancelled && loud) {
@@ -277,7 +298,8 @@ export function SiteTranslator() {
     // Menu yang dibuka, data yang dimuat, harga yang diperbarui: semua itu
     // menambah atau mengubah teks setelah terjemahan pertama selesai.
     const observer = new MutationObserver(() => {
-      if (!timer) timer = setTimeout(run, 200)
+      if (isMutating) return
+      if (!timer) timer = setTimeout(run, 350)
     })
     observer.observe(document.body, {
       childList: true,

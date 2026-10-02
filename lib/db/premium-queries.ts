@@ -45,10 +45,12 @@ const DEFAULTS = {
     'kuota lebih longgar, dan ikut membiayai server, data pasar, serta model AI.',
 }
 
-let tablesReady = false
+declare global {
+  var __premiumTablesReady: boolean | undefined
+}
 
 export async function ensurePremiumTables(): Promise<void> {
-  if (tablesReady) return
+  if (globalThis.__premiumTablesReady) return
 
   await db.execute(sql`ALTER TABLE app_user ADD COLUMN IF NOT EXISTS premium_until TIMESTAMPTZ`)
   await db.execute(sql`
@@ -99,7 +101,7 @@ export async function ensurePremiumTables(): Promise<void> {
   await db.execute(
     sql`CREATE INDEX IF NOT EXISTS premium_order_user_idx ON premium_order (user_id, created_at)`,
   )
-  tablesReady = true
+  globalThis.__premiumTablesReady = true
 }
 
 // ---------------------------------------------------------------------------

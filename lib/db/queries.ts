@@ -1263,12 +1263,12 @@ export async function listInstrumentQuotes(): Promise<InstrumentQuote[]> {
       from (
         select
           close, date,
-          row_number() over (order by date desc) as rn,
-          count(*) over () as total
+          row_number() over (order by date desc) as rn
         from candle_daily
         where instrument_id = i.id
+        order by date desc
+        limit 2
       ) d
-      where d.rn <= 2
     ) c on true
     where i.is_active
     order by i.asset_class, i.symbol

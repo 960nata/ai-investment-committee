@@ -398,7 +398,7 @@ export function LandingNav({
                     {/* Col 1: Menu Pasar */}
                     <div className="mega-col">
                       <span className="mega-col-title mono">Pusat Pasar</span>
-                      <Link href="/ringkasan" className="mega-item" onClick={() => setActiveMenu(null)}>
+                      <Link href="/ringkasan" prefetch={false} className="mega-item" onClick={() => setActiveMenu(null)}>
                         <div className="mega-item-icon">
                           <IconGauge size={16} />
                         </div>
@@ -408,7 +408,7 @@ export function LandingNav({
                         </div>
                       </Link>
 
-                      <Link href="/instruments" className="mega-item" onClick={() => setActiveMenu(null)}>
+                      <Link href="/instruments" prefetch={false} className="mega-item" onClick={() => setActiveMenu(null)}>
                         <div className="mega-item-icon">
                           <IconRows size={16} />
                         </div>
@@ -428,6 +428,7 @@ export function LandingNav({
                             ? `/analisis/${encodeURIComponent(topLosers[0].symbol)}`
                             : '/ringkasan'
                         }
+                        prefetch={false}
                         className="mega-item"
                         onClick={() => setActiveMenu(null)}
                       >
@@ -449,7 +450,7 @@ export function LandingNav({
                     <div className="mega-col mega-col-border">
                       <span className="mega-col-title mono">Kategori Pilihan</span>
                       <div className="mega-asset-list">
-                        <Link href="/ringkasan?tab=crypto" className="mega-asset-row" onClick={() => setActiveMenu(null)}>
+                        <Link href="/ringkasan?tab=crypto" prefetch={false} className="mega-asset-row" onClick={() => setActiveMenu(null)}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span className="chip-dot" style={{ background: 'var(--signal)' }} />
                             <span className="mono bold">Kripto Populer</span>
@@ -457,7 +458,7 @@ export function LandingNav({
                           <span className="tag mono" style={{ fontSize: '9px' }}>{assetCounts.crypto} aset</span>
                         </Link>
 
-                        <Link href="/ringkasan?tab=saham" className="mega-asset-row" onClick={() => setActiveMenu(null)}>
+                        <Link href="/ringkasan?tab=saham" prefetch={false} className="mega-asset-row" onClick={() => setActiveMenu(null)}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span className="chip-dot" style={{ background: 'var(--ink-soft)' }} />
                             <span className="mono bold">Saham Bluechip IDX</span>
@@ -465,7 +466,7 @@ export function LandingNav({
                           <span className="tag mono" style={{ fontSize: '9px' }}>{assetCounts.saham} emiten</span>
                         </Link>
 
-                        <Link href="/ringkasan?tab=emas" className="mega-asset-row" onClick={() => setActiveMenu(null)}>
+                        <Link href="/ringkasan?tab=emas" prefetch={false} className="mega-asset-row" onClick={() => setActiveMenu(null)}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span className="chip-dot" style={{ background: 'var(--signal)' }} />
                             <span className="mono bold">Emas &amp; Logam Mulia</span>
@@ -473,7 +474,7 @@ export function LandingNav({
                           <span className="tag mono" style={{ fontSize: '9px' }}>{assetCounts.emas} kontrak</span>
                         </Link>
 
-                        <Link href="/ringkasan?tab=komoditi" className="mega-asset-row" onClick={() => setActiveMenu(null)}>
+                        <Link href="/ringkasan?tab=komoditi" prefetch={false} className="mega-asset-row" onClick={() => setActiveMenu(null)}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span className="chip-dot" style={{ background: 'var(--halted)' }} />
                             <span className="mono bold">Komoditas Energi</span>
@@ -496,6 +497,7 @@ export function LandingNav({
                             <Link
                               key={g.id}
                               href={`/analisis/${encodeURIComponent(g.symbol)}`}
+                              prefetch={false}
                               className="radar-item"
                               onClick={() => setActiveMenu(null)}
                             >
@@ -514,6 +516,7 @@ export function LandingNav({
                             <Link
                               key={l.id}
                               href={`/analisis/${encodeURIComponent(l.symbol)}`}
+                              prefetch={false}
                               className="radar-item"
                               onClick={() => setActiveMenu(null)}
                             >
@@ -608,6 +611,7 @@ export function LandingNav({
                     </p>
                     <Link
                       href="/ringkasan?symbol=BTCUSDT"
+                      prefetch={false}
                       className="btn btn-primary mono"
                       onClick={() => setActiveMenu(null)}
                       style={{ padding: '4px 10px', fontSize: '11px', textDecoration: 'none' }}
@@ -644,6 +648,7 @@ export function LandingNav({
                           <Link
                             key={cat.id}
                             href={`/warta?kategori=${cat.id}`}
+                            prefetch={false}
                             className="mega-cat-row"
                             onClick={() => setActiveMenu(null)}
                           >
@@ -655,7 +660,7 @@ export function LandingNav({
                           </Link>
                         ))}
                       </div>
-                      <Link href="/warta" className="mega-more-link mono" onClick={() => setActiveMenu(null)}>
+                      <Link href="/warta" prefetch={false} className="mega-more-link mono" onClick={() => setActiveMenu(null)}>
                         Semua warta intelijen &rarr;
                       </Link>
                     </div>
@@ -666,6 +671,7 @@ export function LandingNav({
                         <>
                           <Link
                             href={`/warta/${latestNews[0].slug}`}
+                            prefetch={false}
                             className="mega-news-featured"
                             onClick={() => setActiveMenu(null)}
                           >
@@ -684,6 +690,7 @@ export function LandingNav({
                               <Link
                                 key={item.id}
                                 href={`/warta/${item.slug}`}
+                                prefetch={false}
                                 className="mega-news-row"
                                 onClick={() => setActiveMenu(null)}
                               >
@@ -696,6 +703,7 @@ export function LandingNav({
                       ) : (
                         <Link
                           href="/warta"
+                          prefetch={false}
                           className="mega-news-featured"
                           onClick={() => setActiveMenu(null)}
                         >
@@ -735,7 +743,7 @@ export function LandingNav({
                   <div className="mega-menu-grid">
                     <div className="mega-col">
                       <span className="mega-col-title mono">Alat Riset</span>
-                      <Link href="/backtest" className="mega-item" onClick={() => setActiveMenu(null)}>
+                      <Link href="/backtest" prefetch={false} className="mega-item" onClick={() => setActiveMenu(null)}>
                         <div className="mega-item-icon">
                           <IconCandles size={16} />
                         </div>
@@ -745,7 +753,7 @@ export function LandingNav({
                         </div>
                       </Link>
 
-                      <Link href="/instruments" className="mega-item" onClick={() => setActiveMenu(null)}>
+                      <Link href="/instruments" prefetch={false} className="mega-item" onClick={() => setActiveMenu(null)}>
                         <div className="mega-item-icon">
                           <IconRows size={16} />
                         </div>
@@ -757,7 +765,7 @@ export function LandingNav({
                         </div>
                       </Link>
 
-                      <Link href="/pipeline" className="mega-item" onClick={() => setActiveMenu(null)}>
+                      <Link href="/pipeline" prefetch={false} className="mega-item" onClick={() => setActiveMenu(null)}>
                         <div className="mega-item-icon">
                           <IconFlow size={16} />
                         </div>
@@ -800,7 +808,7 @@ export function LandingNav({
                           </span>
                         </div>
                       </div>
-                      <Link href="/pipeline" className="mega-more-link mono" onClick={() => setActiveMenu(null)}>
+                      <Link href="/pipeline" prefetch={false} className="mega-more-link mono" onClick={() => setActiveMenu(null)}>
                         Lihat rincian pipeline &rarr;
                       </Link>
                     </div>

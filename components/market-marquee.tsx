@@ -61,6 +61,7 @@ export function MarketMarquee({ items, secondsPerItem = 3.4, className }: Props)
     <div
       className={`marquee${className ? ` ${className}` : ''}`}
       style={{ ['--marquee-duration' as string]: `${duration}s` }}
+      translate="no"
     >
       <div className="marquee-track">
         <MarqueeGroup items={filled} />
@@ -80,6 +81,7 @@ function MarqueeGroup({ items, clone }: { items: MarqueeTicker[]; clone?: boolea
           <Link
             key={`${clone ? 'clone-' : ''}${item.key}`}
             href={`/ringkasan?symbol=${encodeURIComponent(item.symbol)}`}
+            prefetch={false}
             className="marquee-chip"
             title={`${item.name} (${item.symbol})`}
             tabIndex={clone ? -1 : undefined}

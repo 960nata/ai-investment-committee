@@ -4529,8 +4529,9 @@ body.rail-lock {
 .landing-nav-links {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   height: 100%;
+  margin-left: 16px;
 }
 
 .nav-dropdown-trigger {
@@ -11373,6 +11374,7 @@ body.rail-lock {
   height: 100%;
   pointer-events: none;
   z-index: 0;
+  transform: translateZ(0);
 }
 
 /* Butiran halus di seluruh bidang */
@@ -12927,6 +12929,8 @@ body.rail-lock {
   opacity: 0;
   transition: opacity 0.25s ease;
   pointer-events: none;
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 .landing-header.is-scrolled::before {
@@ -12952,6 +12956,8 @@ body.rail-lock {
   font-family: var(--sans);
   transform-origin: top left;
   animation: glassPop 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 /* Jembatan tak terlihat di atas panel, supaya kursor yang turun dari tombol
@@ -15452,6 +15458,7 @@ body.rail-lock {
   height: 100%;
   pointer-events: none;
   z-index: 0;
+  transform: translateZ(0);
 }
 
 .lp-closing .lp-inner {

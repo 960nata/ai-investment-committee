@@ -79,6 +79,14 @@ export function PageEnter({
     const root = scope.current
     if (!root || reduce || !window.__motionReady) return
 
+    if (variant === 'fade') {
+      const controls = animate(root, { opacity: [0, 1] }, { duration: 0.28, ease: EASE })
+      controls.then(() => {
+        root.style.removeProperty('opacity')
+      })
+      return
+    }
+
     /**
      * Gaya sisa animasi dibersihkan setelah selesai. `transform` dan `opacity`
      * yang tertinggal membuat tiap panel jadi lapisan (stacking context)
@@ -93,14 +101,11 @@ export function PageEnter({
 
     const enter = (elements: HTMLElement[], delay = 0) => {
       if (elements.length === 0) return
-      const controls =
-        variant === 'fade'
-          ? animate(elements, { opacity: [0, 1] }, { duration: 0.32, ease: EASE, delay })
-          : animate(
-              elements,
-              { opacity: [0, 1], transform: ['translateY(14px)', 'translateY(0px)'] },
-              { duration: 0.42, ease: EASE, delay: stagger(0.05, { startDelay: delay }) },
-            )
+      const controls = animate(
+        elements,
+        { opacity: [0, 1], transform: ['translateY(14px)', 'translateY(0px)'] },
+        { duration: 0.38, ease: EASE, delay: stagger(0.04, { startDelay: delay }) },
+      )
       controls.then(() => settle(elements))
     }
 
@@ -115,7 +120,7 @@ export function PageEnter({
     const stop = setTimeout(() => {
       watching.current = false
       observer.disconnect()
-    }, 8000)
+    }, 2500)
 
     return () => {
       clearTimeout(stop)

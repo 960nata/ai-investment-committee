@@ -33,13 +33,18 @@ export const MAX_TEXTS = 50
 export const MAX_TEXT_LENGTH = 1000
 export const MAX_REQUEST_CHARS = 12_000
 
-/** Berapa kalimat dikirim ke model dalam satu panggilan (35 untuk reliabilitas tinggi respon JSON). */
-const BATCH_SIZE = 35
+declare global {
+  var __uiTranslationTableReady: boolean | undefined
+  var __uiTranslationMemoryCache: Map<string, string> | undefined
+}
 
-let tableReady = false
+/** Berapa kalimat dikirim ke model dalam satu panggilan (20 untuk keandalan maksimal agar model tidak pernah salah hitung jumlah butir JSON). */
+const BATCH_SIZE = 20
+
+const memoryCache = (globalThis.__uiTranslationMemoryCache ??= new Map<string, string>())
 
 async function ensureTable(): Promise<void> {
-  if (tableReady) return
+  if (globalThis.__uiTranslationTableReady) return
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS ui_translation (
       locale VARCHAR(8) NOT NULL,
@@ -51,7 +56,7 @@ async function ensureTable(): Promise<void> {
     );
     CREATE INDEX IF NOT EXISTS ui_translation_created_idx ON ui_translation (created_at);
   `)
-  tableReady = true
+  globalThis.__uiTranslationTableReady = true
 }
 
 const hashOf = (text: string) => createHash('sha1').update(text).digest('hex')
@@ -60,7 +65,8 @@ const hashOf = (text: string) => createHash('sha1').update(text).digest('hex')
 async function translateBatch(texts: string[], locale: Locale): Promise<string[] | null> {
   const language = LOCALE_INFO[locale].english
   const response = await complete({
-        feature: 'ui-translation',
+    feature: 'ui-translation',
+    prefer: ['groq', 'cerebras'],
     messages: [
       {
         role: 'system',
@@ -86,7 +92,7 @@ ${JSON.stringify(texts)}`,
       },
     ],
     temperature: 0.2,
-    maxOutputTokens: 6000,
+    maxOutputTokens: 4000,
     json: true,
   })
 
@@ -108,8 +114,8 @@ const MIN_SPLIT = 4
  * Terjemahkan satu kelompok dan simpan hasilnya.
  *
  * Satu balasan model yang cacat — jumlah butir meleset satu, JSON terpotong —
- * tidak boleh membuang enam puluh kalimat sekaligus. Kelompok yang gagal
- * dibelah dua dan dicoba lagi sampai tinggal beberapa kalimat, sehingga yang
+ * tidak boleh membuang banyak kalimat sekaligus. Kelompok yang gagal
+ * dibelah dua dan dicoba lagi secara paralel sampai tinggal beberapa kalimat, sehingga yang
  * hilang hanya kalimat yang memang bermasalah.
  */
 async function translateAndStore(
@@ -129,10 +135,11 @@ async function translateAndStore(
   if (!out) {
     if (batch.length <= MIN_SPLIT) return 0
     const mid = Math.ceil(batch.length / 2)
-    return (
-      (await translateAndStore(batch.slice(0, mid), locale, cached)) +
-      (await translateAndStore(batch.slice(mid), locale, cached))
-    )
+    const [left, right] = await Promise.all([
+      translateAndStore(batch.slice(0, mid), locale, cached),
+      translateAndStore(batch.slice(mid), locale, cached),
+    ])
+    return left + right
   }
 
   const values = batch.map((source, j) => sql`(${locale}, ${hashOf(source)}, ${source}, ${out![j]})`)
@@ -141,7 +148,11 @@ async function translateAndStore(
     values ${sql.join(values, sql`, `)}
     on conflict (locale, source_hash) do nothing
   `)
-  batch.forEach((source, j) => cached.set(hashOf(source), out![j]))
+  batch.forEach((source, j) => {
+    const h = hashOf(source)
+    cached.set(h, out![j])
+    memoryCache.set(`${locale}:${h}`, out![j])
+  })
   return batch.length
 }
 
@@ -183,7 +194,16 @@ export async function translateUiTexts(
     }
   }
 
-  // 2. Kueri tabel ui_translation di basis data untuk yang belum ditemukan
+  // 2. Periksa cache memori instan di proses server (0ms)
+  for (const t of unique) {
+    const h = hashOf(t)
+    if (!cached.has(h)) {
+      const mem = memoryCache.get(`${locale}:${h}`)
+      if (mem) cached.set(h, mem)
+    }
+  }
+
+  // 3. Kueri tabel ui_translation di basis data untuk yang belum ditemukan di memori
   const stillMissingHashes = unique
     .filter((t) => !cached.has(hashOf(t)))
     .map(hashOf)
@@ -195,6 +215,7 @@ export async function translateUiTexts(
     `)
     for (const r of rows as unknown as { source_hash: string; translated: string }[]) {
       cached.set(r.source_hash, r.translated)
+      memoryCache.set(`${locale}:${r.source_hash}`, r.translated)
     }
   }
 
@@ -218,9 +239,14 @@ export async function translateUiTexts(
     capped = fitting.length < missing.length
     missing = fitting
 
+    const chunks: string[][] = []
     for (let i = 0; i < missing.length; i += BATCH_SIZE) {
-      translatedCount += await translateAndStore(missing.slice(i, i + BATCH_SIZE), locale, cached)
+      chunks.push(missing.slice(i, i + BATCH_SIZE))
     }
+    const counts = await Promise.all(
+      chunks.map((chunk) => translateAndStore(chunk, locale, cached))
+    )
+    translatedCount = counts.reduce((sum, c) => sum + c, 0)
 
     // Yang tidak muat dan yang gagal diterjemahkan tidak membelanjakan apa pun
     // yang layak dihitung, jadi pagunya dikembalikan.

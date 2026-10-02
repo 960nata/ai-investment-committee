@@ -408,12 +408,15 @@ function envInt(name: string, fallback: number): number {
   return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : fallback
 }
 
-const translateLimits = () => ({
-  total: envInt('UI_TRANSLATE_DAILY_CHARS', 400_000),
-  guestShare: 0.4,
-  perIp: envInt('UI_TRANSLATE_DAILY_PER_IP', 30_000),
-  perUser: envInt('UI_TRANSLATE_DAILY_PER_USER', 60_000),
-})
+const translateLimits = () => {
+  const isDev = process.env.NODE_ENV !== 'production'
+  return {
+    total: envInt('UI_TRANSLATE_DAILY_CHARS', isDev ? 2_000_000 : 400_000),
+    guestShare: isDev ? 1.0 : 0.4,
+    perIp: envInt('UI_TRANSLATE_DAILY_PER_IP', isDev ? 500_000 : 30_000),
+    perUser: envInt('UI_TRANSLATE_DAILY_PER_USER', isDev ? 500_000 : 60_000),
+  }
+}
 
 interface Bucket {
   key: string
