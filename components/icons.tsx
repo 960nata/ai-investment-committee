@@ -308,6 +308,41 @@ export function IconCopy(props: IconProps) {
   )
 }
 
+/** Bagikan / Share tautan atau dokumen. */
+export function IconShare(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <circle cx="18" cy="5" r="3" />
+      <circle cx="6" cy="12" r="3" />
+      <circle cx="18" cy="19" r="3" />
+      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+      <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+    </Svg>
+  )
+}
+
+/** Unduh berkas / laporan. */
+export function IconDownload(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="7 10 12 15 17 10" />
+      <line x1="12" y1="15" x2="12" y2="3" />
+    </Svg>
+  )
+}
+
+/** Cetak / Simpan PDF. */
+export function IconPrinter(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <polyline points="6 9 6 2 18 2 18 9" />
+      <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+      <rect x="6" y="14" width="12" height="8" />
+    </Svg>
+  )
+}
+
 /** Tanda silang tutup / batal. */
 export function IconClose(props: IconProps) {
   return (

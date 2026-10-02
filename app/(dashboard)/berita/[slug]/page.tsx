@@ -9,6 +9,7 @@ import { IconCandles, IconNews, IconEye } from '@/components/icons'
 import { NewsSidebar } from '@/components/news-sidebar'
 import { AdSlot } from '@/components/ad-slot'
 import { requireUser } from '@/lib/auth/user-auth'
+import { SITE_NAME, getBaseUrl } from '@/lib/brand'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,10 +29,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 
   const imageUrl = article.featuredImage?.url
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  const baseUrl = getBaseUrl()
 
   return {
-    title: `${article.title} | AI Investment Committee`,
+    title: `${article.title} | ${SITE_NAME}`,
     description: article.summary,
     keywords: [...article.tags, ...article.mentionedSymbols, 'Investasi', 'Saham', 'AI', 'Energi'],
     authors: [{ name: article.author }],
@@ -39,7 +40,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       title: article.title,
       description: article.summary,
       url: `${baseUrl}/berita/${article.slug}`,
-      siteName: 'AI Investment Committee',
+      siteName: SITE_NAME,
       images: imageUrl ? [{ url: imageUrl, alt: article.title }] : undefined,
       type: 'article',
       publishedTime: article.publishedAt.toISOString(),
@@ -81,7 +82,7 @@ export default async function BeritaDetailPage({ params }: Props) {
   const footerAd = adSlots.find((s) => s.slotName === 'footer_banner')
 
   const related = allNews.filter((a) => a.slug !== slug).slice(0, 3)
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  const baseUrl = getBaseUrl()
 
   // JSON-LD Structured Data untuk Google Search & Google News
   const jsonLd = {
@@ -101,7 +102,7 @@ export default async function BeritaDetailPage({ params }: Props) {
     ],
     publisher: {
       '@type': 'Organization',
-      name: 'AI Investment Committee',
+      name: SITE_NAME,
       url: baseUrl,
     },
     mainEntityOfPage: {
@@ -142,7 +143,7 @@ export default async function BeritaDetailPage({ params }: Props) {
 
       <div className="news-layout-with-sidebar">
         <div className="news-main-column">
-          <article className="panel" style={{ padding: 'var(--space-5)' }}>
+          <article className="panel warta-article-panel" style={{ padding: 'var(--space-5)', minWidth: 0 }}>
         {/* Slot Iklan 1: Header Leaderboard (Default Hidden) */}
         <AdSlot slot={headerAd} />
 
@@ -189,6 +190,22 @@ export default async function BeritaDetailPage({ params }: Props) {
             </span>
           </div>
         </header>
+
+        {/* Bilah Aksi Ringkas: Unduh .MD, PDF, Salin Tautan & Bagikan */}
+        <ArticleActions
+          title={article.title}
+          summary={article.summary}
+          slug={article.slug}
+          keyTakeaways={article.keyTakeaways}
+          symbols={article.mentionedSymbols}
+          contentMarkdown={article.contentMarkdown}
+          author={article.author}
+          publishedAt={article.publishedAt}
+          category={article.category}
+          sentiment={article.sentiment}
+          impactScore={article.impactScore}
+          mode="compact"
+        />
 
         {/* Gambar Utama (Featured Image) */}
         {article.featuredImage?.url && (
@@ -346,6 +363,13 @@ export default async function BeritaDetailPage({ params }: Props) {
           slug={article.slug}
           keyTakeaways={article.keyTakeaways}
           symbols={article.mentionedSymbols}
+          contentMarkdown={article.contentMarkdown}
+          author={article.author}
+          publishedAt={article.publishedAt}
+          category={article.category}
+          sentiment={article.sentiment}
+          impactScore={article.impactScore}
+          mode="full"
         />
       </article>
 

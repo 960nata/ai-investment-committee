@@ -161,24 +161,6 @@ export function AiTokensDashboardClient({ initialData }: AiTokensDashboardClient
       {refreshError && <p role="alert">{refreshError}</p>}
       <p className="mono">Diperbarui {new Date(data.generatedAt).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB · otomatis setiap 30 detik</p>
       {data.storage !== 'redis' && <p role="status">{data.storage === 'degraded' ? 'Redis bermasalah: riwayat dapat tidak lengkap.' : 'Redis belum dikonfigurasi: angka hanya dari proses server ini.'}</p>}
-      <section className="panel">
-        <div className="panel-head"><span className="panel-title">Alur API fitur</span></div>
-        <p>Komite: pengawas risiko → Cloudflare, ketua → GPT. Tanya Komite → GPT lalu Cloudflare. Preferensi dapat diatur lewat konfigurasi; saat gagal, provider lama tetap menjadi cadangan. Setiap baris di bawah adalah satu percobaan API, bukan satu permintaan pengguna.</p>
-        {data.configuration.filter((p) => p.id === 'openai' || p.id === 'cloudflare' || p.issue).map((p) => (
-          <p key={p.id}><strong>{p.name}</strong> · {p.model} · {!p.configured ? 'Kunci belum dikonfigurasi' : p.issue ?? 'Dikonfigurasi; keberhasilan panggilan terlihat pada riwayat'}</p>
-        ))}
-        <div className="scroll-x"><table className="grid">
-          <thead><tr><th>Waktu WIB</th><th>Fitur / Jejak</th><th>Provider / Model</th><th>Percobaan</th><th>Hasil</th><th>Token masuk / keluar</th><th>Latensi</th></tr></thead>
-          <tbody>{data.recentCalls.map((call, index) => <tr key={`${call.requestId}-${call.attempt}-${index}`}>
-            <td>{new Date(call.timestamp ?? 0).toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' })}</td>
-            <td>{call.feature ?? 'Tidak tercatat'}<br /><small>{call.requestId?.slice(0, 8)}</small></td>
-            <td>{call.providerId}<br /><small>{call.model}</small></td>
-            <td>{call.attempt ?? 1}{(call.attempt ?? 1) > 1 ? ' · fallback/retry' : ''}</td>
-            <td>{call.success ? 'Sukses' : `${call.errorKind ?? 'error'} (${call.status})`}</td>
-            <td>{call.inputTokens} / {call.outputTokens}</td><td>{call.latencyMs} ms</td>
-          </tr>)}</tbody>
-        </table>{data.recentCalls.length === 0 && <p>Belum ada panggilan tercatat dalam rentang ini.</p>}</div>
-      </section>
       {/* 1. HERO */}
       <div className="admin-page-hero">
         <span className="admin-hero-glow" aria-hidden="true" />

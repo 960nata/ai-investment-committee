@@ -8,6 +8,7 @@
  */
 
 import { fetchWithTimeout, MODEL_TIMEOUT_MS } from '@/lib/http/fetch'
+import { getBaseUrl, SITE_NAME } from '@/lib/brand'
 import {
   LlmError,
   classifyStatus,
@@ -155,8 +156,8 @@ export const openRouterAdapter = createOpenAiCompatibleAdapter({
   // utuh dalam ~140 token.
   extraBody: { reasoning: { enabled: false } },
   extraHeaders: {
-    'http-referer': process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000',
-    'x-title': 'investasi',
+    'http-referer': getBaseUrl(),
+    'x-title': SITE_NAME,
   },
 })
 
@@ -191,8 +192,8 @@ export const premiumAdapter = createOpenAiCompatibleAdapter({
   model: process.env.PREMIUM_LLM_MODEL ?? 'anthropic/claude-sonnet-5',
   envPrefix: 'PREMIUM_LLM_API_KEY',
   extraHeaders: {
-    'http-referer': process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000',
-    'x-title': 'investasi',
+    'http-referer': getBaseUrl(),
+    'x-title': SITE_NAME,
   },
 })
 

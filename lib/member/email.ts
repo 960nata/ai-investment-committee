@@ -19,7 +19,7 @@ import crypto from 'node:crypto'
 import { sql } from 'drizzle-orm'
 import { db } from '@/lib/db/client'
 import { ensureMemberTables } from '@/lib/db/member-queries'
-import { SITE_NAME } from '@/lib/brand'
+import { SITE_NAME, getBaseUrl } from '@/lib/brand'
 import { fetchWithTimeout } from '@/lib/http/fetch'
 
 export type Delivery = 'resend' | 'off'
@@ -29,7 +29,7 @@ export function emailDelivery(): Delivery {
 }
 
 export function appUrl(): string {
-  return (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '')
+  return getBaseUrl()
 }
 
 function secret(): string {

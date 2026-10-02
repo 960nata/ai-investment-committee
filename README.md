@@ -174,9 +174,10 @@ Tanya Komite mendahulukan GPT lalu Cloudflare; fitur AI lain tetap memakai regis
 bersama dan provider lama tetap tersedia. Permintaan Premium masih mendahulukan
 provider Premium bila dikonfigurasi. Pemakaian provider dapat menimbulkan biaya.
 
-Halaman `/admin/ai-tokens` memperbarui data setiap 30 detik saat tab terlihat:
-jumlah percobaan, sukses/429/error, token, latensi, serta 100 percobaan terbaru
-dengan nama fitur, model, ID permintaan, dan urutan retry/fallback. Token dihitung
+Halaman `/admin/ai-tokens` memantau kuota, kesehatan key, token, dan latensi.
+Halaman `/admin/aktivitas-ai` menunjukkan alur provider tiap fitur dan 100
+percobaan terbaru dengan nama fitur, model, ID permintaan, dan urutan
+retry/fallback. Keduanya diperbarui setiap 30 detik saat tab terlihat. Token dihitung
 sesuai usage yang dilaporkan provider. Jumlah percobaan bukan jumlah pengguna.
 Tidak ada prompt, jawaban, atau API key mentah dalam telemetry.
 

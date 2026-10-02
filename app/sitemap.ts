@@ -3,6 +3,7 @@ import { getMarketNewsList, listNewsLocaleMap } from '@/lib/db/news-queries'
 import { getPublicDonationSettings } from '@/lib/db/donation-queries'
 import { listInstrumentQuotes } from '@/lib/db/queries'
 import { LOCALES, LOCALE_INFO, SOURCE_LOCALE, localePath, type Locale } from '@/lib/i18n/locales'
+import { getBaseUrl } from '@/lib/brand'
 
 /**
  * Peta situs untuk halaman publik.
@@ -15,7 +16,7 @@ import { LOCALES, LOCALE_INFO, SOURCE_LOCALE, localePath, type Locale } from '@/
 
 export const dynamic = 'force-dynamic'
 
-const base = () => (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '')
+const base = () => getBaseUrl()
 
 function entry(
   path: string,

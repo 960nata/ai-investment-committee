@@ -608,8 +608,26 @@ export async function acquireFeaturedPhoto(options: {
     console.warn(`[NewsAgent] Kandidat ${candidate.provider} gagal — ${stored.error}`)
   }
 
+  // Jika penyimpanan ke Supabase gagal (misal kunci Supabase belum diset),
+  // gunakan URL gambar internet kandidat pertama agar artikel tetap terbit
+  // dengan foto internet nyata yang segar dan bervariasi.
+  const fallbackCandidate = queue[0]
+  if (fallbackCandidate?.url) {
+    console.warn(
+      `[NewsAgent] Supabase Storage belum aktif (${failures[0] ?? '-'}), memakai foto internet langsung dari ${fallbackCandidate.provider}.`,
+    )
+    return {
+      url: fallbackCandidate.url,
+      caption: options.caption?.trim() || fallbackCandidate.title || curated.caption,
+      credit: fallbackCandidate.credit,
+      alt: options.alt?.trim() || fallbackCandidate.title || curated.alt,
+      sourceUrl: fallbackCandidate.sourcePage,
+      license: fallbackCandidate.license,
+    }
+  }
+
   throw new Error(
-    'Foto sampul gagal diunggah ke Supabase Storage, artikel tidak diterbitkan. ' +
+    'Foto sampul gagal didapatkan dari internet, artikel tidak diterbitkan. ' +
       `Percobaan: ${failures.join(' | ')}`,
   )
 }

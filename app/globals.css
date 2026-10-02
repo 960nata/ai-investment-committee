@@ -3915,6 +3915,213 @@ body.rail-lock {
   margin: var(--space-5) 0;
 }
 
+.article-body-content video,
+.article-body-content iframe {
+  max-width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-sm);
+  display: block;
+  margin: var(--space-4) 0;
+}
+
+/* ---------------------------------------------------------------------------
+   Aksi Dokumen, Unduh (.md / PDF) & Distribusi (Share) Artikel
+   --------------------------------------------------------------------------- */
+
+.article-actions-compact {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 var(--space-4) 0;
+}
+
+.article-actions-box {
+  background: var(--bg-subtle);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  margin: var(--space-4) 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.article-actions-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 8px;
+}
+
+.article-actions-kicker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--t-micro);
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: 0.08em;
+}
+
+.article-actions-note {
+  font-size: var(--t-micro);
+  color: var(--ink-faint);
+  letter-spacing: 0.06em;
+}
+
+.article-actions-rows {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px 20px;
+}
+
+.article-actions-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.article-actions-label {
+  font-size: var(--t-micro);
+  font-weight: 600;
+  color: var(--ink-mute);
+  letter-spacing: 0.06em;
+}
+
+@media (max-width: 760px) {
+  .article-actions-box {
+    padding: 12px;
+  }
+
+  .article-actions-rows {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .article-actions-group {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .article-actions-group .segmented {
+    width: 100%;
+    display: flex;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .article-actions-group .seg {
+    flex: 1 1 auto;
+    justify-content: center;
+    padding: 8px 10px;
+    font-size: 11px;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Gaya Cetak & Ekspor Dokumen Resmi (@media print)
+   --------------------------------------------------------------------------- */
+@media print {
+  html, body {
+    background: #ffffff !important;
+    color: #111111 !important;
+    font-size: 11pt !important;
+    line-height: 1.5 !important;
+  }
+
+  /* Sembunyikan elemen antarmuka, navigasi, iklan, bilah samping & tombol */
+  header,
+  nav,
+  aside,
+  footer,
+  .site-header,
+  .landing-header,
+  .warta-toolbar,
+  .warta-back,
+  .rail,
+  .news-sidebar,
+  .news-sidebar-column,
+  .ad-slot,
+  .ad-container,
+  .article-actions-compact,
+  .article-actions-box,
+  .theme-toggle,
+  .btn,
+  button,
+  .auth-button {
+    display: none !important;
+  }
+
+  .landing-section,
+  .landing-section-container,
+  .news-layout-with-sidebar,
+  .news-main-column,
+  .warta-article-panel,
+  .panel {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+
+  .article-title {
+    color: #000000 !important;
+    font-size: 20pt !important;
+    margin-bottom: 6pt !important;
+  }
+
+  .article-meta,
+  .warta-kicker {
+    color: #555555 !important;
+    font-size: 9pt !important;
+    border-bottom: 1pt solid #cccccc !important;
+  }
+
+  .takeaways-box {
+    background: #f7f7f7 !important;
+    border: 1pt solid #dddddd !important;
+    border-left: 3pt solid #111111 !important;
+    color: #111111 !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    margin: 12pt 0 !important;
+    padding: 10pt !important;
+  }
+
+  .takeaways-title {
+    color: #000000 !important;
+    font-weight: bold !important;
+  }
+
+  .article-body-content,
+  .markdown-view,
+  p {
+    color: #111111 !important;
+    font-size: 10.5pt !important;
+  }
+
+  a {
+    color: #111111 !important;
+    text-decoration: underline !important;
+  }
+
+  figure, img {
+    max-width: 100% !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+}
+
 /* ---------------------------------------------------------------------------
    Kolom Widget Samping Berita & Slot Iklan (Palet Gelap Institusional)
    --------------------------------------------------------------------------- */

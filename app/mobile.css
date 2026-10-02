@@ -47,11 +47,37 @@
     overflow-wrap: anywhere;
   }
 
-  .article-body-content img,
+  .article-body-content img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /*
+   * Video di dalam isi berita (artikel CMS) pada layar mobile:
+   * Diberi padding 3px khusus pada layar mobile di bagian isi berita saja,
+   * serta aspect-ratio 16/9 agar tetap proporsional dan tidak amblas.
+   */
   .article-body-content video,
   .article-body-content iframe {
     max-width: 100%;
     height: auto;
+    aspect-ratio: 16 / 9;
+    padding: 3px !important;
+    box-sizing: border-box !important;
+    display: block;
+  }
+
+  .article-body-content .youtube-wrapper {
+    box-sizing: border-box !important;
+    padding: 3px !important;
+  }
+
+  .article-body-content .youtube-wrapper iframe {
+    top: 3px;
+    left: 3px;
+    width: calc(100% - 6px);
+    height: calc(100% - 6px);
+    padding: 0 !important;
   }
 
   /* Padding 24px di tiap sisi menyisakan kolom baca ~270px di layar 360px. */

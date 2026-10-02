@@ -37,10 +37,11 @@ import { LandingNav } from '@/components/landing-nav'
 import { LandingFooter } from '@/components/landing-footer'
 import { PublicTerminalCta } from '@/components/public-news-portal'
 import { NewsSidebar } from '@/components/news-sidebar'
+import { ArticleActions } from '@/components/article-actions'
 import { IconEye, IconNews } from '@/components/icons'
-import { SITE_NAME } from '@/lib/brand'
+import { SITE_NAME, getBaseUrl } from '@/lib/brand'
 
-const baseUrl = () => process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+const baseUrl = () => getBaseUrl()
 
 export async function wartaArticleMetadata(slug: string, locale: Locale): Promise<Metadata> {
   await seedInitialNewsArticles()
@@ -225,6 +226,22 @@ export async function WartaArticle({ slug, locale }: { slug: string; locale: Loc
               {ui.aiNote && <p className="warta-ai-note">{ui.aiNote}</p>}
             </header>
 
+            {/* Bilah Aksi Ringkas: Unduh .MD, PDF, Salin Tautan & Bagikan */}
+            <ArticleActions
+              title={article.title}
+              summary={article.summary}
+              slug={article.slug}
+              keyTakeaways={article.keyTakeaways}
+              symbols={article.mentionedSymbols}
+              contentMarkdown={article.contentMarkdown}
+              author={article.author}
+              publishedAt={article.publishedAt}
+              category={article.category}
+              sentiment={article.sentiment}
+              impactScore={article.impactScore}
+              mode="compact"
+            />
+
             {article.featuredImage?.url && (
               <figure style={{ margin: 'var(--space-4) 0' }}>
                 <div
@@ -336,6 +353,22 @@ export async function WartaArticle({ slug, locale }: { slug: string; locale: Loc
                 </p>
               </div>
             )}
+
+            {/* Bilah Aksi & Unduh Dokumen Lengkap */}
+            <ArticleActions
+              title={article.title}
+              summary={article.summary}
+              slug={article.slug}
+              keyTakeaways={article.keyTakeaways}
+              symbols={article.mentionedSymbols}
+              contentMarkdown={article.contentMarkdown}
+              author={article.author}
+              publishedAt={article.publishedAt}
+              category={article.category}
+              sentiment={article.sentiment}
+              impactScore={article.impactScore}
+              mode="full"
+            />
 
             <AdSlot slot={footerAd} />
           </article>

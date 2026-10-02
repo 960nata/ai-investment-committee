@@ -318,23 +318,25 @@ function keywordsOf(query: string): string[] {
  * kunci bermakna. Kata di URL halaman ikut dihitung karena judul Wikimedia
  * sering kosong sementara nama berkasnya deskriptif.
  */
-function isRelevant(candidate: PhotoCandidate, keywords: string[]): boolean {
+function isRelevant(candidate: PhotoCandidate, keywords: string[], minMatches = 2): boolean {
   if (!KEYWORD_MATCH_PROVIDERS.has(candidate.provider) || keywords.length === 0) return true
   const haystack = `${candidate.title ?? ''} ${decodeURIComponent(candidate.sourcePage ?? '')}`
     .toLowerCase()
     .replace(/[_-]+/g, ' ')
-  // Satu kata tidak cukup: "wall street" cocok dengan "red-brick wall", dan
-  // "gold bars" dengan lukisan Manet. Dua kata kunci menyaring kebetulan itu.
-  const needed = Math.min(2, keywords.length)
-  return keywords.filter((k) => new RegExp(`\\b${k}`).test(haystack)).length >= needed
+  const needed = Math.min(minMatches, keywords.length)
+  return (
+    keywords.filter((k) => haystack.includes(k) || new RegExp(`\\b${k}`).test(haystack)).length >=
+    needed
+  )
 }
 
 /**
  * Cari foto asli di internet untuk satu kata kunci.
  *
- * Penyedia dijalankan berbarengan, bukan berurutan: pencarian yang gagal atau
- * lambat di satu sumber tidak boleh menahan yang lain, dan hasil gabungannya
- * memberi kandidat cadangan saat unduhan pertama ditolak.
+ * Menggunakan pendekatan multi-pass:
+ * 1. Coba pencocokan presisi (min 2 kata kunci).
+ * 2. Jika nihil, relaksasikan filter ke 1 kata kunci relevan.
+ * 3. Jika masih nihil dan query panjang (>2 kata), sederhanakan query ke 2 kata kunci inti.
  */
 export async function searchInternetPhotos(query: string): Promise<PhotoCandidate[]> {
   const clean = query.trim()
@@ -353,14 +355,52 @@ export async function searchInternetPhotos(query: string): Promise<PhotoCandidat
   const candidates: PhotoCandidate[] = []
   const keywords = keywordsOf(clean)
 
+  // Pass 1: Saring dengan kecocokan ketat (minimal 2 kata kunci)
   for (const batch of batches) {
     for (const candidate of batch) {
       if (!isUsable(candidate)) continue
-      if (!isRelevant(candidate, keywords)) continue
+      if (!isRelevant(candidate, keywords, 2)) continue
       if (seen.has(candidate.url)) continue
       seen.add(candidate.url)
       candidates.push(candidate)
       if (candidates.length >= MAX_CANDIDATES) break
+    }
+  }
+
+  // Pass 2: Jika masih kosong, relaksasikan kecocokan ke 1 kata kunci
+  if (candidates.length === 0) {
+    for (const batch of batches) {
+      for (const candidate of batch) {
+        if (!isUsable(candidate)) continue
+        if (!isRelevant(candidate, keywords, 1)) continue
+        if (seen.has(candidate.url)) continue
+        seen.add(candidate.url)
+        candidates.push(candidate)
+        if (candidates.length >= MAX_CANDIDATES) break
+      }
+    }
+  }
+
+  // Pass 3: Jika masih kosong dan query panjang (>2 kata), cari ulang dengan kata kunci inti
+  if (candidates.length === 0 && keywords.length > 2) {
+    const simplified = keywords.slice(0, 2).join(' ')
+    console.log(`[ImageSearch] Query "${clean}" nihil, mencoba query inti: "${simplified}"`)
+    const fallbackBatches = await Promise.all([
+      searchPexels(simplified),
+      searchUnsplash(simplified),
+      searchOpenverse(simplified),
+      searchWikimedia(simplified),
+    ])
+
+    for (const batch of fallbackBatches) {
+      for (const candidate of batch) {
+        if (!isUsable(candidate)) continue
+        if (!isRelevant(candidate, keywords.slice(0, 2), 1)) continue
+        if (seen.has(candidate.url)) continue
+        seen.add(candidate.url)
+        candidates.push(candidate)
+        if (candidates.length >= MAX_CANDIDATES) break
+      }
     }
   }
 

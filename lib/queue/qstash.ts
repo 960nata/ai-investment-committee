@@ -9,6 +9,7 @@
 
 import { Client, Receiver } from '@upstash/qstash'
 import { fetchWithTimeout } from '@/lib/http/fetch'
+import { getBaseUrl } from '@/lib/brand'
 
 export interface JobPayload {
   jobName: string
@@ -22,7 +23,7 @@ export interface JobPayload {
 }
 
 function appUrl(): string {
-  return process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') ?? 'http://localhost:3000'
+  return getBaseUrl()
 }
 
 let client: Client | null | undefined

@@ -1,0 +1,244 @@
+.page {
+  gap: 24px;
+}
+
+.updated {
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 16px;
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  border-radius: var(--radius-sm);
+  background: rgba(245, 158, 11, 0.08);
+  color: var(--amber);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.notice svg { flex: none; }
+
+.statTotal {
+  font-size: 0.48em;
+  color: var(--ink-mute);
+}
+
+.routeGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(260px, 1fr);
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.routeCard {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+}
+
+.routeHeading {
+  display: grid;
+  gap: 4px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.routeHeading strong {
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.routeEyebrow {
+  color: var(--signal);
+  font: 700 10px var(--mono);
+  letter-spacing: 0.1em;
+}
+
+.roleList {
+  display: grid;
+  gap: 0;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.roleRow {
+  display: grid;
+  grid-template-columns: 26px minmax(95px, 1fr) 14px minmax(95px, 1fr) 8px;
+  align-items: center;
+  gap: 9px;
+  min-height: 40px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-mute);
+  font-size: 12px;
+}
+
+.roleRow:last-child { border-bottom: 0; }
+
+.step {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-xs);
+  background: var(--surface-2);
+  color: var(--signal);
+  font: 700 11px var(--mono);
+}
+
+.roleName, .roleProvider {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.roleName { color: var(--ink-soft); }
+.roleProvider { color: var(--ink); font-weight: 600; }
+
+.stateDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.ready { background: var(--green); }
+.unready { background: var(--amber); }
+
+.routeNote {
+  margin: auto 0 0;
+  padding-top: 15px;
+  color: var(--ink-mute);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.askFlow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 24px 0;
+  color: var(--ink-mute);
+}
+
+.askFlow span {
+  padding: 8px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-xs);
+  background: var(--surface-2);
+  color: var(--ink-soft);
+  font: 600 11px var(--mono);
+}
+
+.tableCount {
+  color: var(--ink-mute);
+  font: 11px var(--mono);
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.filters label {
+  display: grid;
+  gap: 6px;
+  min-width: 150px;
+  color: var(--ink-mute);
+  font: 700 10px var(--mono);
+  letter-spacing: 0.08em;
+}
+
+.filters select {
+  width: 100%;
+  min-height: 34px;
+  padding: 0 32px 0 11px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-xs);
+  background: var(--surface-0);
+  color: var(--ink);
+  font: 12px var(--mono);
+  letter-spacing: normal;
+}
+
+.filters select:focus-visible,
+.more button:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 2px;
+}
+
+.table { min-width: 900px; }
+.table th, .table td { white-space: nowrap; }
+
+.primary, .secondary { display: block; }
+.primary { color: var(--ink); font-weight: 600; }
+.secondary {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--ink-mute);
+  font: 11px var(--mono);
+  margin-top: 3px;
+}
+
+.nowrap { font-variant-numeric: tabular-nums; }
+
+.resultBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 2px 7px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  font: 600 10px var(--mono);
+}
+
+.success {
+  color: var(--green);
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.2);
+}
+
+.failure {
+  color: var(--amber);
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.2);
+}
+
+.empty {
+  padding: 40px 20px;
+  color: var(--ink-mute);
+  font-size: 12px;
+  text-align: center;
+}
+
+.more {
+  display: flex;
+  justify-content: center;
+  padding: 12px;
+  border-top: 1px solid var(--line);
+}
+
+@media (max-width: 920px) {
+  .routeGrid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+  .routeCard { padding: 16px; }
+  .filters { padding: 12px 16px; }
+  .filters label { flex: 1 1 100%; }
+}

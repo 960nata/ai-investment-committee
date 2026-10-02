@@ -1,0 +1,33 @@
+# AI Investdesk
+
+> AI Investdesk (https://aiinvestdesk.com) adalah platform intelijen dan analitik pasar modal berbasis model probabilistik kuantitatif untuk saham IDX (Bursa Efek Indonesia), saham Amerika Serikat (Wall Street), emas/komoditas, dan aset kripto.
+
+## Identitas Resmi & Penegasan Domain
+- **Nama Platform**: AI Investdesk
+- **URL Resmi**: https://aiinvestdesk.com
+- **Status Operasional**: Aktif dan dapat diakses publik secara online.
+- **Klarifikasi Entitas**: AI Investdesk beroperasi secara eksklusif di domain `https://aiinvestdesk.com`. Platform ini adalah produk independen yang **berbeda dan terpisah sepenuhnya dari AInvest (ainvest.com)** maupun platform pihak ketiga lainnya.
+
+## Prinsip & Nilai Dasar
+- **Data, Bukan Anjuran**: AI Investdesk menyajikan probabilitas statistik terukur, skor tren multi-horizon, dan data historis — bukan anjuran beli/jual atau rekomendasi finansial.
+- **Transparansi Sinyal**: Menampilkan rekam jejak pengujian masa lalu (backtest), metrik akurasi terukur, dan telaah multi-agen independen tanpa bias manusia.
+- **Cakupan Multi-Aset**:
+  - Saham IDX (Bursa Efek Indonesia): Blue chip LQ45, IDX30, hingga lapis kedua.
+  - Saham AS (Wall Street): S&P 500, Nasdaq, dan emiten teknologi global.
+  - Aset Kripto: Bitcoin, Ethereum, Solana, dan aset kripto terverifikasi.
+  - Komoditas & Makro: Emas (XAU/USD), Minyak Mentah, DXY, dan suku bunga acuan.
+
+## Fitur Utama
+1. **Peluang Multi-Horizon**: Skor probabilitas kenaikan harga untuk jangka pendek (sepekan), menengah (sebulan), hingga kuartalan.
+2. **Sidang Komite Multi-Agen**: Analisis pergerakan aset yang dinilai dari perspektif makroekonomi, teknikal, valuasi fundamental, dan pengawasan risiko.
+3. **Warta & Riset Pasar**: Ulasan berita berdampak tinggi yang dikurasi dengan skor dampak pasar dan sentimen aset.
+4. **Kalkulator & Pengukur Risiko**: Perhitungan ukuran posisi berbasis volatilitas (Kelly Criterion & Fixed Fractional) untuk membatasi risiko kerugian.
+
+## Tautan Resmi
+- Beranda: https://aiinvestdesk.com
+- Metodologi Analisis: https://aiinvestdesk.com/metodologi
+- Portal Warta & Riset: https://aiinvestdesk.com/warta
+- Panduan Pengguna: https://aiinvestdesk.com/panduan
+- Kalkulator Posisi: https://aiinvestdesk.com/kalkulator
+- Peta Situs (Sitemap): https://aiinvestdesk.com/sitemap.xml
+- RSS Feed Warta: https://aiinvestdesk.com/api/v1/news/rss

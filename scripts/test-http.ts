@@ -34,7 +34,7 @@ async function main() {
     const protectedPage = await request('/backtest')
     assert.equal(protectedPage.status, 307)
     assert.ok(protectedPage.headers.get('location')?.includes('/login'))
-    for (const path of ['/admin/ai-tokens', '/admin/users']) {
+    for (const path of ['/admin/ai-tokens', '/admin/aktivitas-ai', '/admin/users']) {
       const page = await request(path, { headers: { purpose: 'prefetch', 'next-router-prefetch': '1' } })
       assert.equal(page.status, 404, `${path} must authorize even when proxy is skipped`)
     }
@@ -52,6 +52,9 @@ async function main() {
     assert.ok(data.configuration.some((p: { id: string }) => p.id === 'cloudflare'))
     assert.ok(Array.isArray(data.recentCalls))
     assert.ok(!JSON.stringify(data).includes(pin))
+    const activityPage = await request('/admin/aktivitas-ai', { headers: { cookie } })
+    assert.equal(activityPage.status, 200)
+    assert.ok((await activityPage.text()).includes('Alur'))
     const expires = Math.floor(Date.now() / 1000) - 1
     const signature = createHmac('sha256', pin).update(`admin:${expires}`).digest('hex')
     assert.equal((await request('/api/v1/admin/ai-tokens', { headers: { cookie: `komite_admin_session=${expires}.${signature}` } })).status, 401)

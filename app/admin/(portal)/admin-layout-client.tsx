@@ -35,6 +35,8 @@ export function AdminLayoutClient({ children }: AdminLayoutClientProps) {
   let moduleTitle = 'Ringkasan Sistem'
   if (pathname.startsWith('/admin/serangan-cyber')) {
     moduleTitle = 'Radar Serangan Cyber Global'
+  } else if (pathname.startsWith('/admin/aktivitas-ai')) {
+    moduleTitle = 'Alur & Aktivitas AI'
   } else if (pathname.startsWith('/admin/ai-tokens')) {
     moduleTitle = 'Analisis AI Token & API Keys'
   } else if (pathname.startsWith('/admin/analytics')) {
@@ -137,6 +139,15 @@ export function AdminLayoutClient({ children }: AdminLayoutClientProps) {
             >
               <IconPulse size={15} />
               <span>Analisis AI Token</span>
+            </Link>
+
+            <Link
+              href="/admin/aktivitas-ai"
+              className={`admin-nav-link ${pathname.startsWith('/admin/aktivitas-ai') ? 'active' : ''}`}
+              onClick={() => setMobileOpen(false)}
+            >
+              <IconPulse size={15} />
+              <span>Aktivitas AI</span>
             </Link>
 
             <Link

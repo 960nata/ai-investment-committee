@@ -17,6 +17,7 @@ import { MODEL_VERSION } from '@/lib/scoring/weights'
 import { toLiveSession } from '@/lib/agents/session-view'
 import { LandingNav } from '@/components/landing-nav'
 import { NextAiLanding } from '@/components/next-ai-landing'
+import { SITE_NAME, getBaseUrl } from '@/lib/brand'
 import { LandingProtocol } from '@/components/landing-protocol'
 import { LandingReveal } from '@/components/landing-reveal'
 import type { PulseAsset } from '@/components/landing-pulse-grid'
@@ -173,8 +174,70 @@ export default async function LandingPage() {
 
   const freshnessLabel = freshness?.freshness === 'fresh' ? 'DATA SEGAR · TERHUBUNG' : 'DATA TERCATAT'
 
+  const baseUrl = getBaseUrl()
+
+  // JSON-LD Structured Data Schema.org untuk Google Search & AI Engines
+  // Menyediakan identitas resmi entitas "AI Investdesk" dan klarifikasi disambiguasi
+  const landingJsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'Organization',
+        '@id': `${baseUrl}/#organization`,
+        name: SITE_NAME,
+        alternateName: ['AIInvestdesk', 'Investdesk', 'AI Invest Desk'],
+        url: baseUrl,
+        logo: `${baseUrl}/icon.svg`,
+        description:
+          'Platform analitik kuantitatif independen untuk kalkulasi probabilitas arah pergerakan saham IDX, saham AS, dan kripto.',
+        disambiguatingDescription:
+          'AI Investdesk (aiinvestdesk.com) adalah platform analitik independen resmi di domain aiinvestdesk.com dan tidak terafiliasi dengan AInvest (ainvest.com).',
+        knowsAbout: [
+          'Analisis Saham IDX',
+          'Analisis Saham AS',
+          'Analisis Probabilistik Kripto',
+          'Kuantitatif Trading',
+          'Indeks Harga Saham Gabungan (IHSG)',
+        ],
+      },
+      {
+        '@type': 'WebSite',
+        '@id': `${baseUrl}/#website`,
+        url: baseUrl,
+        name: SITE_NAME,
+        alternateName: 'AI Investdesk Terminal',
+        publisher: {
+          '@id': `${baseUrl}/#organization`,
+        },
+        description:
+          'Alat analisis data untuk saham IDX, saham AS, dan crypto. Menampilkan peluang beserta dasarnya, bukan anjuran.',
+        inLanguage: 'id-ID',
+      },
+      {
+        '@type': 'SoftwareApplication',
+        '@id': `${baseUrl}/#software`,
+        name: SITE_NAME,
+        applicationCategory: 'FinanceApplication',
+        operatingSystem: 'All Modern Web Browsers',
+        url: baseUrl,
+        offers: {
+          '@type': 'Offer',
+          price: '0',
+          priceCurrency: 'IDR',
+          availability: 'https://schema.org/InStock',
+        },
+        description:
+          'Terminal intelijen data dan probabilitas pasar untuk saham Bursa Efek Indonesia, Wall Street, dan kripto.',
+      },
+    ],
+  }
+
   return (
     <div className="landing-shell">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(landingJsonLd) }}
+      />
       <LandingNav
         instruments={instruments}
         topAssets={navHighlights}

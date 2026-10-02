@@ -7,7 +7,7 @@ import { getMeasurementId } from "@/lib/analytics/ga4";
 import { VisitBeacon } from "@/components/visit-beacon";
 import { MotionProvider } from "@/components/motion-kit";
 import { SiteTranslator } from "@/components/site-translator";
-import { SITE_NAME } from "@/lib/brand";
+import { SITE_NAME, SITE_DESCRIPTION, SITE_TAGLINE, getBaseUrl } from "@/lib/brand";
 import { ADSENSE_CLIENT } from "@/lib/ads/adsense";
 import "./globals.css";
 import "./mobile.css";
@@ -18,23 +18,64 @@ const fontSans = Plus_Jakarta_Sans({
   display: "swap",
 });
 
+const siteUrl = getBaseUrl();
+
 export const metadata: Metadata = {
-  // Alamat dasar untuk canonical, hreflang, dan Open Graph. Tanpa ini Next
-  // menulis alamat relatif, dan Google menolak hreflang yang tidak absolut.
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"),
-  title: { default: `${SITE_NAME} — peluang naik saham IDX, kripto & emas`, template: `%s — ${SITE_NAME}` },
+  // Alamat dasar untuk canonical, hreflang, dan Open Graph.
+  // Otomatis menunjuk domain produksi resmi https://aiinvestdesk.com jika di deploy
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: `${SITE_NAME} — ${SITE_TAGLINE}`,
+    template: `%s — ${SITE_NAME}`,
+  },
   applicationName: SITE_NAME,
-  openGraph: { siteName: SITE_NAME },
-  description:
-    "Skor peluang saham IDX, saham AS, kripto, dan emas untuk sepekan sampai setahun, " +
-    "beserta penggerak dan rekam jejaknya. Gratis. Data, bukan anjuran.",
-  keywords: ["saham", "analisis", "IDX", "crypto", "investasi", "probabilistik"],
+  description: SITE_DESCRIPTION,
+  keywords: [
+    "AI Investdesk",
+    "aiinvestdesk.com",
+    "analisis saham",
+    "saham IDX",
+    "saham AS",
+    "analisis probabilistik",
+    "kripto",
+    "crypto",
+    "investasi",
+    "terminal investasi AI",
+    "prediksi saham",
+    "IHSG",
+    "fintech Indonesia",
+    "probabilitas investasi",
+  ],
+  alternates: {
+    canonical: siteUrl,
+  },
+  openGraph: {
+    title: `${SITE_NAME} — ${SITE_TAGLINE}`,
+    description: SITE_DESCRIPTION,
+    url: siteUrl,
+    siteName: SITE_NAME,
+    locale: "id_ID",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `${SITE_NAME} — ${SITE_TAGLINE}`,
+    description: SITE_DESCRIPTION,
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
   verification: {
     google: "NtftDAwujuLQyXmxBa2q2cBv_wqnVO1h1TNUigXmVL0",
   },
-  // Verifikasi kepemilikan situs untuk AdSense. Hanya tag meta — tidak memuat
-  // skrip apa pun, jadi tidak ada iklan otomatis. Skripnya dimuat oleh slot
-  // iklan saja (lihat lib/ads/adsense.ts).
   other: { "google-adsense-account": ADSENSE_CLIENT },
 };
 
