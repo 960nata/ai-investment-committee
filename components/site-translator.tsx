@@ -86,6 +86,7 @@ export function SiteTranslator() {
   const originals = useRef(new WeakMap<Text, string>())
   const applied = useRef(new WeakMap<Text, string>())
   const attrOriginals = useRef(new WeakMap<Element, Map<string, string>>())
+  const attrApplied = useRef(new WeakMap<Element, Map<string, string>>())
   const touched = useRef(new Set<WeakRef<Text>>())
   const touchedEls = useRef(new Set<WeakRef<Element>>())
 
@@ -105,23 +106,34 @@ export function SiteTranslator() {
   useEffect(() => {
     document.documentElement.lang = LOCALE_INFO[locale].htmlLang
 
+    // Pindah antarbahasa harus selalu dimulai dari teks sumber. Tanpa ini,
+    // node yang sudah diterjemahkan akan tetap ditandai sebagai hasil lama dan
+    // dilewati oleh apply() untuk bahasa yang baru dipilih.
+    for (const ref of touched.current) {
+      const node = ref.deref()
+      const original = node && originals.current.get(node)
+      if (node && original !== undefined && node.nodeValue === applied.current.get(node)) {
+        node.nodeValue = original
+      }
+    }
+    for (const ref of touchedEls.current) {
+      const el = ref.deref()
+      const originalsForElement = el && attrOriginals.current.get(el)
+      const appliedForElement = el && attrApplied.current.get(el)
+      if (!el || !originalsForElement || !appliedForElement) continue
+      for (const [attr, original] of originalsForElement) {
+        if (el.getAttribute(attr) === appliedForElement.get(attr)) el.setAttribute(attr, original)
+      }
+    }
+    touched.current.clear()
+    touchedEls.current.clear()
+    originals.current = new WeakMap()
+    applied.current = new WeakMap()
+    attrOriginals.current = new WeakMap()
+    attrApplied.current = new WeakMap()
+
     // --- Kembali ke bahasa sumber: pulihkan semua yang pernah diganti. --------
     if (locale === SOURCE_LOCALE) {
-      for (const ref of touched.current) {
-        const node = ref.deref()
-        const original = node && originals.current.get(node)
-        if (node && original !== undefined) node.nodeValue = original
-      }
-      for (const ref of touchedEls.current) {
-        const el = ref.deref()
-        const map = el && attrOriginals.current.get(el)
-        if (el && map) for (const [attr, value] of map) el.setAttribute(attr, value)
-      }
-      touched.current.clear()
-      touchedEls.current.clear()
-      originals.current = new WeakMap()
-      applied.current = new WeakMap()
-      attrOriginals.current = new WeakMap()
       queueMicrotask(() => {
         setBusy(false)
         setJustDone(false)
@@ -202,6 +214,12 @@ export function SiteTranslator() {
             }
             if (!map.has(attr)) map.set(attr, current)
             el.setAttribute(attr, hit)
+            let appliedMap = attrApplied.current.get(el)
+            if (!appliedMap) {
+              appliedMap = new Map()
+              attrApplied.current.set(el, appliedMap)
+            }
+            appliedMap.set(attr, hit)
           }
         }
 

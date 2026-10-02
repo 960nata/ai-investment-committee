@@ -77,7 +77,7 @@ async function translateBatch(texts: string[], locale: Locale): Promise<string[]
         content: `Translate each string below into natural ${language} for the interface of a financial market analysis website.
 
 Rules:
-- Most strings are Indonesian; a few may already be English. Translate all of them into ${language}.
+- The source strings may be in any language, including Indonesian, English, Chinese, Japanese, or Russian. Detect each string's language and translate it into ${language}.
 - Keep numbers, dates, prices, percentages, and asset tickers (e.g. BTCUSDT, BBCA.JK, ^JKSE, NVDA) exactly as written.
 - Placeholders such as {0}, {1} stand for numbers. Keep every placeholder exactly once, unchanged, placed where the number belongs in ${language} grammar.
 - Keep the brand name "AI Investdesk" unchanged. "Komite" on its own is the name of the AI investment committee feature; translate it as a committee.
