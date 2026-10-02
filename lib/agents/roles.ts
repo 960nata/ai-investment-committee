@@ -94,7 +94,7 @@ export const STRATEG: AgentRole = {
   temperature: 0.5,
   maxOutputTokens: 460,
   facts: 'full',
-  provider: process.env.STRATEG_LLM_PROVIDER ?? (process.env.OPENROUTER_API_KEY ? 'openrouter' : (process.env.CEREBRAS_API_KEY ? 'cerebras' : 'groq')),
+  provider: process.env.STRATEG_LLM_PROVIDER ?? (process.env.OPENROUTER_API_KEY && process.env.CEREBRAS_API_KEY ? 'openrouter|cerebras' : (process.env.OPENROUTER_API_KEY ? 'openrouter' : 'cerebras')),
   system: [
     'Kamu strateg portofolio. Susun SATU tesis yang bisa diuji dari laporan analis:',
     '1. Tesis dalam satu kalimat.',
@@ -114,7 +114,7 @@ export const RISIKO: AgentRole = {
   temperature: 0.3,
   maxOutputTokens: 420,
   facts: 'summary',
-  provider: process.env.RISIKO_LLM_PROVIDER ?? 'cloudflare',
+  provider: process.env.RISIKO_LLM_PROVIDER ?? (process.env.DEEPSEEK_API_KEY ? 'cloudflare|deepseek' : 'cloudflare'),
   system: [
     'Kamu pengawas risiko. Tugasmu MENYERANG tesis strateg, bukan menyeimbangkannya — tesis yang kuat akan bertahan; kalau kamu menahan diri, tidak ada yang menghentikan keputusan buruk.',
     'Hasilkan:',
@@ -133,7 +133,7 @@ export const KETUA: AgentRole = {
   temperature: 0.2,
   maxOutputTokens: 380,
   facts: 'summary',
-  provider: process.env.KETUA_LLM_PROVIDER ?? 'openai',
+  provider: process.env.KETUA_LLM_PROVIDER ?? 'openai|gemini',
   json: true,
   system: [
     'Kamu ketua komite investasi. Timbang laporan analis, tesis strateg, dan keberatan pengawas risiko, lalu putuskan.',

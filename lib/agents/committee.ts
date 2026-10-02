@@ -21,6 +21,7 @@
  */
 
 import { complete } from '@/lib/ai/registry'
+import { cache } from '@/lib/cache/redis'
 import type { LlmMessage } from '@/lib/ai/types'
 import {
   closeAgentSession,
@@ -172,7 +173,7 @@ export async function runCommittee(input: CommitteeInput): Promise<CommitteeResu
         temperature: role.temperature,
         maxOutputTokens: role.maxOutputTokens,
         json: role.json,
-        prefer: speakingOrder(role.provider, turns),
+        prefer: await speakingOrder(role.provider, role.name, turns),
       })
 
       await recordAgentMessage({
@@ -334,10 +335,56 @@ async function reusePreviousSession(
  * jatuh ke penyedia teratas registry — yang besar kemungkinan sudah menjawab
  * giliran sebelumnya — dan rapat empat model diam-diam menyusut jadi dua.
  */
-function speakingOrder(own: string, turns: { providerId?: string }[]): string[] {
+const localRoleCursors = new Map<string, number>()
+
+/**
+ * Urutan penyedia untuk satu giliran:
+ * - Jika peran memiliki beberapa kandidat (mis. "openrouter|cerebras"),
+ *   sistem merotasi siapa yang maju pertama kali secara bergantian (Round-Robin).
+ * - Kandidat yang belum/tidak maju menjadi prioritas cadangan (backup pertama).
+ * - Baru kemudian sisa penyedia yang belum bicara di rapat ini.
+ */
+async function speakingOrder(
+  providerSpec: string,
+  roleName: string,
+  turns: { providerId?: string }[],
+): Promise<string[]> {
+  const candidates = providerSpec.split(/[|,]/).map((s) => s.trim()).filter(Boolean)
+  let orderedCandidates = candidates
+
+  if (candidates.length > 1) {
+    const redisKey = `llm:cursor:role:${roleName}`
+    let cur = 0
+
+    if (cache.isAvailable()) {
+      const stored = await cache.get<number>(redisKey)
+      if (typeof stored === 'number') cur = stored
+    } else {
+      cur = localRoleCursors.get(roleName) ?? 0
+    }
+
+    const start = cur % candidates.length
+    orderedCandidates = [
+      ...candidates.slice(start),
+      ...candidates.slice(0, start),
+    ]
+
+    const nextCur = (cur + 1) % candidates.length
+    if (cache.isAvailable()) {
+      await cache.set(redisKey, nextCur)
+    }
+    localRoleCursors.set(roleName, nextCur)
+  }
+
   const spoken = new Set(turns.map((t) => t.providerId).filter(Boolean))
-  const ids = LLM_ADAPTERS.map((a) => a.id).filter((id) => id !== own)
-  return [own, ...ids.filter((id) => !spoken.has(id)), ...ids.filter((id) => spoken.has(id))]
+  const candSet = new Set(orderedCandidates)
+  const others = LLM_ADAPTERS.map((a) => a.id).filter((id) => !candSet.has(id))
+
+  return [
+    ...orderedCandidates,
+    ...others.filter((id) => !spoken.has(id)),
+    ...others.filter((id) => spoken.has(id)),
+  ]
 }
 
 /**
