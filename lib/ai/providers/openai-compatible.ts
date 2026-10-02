@@ -88,6 +88,7 @@ export function createOpenAiCompatibleAdapter(config: OpenAiCompatibleConfig): L
       }
 
       const payload = (await response.json()) as {
+        model?: string
         choices?: { message?: { content?: string } }[]
         usage?: { prompt_tokens?: number; completion_tokens?: number }
         error?: { message?: string }
@@ -108,7 +109,7 @@ export function createOpenAiCompatibleAdapter(config: OpenAiCompatibleConfig): L
       return {
         text,
         providerId: config.id,
-        model: config.model,
+        model: payload.model ?? config.model,
         keyIndex,
         latencyMs: Date.now() - startedAt,
         inputTokens: payload.usage?.prompt_tokens,
@@ -139,22 +140,33 @@ export const groqAdapter = createOpenAiCompatibleAdapter({
   envPrefix: 'GROQ_API_KEY',
 })
 
+const DEFAULT_OPENROUTER_MODELS = [
+  'nvidia/nemotron-3.5-lightning:free',
+  'poolside/laguna-s-2.1:free',
+  'apodex/apodex-1.1-mini:free',
+  'qwen/qwen3.8-27b:free',
+]
+
+const parsedOpenRouterModels = (process.env.OPENROUTER_MODELS ?? process.env.OPENROUTER_MODEL ?? '')
+  .split(',')
+  .map((m) => m.trim())
+  .filter(Boolean)
+
+const activeOpenRouterModels =
+  parsedOpenRouterModels.length > 0 ? parsedOpenRouterModels : DEFAULT_OPENROUTER_MODELS
+
 export const openRouterAdapter = createOpenAiCompatibleAdapter({
   id: 'openrouter',
   name: 'OpenRouter',
   baseUrl: 'https://openrouter.ai/api/v1',
-  // Model gratis OpenRouter datang dan pergi tanpa pemberitahuan: deepseek-v4-
-  // flash-0731:free dihapus, lalu ling-3.0-flash-fin:free jadi berbayar saja
-  // (404) — dan selama itu 25 kunci di sini tidak menjawab satu pun panggilan.
-  // dots-3-note menjawab bahasa Indonesia utuh dalam ~8 detik. Bila ia juga
-  // hilang, registry pindah ke penyedia berikutnya; ganti lewat OPENROUTER_MODEL.
-  model: process.env.OPENROUTER_MODEL ?? 'dots-studio/dots-3-note-preview:free',
+  model: activeOpenRouterModels[0],
   envPrefix: 'OPENROUTER_API_KEY',
-  // Tanpa ini model menghabiskan hampir seluruh `max_tokens` untuk penalaran
-  // tersembunyi, dan jawabannya terpotong di tengah kalimat (diuji: 700 token
-  // habis, jawaban berhenti di kata ketiga belas). Dimatikan, ia menjawab
-  // utuh dalam ~140 token.
-  extraBody: { reasoning: { enabled: false } },
+  extraBody: {
+    // OpenRouter otomatis melakukan fallback berantai ke model berikutnya bila model
+    // pertama sedang sibuk (429/503), menjaga ketersediaan tanpa membakar kunci baru.
+    models: activeOpenRouterModels,
+    reasoning: { enabled: false },
+  },
   extraHeaders: {
     'http-referer': getBaseUrl(),
     'x-title': SITE_NAME,
