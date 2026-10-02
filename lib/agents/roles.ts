@@ -94,7 +94,7 @@ export const STRATEG: AgentRole = {
   temperature: 0.5,
   maxOutputTokens: 460,
   facts: 'full',
-  provider: process.env.STRATEG_LLM_PROVIDER ?? (process.env.CEREBRAS_API_KEY ? 'cerebras' : 'openrouter'),
+  provider: process.env.STRATEG_LLM_PROVIDER ?? (process.env.OPENROUTER_API_KEY ? 'openrouter' : (process.env.CEREBRAS_API_KEY ? 'cerebras' : 'groq')),
   system: [
     'Kamu strateg portofolio. Susun SATU tesis yang bisa diuji dari laporan analis:',
     '1. Tesis dalam satu kalimat.',
