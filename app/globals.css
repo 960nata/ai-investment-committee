@@ -3992,6 +3992,34 @@ body.rail-lock {
 }
 
 @media (max-width: 760px) {
+  .article-actions-compact {
+    margin: var(--space-2) 0 var(--space-3) 0;
+  }
+
+  .article-actions-compact .segmented {
+    display: inline-flex;
+    max-width: 100%;
+  }
+
+  .article-actions-compact .seg {
+    padding: 8px 14px;
+    min-width: 44px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+  }
+
+  .article-actions-compact .seg .seg-label {
+    display: none;
+  }
+
+  .article-actions-compact .seg svg {
+    width: 15px;
+    height: 15px;
+  }
+
   .article-actions-box {
     padding: 12px;
   }

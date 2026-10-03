@@ -191,10 +191,11 @@ export function ArticleActions({
             type="button"
             className="seg"
             onClick={handleDownloadMarkdown}
-            title="Unduh laporan dalam format Markdown (.md)"
+            title={downloadedMd ? 'Laporan berhasil diunduh (.md)' : 'Unduh laporan dalam format Markdown (.md)'}
+            aria-label={downloadedMd ? 'Laporan Tersimpan (.md)' : 'Unduh .MD'}
           >
             {downloadedMd ? <IconCheck size={13} style={{ color: 'var(--measured)' }} /> : <IconDownload size={13} />}
-            <span>{downloadedMd ? 'Tersimpan' : 'Unduh .MD'}</span>
+            <span className="seg-label">{downloadedMd ? 'Tersimpan' : 'Unduh .MD'}</span>
           </button>
 
           <button
@@ -202,20 +203,22 @@ export function ArticleActions({
             className="seg"
             onClick={handlePrintOrPdf}
             title="Cetak artikel atau simpan sebagai PDF"
+            aria-label="Cetak / PDF"
           >
             <IconPrinter size={13} />
-            <span>Cetak / PDF</span>
+            <span className="seg-label">Cetak / PDF</span>
           </button>
 
           <button
             type="button"
             className="seg"
             onClick={handleCopyLink}
-            title="Salin tautan artikel"
+            title={copiedLink ? 'Tautan berhasil disalin' : 'Salin tautan artikel'}
+            aria-label={copiedLink ? 'Tautan Tersalin' : 'Salin Tautan'}
             style={{ color: copiedLink ? 'var(--measured)' : undefined }}
           >
             {copiedLink ? <IconCheck size={13} style={{ color: 'var(--measured)' }} /> : <IconCopy size={13} />}
-            <span>{copiedLink ? 'Tersalin' : 'Salin Tautan'}</span>
+            <span className="seg-label">{copiedLink ? 'Tersalin' : 'Salin Tautan'}</span>
           </button>
 
           {hasNativeShare ? (
@@ -224,10 +227,11 @@ export function ArticleActions({
               className="seg"
               onClick={handleNativeShare}
               title="Bagikan artikel lewat menu perangkat"
+              aria-label="Bagikan artikel"
               style={{ fontWeight: 600, color: 'var(--ink)' }}
             >
               <IconShare size={13} />
-              <span>Bagikan</span>
+              <span className="seg-label">Bagikan</span>
             </button>
           ) : (
             <a
@@ -236,9 +240,10 @@ export function ArticleActions({
               rel="noreferrer"
               className="seg"
               title="Bagikan ke WhatsApp"
+              aria-label="Bagikan ke WhatsApp"
             >
               <IconChat size={13} />
-              <span>WhatsApp</span>
+              <span className="seg-label">WhatsApp</span>
             </a>
           )}
         </div>
