@@ -27,14 +27,14 @@ import {
 
 type Calc = 'dca' | 'target' | 'darurat' | 'alokasi'
 
-const TABS: { id: Calc; label: string; lead: string }[] = [
-  { id: 'dca', label: 'Investasi Rutin', lead: 'Berapa nilai investasimu kalau menyisihkan uang tiap bulan?' },
-  { id: 'target', label: 'Target Dana', lead: 'Berapa yang perlu disisihkan per bulan untuk mencapai tujuanmu?' },
-  { id: 'darurat', label: 'Dana Darurat', lead: 'Berapa dana darurat yang ideal untuk kondisimu?' },
-  { id: 'alokasi', label: 'Profil Risiko', lead: 'Cocoknya investasi di mana? Kenali profil risikomu.' },
+const TABS: { id: Calc; label: string; icon: string; lead: string }[] = [
+  { id: 'dca', label: 'Investasi Rutin', icon: '📈', lead: 'Berapa nilai investasimu kalau menyisihkan uang tiap bulan?' },
+  { id: 'target', label: 'Target Dana', icon: '🎯', lead: 'Berapa yang perlu disisihkan per bulan untuk mencapai tujuanmu?' },
+  { id: 'darurat', label: 'Dana Darurat', icon: '🛡️', lead: 'Berapa dana darurat yang ideal untuk kondisimu?' },
+  { id: 'alokasi', label: 'Profil Risiko', icon: '🧭', lead: 'Cocoknya investasi di mana? Kenali profil risikomu.' },
 ]
 
-const ALLOC_COLOR = ['#4f9d8e', '#7aa7c7', '#e0a13c', '#c9b26b', '#b3564e']
+const ALLOC_COLOR = ['#fa862a', '#38bdf8', '#34d399', '#fbbf24', '#f43f5e']
 
 function rupiah(n: number): string {
   if (!Number.isFinite(n)) return '—'
@@ -154,8 +154,16 @@ export function KalkulatorClient({ signedIn }: { signedIn: boolean }) {
     <div className="calc-wrap">
       <div className="tabs calc-tabs" role="tablist" aria-label="Pilih kalkulator">
         {TABS.map((t) => (
-          <button key={t.id} type="button" role="tab" className="tab" aria-selected={t.id === calc} onClick={() => setCalc(t.id)}>
-            {t.label}
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            className="tab"
+            aria-selected={t.id === calc}
+            onClick={() => setCalc(t.id)}
+          >
+            <span style={{ marginRight: '8px', fontSize: '14px' }}>{t.icon}</span>
+            <span>{t.label}</span>
           </button>
         ))}
       </div>

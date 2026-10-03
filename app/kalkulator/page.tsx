@@ -30,15 +30,25 @@ export default async function KalkulatorPage() {
   ])
 
   return (
-    <div className="landing-shell">
+    <div className="landing-shell calc-landing-shell">
       <LandingNav isAdmin={isAdmin} user={user} instruments={instruments} />
       <main className="calc-page">
+        {/* Ambient atmospheric sunburst glow matching the homepage */}
+        <div className="calc-aurora-glow" aria-hidden="true" />
+        <div className="calc-aurora-beam" aria-hidden="true" />
+
         <header className="calc-hero">
-          <p className="calc-eyebrow mono">ALAT GRATIS · TANPA DAFTAR</p>
-          <h1 className="calc-title">Kalkulator Investasi</h1>
+          <div className="calc-badge-wrap">
+            <span className="calc-badge mono">
+              <span className="calc-badge-dot" />
+              ALAT GRATIS · TANPA DAFTAR
+            </span>
+          </div>
+          <h1 className="calc-title">
+            Kalkulator <span className="calc-title-highlight">Investasi</span>
+          </h1>
           <p className="calc-sub">
-            Hitung berapa hasil investasi rutinmu, berapa yang perlu disisihkan untuk sebuah tujuan, berapa dana darurat yang
-            ideal, dan alokasi yang cocok dengan profil risikomu. Lalu tanyakan hasilnya ke AI.
+            Hitung potensi imbal hasil investasi rutin, rencanakan target dana masa depan, tentukan batas aman dana darurat, dan petakan alokasi aset sesuai profil risikomu — lalu tanyakan analisisnya langsung ke AI.
           </p>
         </header>
         <KalkulatorClient signedIn={Boolean(user)} />
