@@ -20428,10 +20428,7 @@ body.rail-lock {
 }
 
 .calc-title-highlight {
-  background: linear-gradient(135deg, #ffffff 0%, #ffac60 50%, #fa862a 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 2px 14px rgba(250, 134, 42, 0.4));
+  color: #ffffff;
 }
 
 .calc-hero-desc {
@@ -20541,7 +20538,7 @@ body.rail-lock {
 .calc-lead {
   margin: 0;
   font-size: 14.5px;
-  color: #f1f5f9;
+  color: #ffffff;
   font-weight: 600;
   line-height: 1.5;
 }
@@ -20575,7 +20572,7 @@ body.rail-lock {
 
 .calc-label strong {
   font-family: var(--mono);
-  color: #ffac60;
+  color: #ffffff;
   font-weight: 700;
 }
 
@@ -20604,9 +20601,9 @@ body.rail-lock {
   padding: 0 13px;
   font-family: var(--mono);
   font-size: 13px;
-  font-weight: 700;
-  color: #fa862a;
-  background: rgba(250, 134, 42, 0.08);
+  font-weight: 600;
+  color: #94a3b8;
+  background: rgba(255, 255, 255, 0.04);
   border-right: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   align-items: center;
@@ -20688,7 +20685,7 @@ body.rail-lock {
   left: 0;
   right: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent 0%, rgba(250, 134, 42, 0.5) 50%, transparent 100%);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .calc-big {
@@ -20712,10 +20709,7 @@ body.rail-lock {
   font-size: clamp(24px, 3.5vw, 34px);
   font-weight: 800;
   letter-spacing: -0.02em;
-  background: linear-gradient(135deg, #ffffff 10%, #ffac60 55%, #fa862a 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 2px 14px rgba(250, 134, 42, 0.35));
+  color: #ffffff;
 }
 
 .calc-kv {
@@ -20781,7 +20775,7 @@ body.rail-lock {
 .calc-bar-value {
   position: relative;
   width: 100%;
-  background: linear-gradient(to top, #d97706 0%, #fa862a 100%);
+  background: #fa862a;
   border-radius: 2px 2px 0 0;
   display: flex;
   align-items: flex-end;
@@ -20791,7 +20785,7 @@ body.rail-lock {
 
 .calc-bar-paid {
   width: 100%;
-  background: linear-gradient(to top, #0284c7 0%, #38bdf8 100%);
+  background: #38bdf8;
   border-radius: 0;
   transition: height 0.3s ease;
 }
@@ -20834,7 +20828,7 @@ body.rail-lock {
 .calc-progress span {
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, #38bdf8 0%, #34d399 100%);
+  background: #38bdf8;
   transition: width 0.4s ease;
 }
 
@@ -20936,7 +20930,7 @@ body.rail-lock {
   background: none;
   border: 0;
   padding: 0;
-  color: #ffac60;
+  color: #fa862a;
   font: inherit;
   font-weight: 600;
   cursor: pointer;
@@ -20946,7 +20940,7 @@ body.rail-lock {
 }
 
 .calc-link:hover {
-  color: #fa862a;
+  color: #ea580c;
 }
 
 .calc-disclaimer {
@@ -21000,16 +20994,16 @@ body.rail-lock {
 }
 
 .calc-send {
-  background: linear-gradient(135deg, #fa862a 0%, #ea580c 100%);
+  background: #fa862a;
   color: #ffffff !important;
   font-family: var(--sans);
   font-size: 13.5px;
   font-weight: 700;
   padding: 10px 22px;
-  border-radius: 6px;
+  border-radius: 4px;
   border: none;
   cursor: pointer;
-  transition: opacity 0.2s ease, transform 0.15s ease;
+  transition: opacity 0.2s ease, transform 0.15s ease, background-color 0.2s ease;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -21017,7 +21011,8 @@ body.rail-lock {
 
 .calc-send:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 0 16px rgba(250, 134, 42, 0.4);
+  background: #ea580c;
+  box-shadow: none;
 }
 
 .calc-send:disabled {
@@ -21036,7 +21031,7 @@ body.rail-lock {
 }
 
 .calc-error-link {
-  color: #ffac60;
+  color: #fa862a;
   font-weight: 600;
   margin-left: 6px;
   display: inline-flex;
@@ -21045,7 +21040,7 @@ body.rail-lock {
 }
 
 .calc-error-link:hover {
-  color: #fa862a;
+  color: #ea580c;
 }
 
 .calc-answer {

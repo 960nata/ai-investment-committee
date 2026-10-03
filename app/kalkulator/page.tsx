@@ -114,7 +114,7 @@ export default async function KalkulatorPage() {
           </div>
 
           <h1 className="calc-hero-title">
-            Kalkulator <span className="calc-title-highlight">Investasi</span>
+            Kalkulator Investasi
           </h1>
 
           <p className="calc-hero-desc">
