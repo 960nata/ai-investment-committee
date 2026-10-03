@@ -142,9 +142,8 @@ export const groqAdapter = createOpenAiCompatibleAdapter({
 
 const DEFAULT_OPENROUTER_MODELS = [
   'nvidia/nemotron-3.5-lightning:free',
-  'poolside/laguna-s-2.1:free',
-  'apodex/apodex-1.1-mini:free',
   'qwen/qwen3.8-27b:free',
+  'poolside/laguna-s-2.1:free',
 ]
 
 const parsedOpenRouterModels = (process.env.OPENROUTER_MODELS ?? process.env.OPENROUTER_MODEL ?? '')
@@ -163,8 +162,8 @@ export const openRouterAdapter = createOpenAiCompatibleAdapter({
   envPrefix: 'OPENROUTER_API_KEY',
   extraBody: {
     // OpenRouter otomatis melakukan fallback berantai ke model berikutnya bila model
-    // pertama sedang sibuk (429/503), menjaga ketersediaan tanpa membakar kunci baru.
-    models: activeOpenRouterModels,
+    // pertama sedang sibuk (429/503). Maksimum 3 model sesuai batasan OpenRouter API.
+    models: activeOpenRouterModels.slice(0, 3),
     reasoning: { enabled: false },
   },
   extraHeaders: {

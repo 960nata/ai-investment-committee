@@ -10,10 +10,22 @@ export const openAiAdapter: LlmAdapter = {
   async complete(request, apiKey, keyIndex) {
     const started = Date.now()
     const client = new OpenAI({ apiKey, maxRetries: 0, timeout: request.timeoutMs ?? 30_000 })
+    let input = request.messages
+    if (request.json) {
+      const hasJson = input.some((m) => m.content.toLowerCase().includes('json'))
+      if (!hasJson && input.length > 0) {
+        const last = input[input.length - 1]
+        input = [
+          ...input.slice(0, -1),
+          { role: last.role, content: `${last.content}\n\nFormat keluaran wajib dalam bentuk JSON.` },
+        ]
+      }
+    }
+
     try {
       const response = await client.responses.create({
         model: this.model,
-        input: request.messages,
+        input,
         max_output_tokens: request.maxOutputTokens ?? 1024,
         store: false,
         ...(request.json ? { text: { format: { type: 'json_object' as const } } } : {}),

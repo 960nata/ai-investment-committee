@@ -727,3 +727,24 @@ export function IconCalculator(props: IconProps) {
     </Svg>
   )
 }
+
+/** Kompas — profil risiko dan penunjuk arah alokasi aset. */
+export function IconCompass(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
+    </Svg>
+  )
+}
+
+/** Kilau AI / Sparkles — konsultasi intelijen buatan. */
+export function IconSparkles(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z" />
+      <path d="M19 3v4M21 5h-4M5 19v2M6 20H4" />
+    </Svg>
+  )
+}
+

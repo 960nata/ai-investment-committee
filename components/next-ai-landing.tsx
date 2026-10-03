@@ -15,7 +15,7 @@ interface NextAiLandingProps {
 /**
  * Kipas sinar radiant amber-emas di pojok kanan atas.
  */
-const BEAM_LAYERS = [
+export const BEAM_LAYERS = [
   { rot: 38, w: 190, blur: 46, peak: 0.55, len: 88, h: 620, dx: 0 },
   { rot: 47, w: 130, blur: 28, peak: 0.85, len: 94, h: 620, dx: 0 },
   { rot: 55, w: 150, blur: 15, peak: 1, len: 100, h: 620, dx: 0 },
@@ -23,6 +23,7 @@ const BEAM_LAYERS = [
   { rot: 71, w: 170, blur: 42, peak: 0.5, len: 84, h: 620, dx: 0 },
   { rot: 48, w: 64, blur: 12, peak: 0.95, len: 100, h: 1180, dx: 62 },
 ]
+
 
 export function NextAiLanding({
   terminalHref = '/ringkasan',

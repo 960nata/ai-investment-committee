@@ -205,8 +205,12 @@ export async function complete(request: LlmRequest): Promise<LlmResponse> {
         }
 
         if (llmError.kind === 'bad_request') {
-          // Kesalahan kita sendiri. Berhenti, jangan sebar ke penyedia lain.
-          throw llmError
+          // Format atau parameter ditolak oleh penyedia ini (mis. parameter spesifik model atau batasan penyedia).
+          // Beralih ke penyedia berikutnya dalam rantai alih-alih langsung membatalkan rapat.
+          console.warn(
+            `[LLM] ${adapter.id} menolak permintaan (HTTP ${llmError.status ?? 400}: ${llmError.message}). Beralih ke penyedia berikutnya.`,
+          )
+          break
         }
 
         // Server/network failures affect the provider; try the next provider immediately.

@@ -13,6 +13,15 @@ import Link from 'next/link'
 import { useMemo, useRef, useState } from 'react'
 import { TurnstileWidget, TURNSTILE_SITE_KEY, type TurnstileHandle } from '@/components/turnstile-widget'
 import {
+  IconTrendUp,
+  IconTarget,
+  IconShield,
+  IconCompass,
+  IconSparkles,
+  IconArrowRight,
+  IconCheck,
+} from '@/components/icons'
+import {
   ALLOCATIONS,
   EMERGENCY_MONTHS,
   HOUSEHOLD_LABEL,
@@ -27,12 +36,13 @@ import {
 
 type Calc = 'dca' | 'target' | 'darurat' | 'alokasi'
 
-const TABS: { id: Calc; label: string; icon: string; lead: string }[] = [
-  { id: 'dca', label: 'Investasi Rutin', icon: '📈', lead: 'Berapa nilai investasimu kalau menyisihkan uang tiap bulan?' },
-  { id: 'target', label: 'Target Dana', icon: '🎯', lead: 'Berapa yang perlu disisihkan per bulan untuk mencapai tujuanmu?' },
-  { id: 'darurat', label: 'Dana Darurat', icon: '🛡️', lead: 'Berapa dana darurat yang ideal untuk kondisimu?' },
-  { id: 'alokasi', label: 'Profil Risiko', icon: '🧭', lead: 'Cocoknya investasi di mana? Kenali profil risikomu.' },
+const TABS = [
+  { id: 'dca' as const, label: 'Investasi Rutin', icon: IconTrendUp, lead: 'Berapa nilai investasimu kalau menyisihkan uang tiap bulan?' },
+  { id: 'target' as const, label: 'Target Dana', icon: IconTarget, lead: 'Berapa yang perlu disisihkan per bulan untuk mencapai tujuanmu?' },
+  { id: 'darurat' as const, label: 'Dana Darurat', icon: IconShield, lead: 'Berapa dana darurat yang ideal untuk kondisimu?' },
+  { id: 'alokasi' as const, label: 'Profil Risiko', icon: IconCompass, lead: 'Cocoknya investasi di mana? Kenali profil risikomu.' },
 ]
+
 
 const ALLOC_COLOR = ['#fa862a', '#38bdf8', '#34d399', '#fbbf24', '#f43f5e']
 
@@ -152,24 +162,32 @@ export function KalkulatorClient({ signedIn }: { signedIn: boolean }) {
 
   return (
     <div className="calc-wrap">
-      <div className="tabs calc-tabs" role="tablist" aria-label="Pilih kalkulator">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            role="tab"
-            className="tab"
-            aria-selected={t.id === calc}
-            onClick={() => setCalc(t.id)}
-          >
-            <span style={{ marginRight: '8px', fontSize: '14px' }}>{t.icon}</span>
-            <span>{t.label}</span>
-          </button>
-        ))}
+      <div className="calc-tabs-bar" role="tablist" aria-label="Pilih kalkulator">
+        {TABS.map((t) => {
+          const Icon = t.icon
+          const isSelected = t.id === calc
+          return (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              className={`calc-tab ${isSelected ? 'is-active' : ''}`}
+              aria-selected={isSelected}
+              onClick={() => setCalc(t.id)}
+            >
+              <span className="calc-tab-icon" aria-hidden="true">
+                <Icon size={15} />
+              </span>
+              <span>{t.label}</span>
+            </button>
+          )
+        })}
       </div>
 
       <section className="calc-card">
-        <p className="calc-lead">{TABS.find((t) => t.id === calc)?.lead}</p>
+        <header className="calc-card-head">
+          <p className="calc-lead">{TABS.find((t) => t.id === calc)?.lead}</p>
+        </header>
 
         {calc === 'dca' && (
           <div className="calc-grid">
@@ -273,12 +291,23 @@ export function KalkulatorClient({ signedIn }: { signedIn: boolean }) {
               {RISK_QUESTIONS.map((q, i) => (
                 <fieldset key={q.id} className="calc-question">
                   <legend>{i + 1}. {q.question}</legend>
-                  {q.options.map(([label, value]) => (
-                    <label key={label} className={`calc-choice ${answers[q.id] === value ? 'on' : ''}`}>
-                      <input type="radio" name={q.id} checked={answers[q.id] === value} onChange={() => setAnswers({ ...answers, [q.id]: value })} />
-                      {label}
-                    </label>
-                  ))}
+                  {q.options.map(([label, value]) => {
+                    const isSelected = answers[q.id] === value
+                    return (
+                      <label key={label} className={`calc-choice ${isSelected ? 'on' : ''}`}>
+                        <input
+                          type="radio"
+                          name={q.id}
+                          checked={isSelected}
+                          onChange={() => setAnswers({ ...answers, [q.id]: value })}
+                        />
+                        <span className="calc-choice-indicator" aria-hidden="true">
+                          {isSelected && <IconCheck size={11} />}
+                        </span>
+                        <span className="calc-choice-text">{label}</span>
+                      </label>
+                    )
+                  })}
                 </fieldset>
               ))}
             </div>
@@ -303,7 +332,7 @@ export function KalkulatorClient({ signedIn }: { signedIn: boolean }) {
                   <p className="calc-note">
                     Perkiraan imbal hasil jangka panjang profil ini sekitar {PROFILE_RETURN[profile]}% per tahun.{' '}
                     <button type="button" className="calc-link" onClick={() => { setDca({ ...dca, annualReturn: PROFILE_RETURN[profile] }); setCalc('dca') }}>
-                      Hitung dengan Investasi Rutin →
+                      Hitung dengan Investasi Rutin <IconArrowRight size={13} style={{ display: 'inline-block', verticalAlign: '-1px', marginLeft: 4 }} />
                     </button>
                   </p>
                 </>
@@ -367,7 +396,12 @@ function AskPanel({ context, signedIn }: { context: unknown; signedIn: boolean }
 
   return (
     <section className="calc-card calc-ask">
-      <h2 className="calc-ask-title">Tanya AI soal hasil hitunganmu</h2>
+      <h2 className="calc-ask-title">
+        <span className="calc-ask-icon" aria-hidden="true">
+          <IconSparkles size={17} />
+        </span>
+        Tanya AI Soal Hasil Hitunganmu
+      </h2>
       <p className="calc-note" style={{ marginTop: 0 }}>
         AI membaca angka di kalkulator yang sedang kamu buka. {signedIn ? '' : 'Pengunjung tanpa akun punya jatah terbatas per hari.'}
       </p>
@@ -383,16 +417,22 @@ function AskPanel({ context, signedIn }: { context: unknown; signedIn: boolean }
         {needsChallenge && <TurnstileWidget ref={turnstile} action="kalkulator-ai" onToken={setToken} />}
         <span className="calc-hint">{question.length}/300</span>
         <button type="button" className="calc-send" onClick={ask} disabled={!ready}>
-          {busy ? 'Menyusun jawaban…' : 'Tanya AI'}
+          <IconSparkles size={14} style={{ marginRight: 6 }} />
+          <span>{busy ? 'Menyusun jawaban…' : 'Tanya AI'}</span>
         </button>
       </div>
       {error && (
         <p className="calc-error">
           {error}{' '}
-          {needsAccount && <Link href="/daftar">Daftar gratis →</Link>}
+          {needsAccount && (
+            <Link href="/daftar" className="calc-error-link">
+              Daftar gratis <IconArrowRight size={13} style={{ display: 'inline-block', verticalAlign: '-1px', marginLeft: 4 }} />
+            </Link>
+          )}
         </p>
       )}
       {answer && <div className="calc-answer">{answer}</div>}
     </section>
   )
 }
+

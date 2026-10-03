@@ -417,7 +417,11 @@ function buildMessages(
     parts.push(`[${turn.agent.toUpperCase()}]\n${clip(turn.content)}`)
   }
 
-  parts.push(`[GILIRANMU: ${role.title.toUpperCase()}]`)
+  parts.push(
+    role.json
+      ? `[GILIRANMU: ${role.title.toUpperCase()} — BALAS HANYA OBJEK JSON]`
+      : `[GILIRANMU: ${role.title.toUpperCase()}]`,
+  )
   messages.push({ role: 'user', content: parts.join('\n\n') })
 
   return messages
