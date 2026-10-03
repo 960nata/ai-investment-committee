@@ -77,19 +77,17 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   // 2. Dengarkan perubahan bahasa di header (LOCALE_EVENT)
-  // Jika pengguna belum mengunci mata uang secara eksplisit, sesuaikan kurs dengan bahasa yang dipilih
+  // Menyesuaikan mata uang otomatis mengikuti bahasa yang dipilih pengunjung
   useEffect(() => {
     const onLocaleChange = (e: Event) => {
       const newLocale = (e as CustomEvent<Locale>).detail
-      if (!userOverridden) {
-        const mapped = LOCALE_DEFAULT_CURRENCY[newLocale] || 'IDR'
-        setActiveCurrencyState(mapped)
-      }
+      const mapped = LOCALE_DEFAULT_CURRENCY[newLocale] || 'IDR'
+      setActiveCurrencyState(mapped)
     }
 
     window.addEventListener(LOCALE_EVENT, onLocaleChange)
     return () => window.removeEventListener(LOCALE_EVENT, onLocaleChange)
-  }, [userOverridden])
+  }, [])
 
   // 3. Sambungkan ke Realtime SSE Stream (/api/v1/forex/stream)
   // Perubahan di terminal (npx tsx scripts/kurs.ts set / sync / currency) langsung tersiar ke sini!
