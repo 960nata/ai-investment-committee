@@ -68,62 +68,60 @@ export default async function KalkulatorPage() {
         user={user}
       />
 
-      <div className="nextai-root">
-        <section className="nextai-hero calc-hero-section">
-          {/* Dynamic Radiant Amber Aurora Beams & Volumetric Rays */}
-          <div className="nextai-aurora-beam" aria-hidden="true" />
-          <div className="nextai-aurora-glow" aria-hidden="true" />
-          <div className="nextai-aurora-subtle" aria-hidden="true" />
+      <section className="calc-hero">
+        {/* Dynamic Radiant Amber Aurora Beams & Volumetric Rays */}
+        <div className="nextai-aurora-beam" aria-hidden="true" />
+        <div className="nextai-aurora-glow" aria-hidden="true" />
+        <div className="nextai-aurora-subtle" aria-hidden="true" />
 
-          {/* Berkas cahaya amber/emas */}
-          <div className="nextai-aurora-rays" aria-hidden="true">
-            {CALC_BEAM_LAYERS.map((layer, idx) => (
-              <span
-                key={layer.rot}
-                className="nextai-ray"
-                style={
-                  {
-                    '--ray-rot': `${layer.rot}deg`,
-                    '--ray-h': `${layer.h}px`,
-                    '--ray-dx': `${layer.dx}px`,
-                    '--ray-w': `${layer.w}px`,
-                    '--ray-blur': `${layer.blur}px`,
-                    '--ray-peak': layer.peak,
-                    '--ray-len': `${layer.len}%`,
-                    animationDelay: `${idx * 0.75}s`,
-                  } as CSSProperties
-                }
-              >
-                <i />
+        {/* Berkas cahaya amber/emas */}
+        <div className="nextai-aurora-rays" aria-hidden="true">
+          {CALC_BEAM_LAYERS.map((layer, idx) => (
+            <span
+              key={layer.rot}
+              className="nextai-ray"
+              style={
+                {
+                  '--ray-rot': `${layer.rot}deg`,
+                  '--ray-h': `${layer.h}px`,
+                  '--ray-dx': `${layer.dx}px`,
+                  '--ray-w': `${layer.w}px`,
+                  '--ray-blur': `${layer.blur}px`,
+                  '--ray-peak': layer.peak,
+                  '--ray-len': `${layer.len}%`,
+                  animationDelay: `${idx * 0.75}s`,
+                } as CSSProperties
+              }
+            >
+              <i />
+            </span>
+          ))}
+        </div>
+
+        <HeroDust />
+
+        <div className="calc-hero-content">
+          {/* Pill Badge */}
+          <div className="nextai-pill-wrap">
+            <div className="nextai-pill">
+              <span className="nextai-pill-dot" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                <IconCalculator size={13} />
               </span>
-            ))}
-          </div>
-
-          <HeroDust />
-
-          <div className="nextai-hero-container calc-hero-container">
-            {/* Pill Badge */}
-            <div className="nextai-pill-wrap">
-              <div className="nextai-pill">
-                <span className="nextai-pill-dot" style={{ display: 'inline-flex', alignItems: 'center' }}>
-                  <IconCalculator size={13} />
-                </span>
-                <span className="nextai-pill-text">
-                  ALAT GRATIS · TANPA DAFTAR <span className="nextai-pill-tag">Kalkulator Finansial</span>
-                </span>
-              </div>
+              <span className="nextai-pill-text">
+                ALAT GRATIS · TANPA DAFTAR <span className="nextai-pill-tag">Kalkulator Finansial</span>
+              </span>
             </div>
-
-            <h1 className="nextai-hero-title calc-main-title">
-              Kalkulator <span className="calc-title-highlight">Investasi</span>
-            </h1>
-
-            <p className="nextai-hero-desc calc-main-desc">
-              Hitung potensi imbal hasil investasi rutin, rencanakan target dana masa depan, tentukan batas aman dana darurat, dan petakan alokasi aset sesuai profil risikomu — lalu tanyakan analisisnya langsung ke AI.
-            </p>
           </div>
-        </section>
-      </div>
+
+          <h1 className="calc-hero-title">
+            Kalkulator <span className="calc-title-highlight">Investasi</span>
+          </h1>
+
+          <p className="calc-hero-desc">
+            Hitung potensi imbal hasil investasi rutin, rencanakan target dana masa depan, tentukan batas aman dana darurat, dan petakan alokasi aset sesuai profil risikomu — lalu tanyakan analisisnya langsung ke AI.
+          </p>
+        </div>
+      </section>
 
       <main className="lp calc-lp-main">
         <div className="lp-inner">
