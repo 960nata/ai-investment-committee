@@ -19827,6 +19827,280 @@ body.rail-lock {
 
 .btn-danger:hover:not(:disabled) { border-color: var(--halted); color: var(--halted); }
 
+/* Tanya Komite — Scoped in-chat sidebar & container */
+.chat-panel {
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+.chat-container {
+  display: flex;
+  min-height: 640px;
+  position: relative;
+  background: var(--surface-0);
+}
+
+.chat-sidebar {
+  width: 270px;
+  min-width: 270px;
+  background: var(--surface-1);
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  transition: width 0.2s ease, opacity 0.2s ease;
+  z-index: 10;
+}
+
+.chat-sidebar.closed {
+  display: none;
+}
+
+.chat-sidebar-head {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.chat-sidebar-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--mono);
+  font-size: var(--t-micro);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+
+.chat-sidebar-close-btn {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--ink-mute);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  line-height: 0;
+}
+
+.chat-sidebar-close-btn:hover {
+  color: var(--ink);
+  background: var(--surface-2);
+}
+
+.chat-sidebar-action {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--line);
+}
+
+.chat-sidebar-new-btn {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  font-size: var(--t-small);
+  padding: 7px 12px;
+}
+
+.chat-thread-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: calc(640px - 110px);
+}
+
+.chat-sidebar-empty {
+  padding: var(--space-4);
+  font-size: var(--t-small);
+  color: var(--ink-mute);
+  text-align: center;
+  line-height: 1.5;
+}
+
+.chat-thread-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  user-select: none;
+  text-align: left;
+  background: none;
+  width: 100%;
+}
+
+.chat-thread-item:hover {
+  background: var(--surface-2);
+}
+
+.chat-thread-item.active {
+  background: var(--surface-2);
+  border-color: var(--line-strong);
+}
+
+.chat-thread-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.chat-thread-title {
+  font-size: var(--t-small);
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+
+.chat-thread-item.active .chat-thread-title {
+  color: var(--signal);
+}
+
+.chat-thread-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: var(--t-micro);
+  color: var(--ink-mute);
+}
+
+.chat-thread-tag {
+  background: var(--surface-0);
+  border: 1px solid var(--line);
+  padding: 1px 5px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  font-size: 10px;
+}
+
+.chat-thread-date {
+  color: var(--ink-faint);
+}
+
+.chat-thread-del {
+  background: none;
+  border: none;
+  color: var(--ink-faint);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  opacity: 0.5;
+  transition: opacity 0.15s ease, color 0.15s ease, background 0.15s ease;
+  line-height: 0;
+  margin-left: 6px;
+}
+
+.chat-thread-item:hover .chat-thread-del {
+  opacity: 1;
+}
+
+.chat-thread-del:hover {
+  color: var(--halted);
+  background: var(--surface-3);
+}
+
+/* Chat Main Pane */
+.chat-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-main-head {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  background: var(--surface-1);
+}
+
+.chat-main-head-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.chat-sidebar-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  font-size: var(--t-small);
+}
+
+.chat-sidebar-toggle-btn.active {
+  background: var(--surface-2);
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
+.chat-main-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 600;
+  font-size: var(--t-body);
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.badge-count {
+  font-family: var(--mono);
+  font-size: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  color: var(--ink-soft);
+  padding: 0 5px;
+  border-radius: 999px;
+  line-height: 16px;
+}
+
+@media (max-width: 959px) {
+  .chat-sidebar {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 280px;
+    max-width: 85%;
+    z-index: 25;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.45);
+  }
+
+  .chat-sidebar-close-btn {
+    display: block;
+  }
+
+  .chat-sidebar-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.65);
+    z-index: 20;
+    backdrop-filter: blur(2px);
+  }
+}
+
+
 /* ---------------------------------------------------------------------------
    Bar atas di layar ponsel
 

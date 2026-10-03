@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { LLM_ADAPTERS, PREMIUM_LLM_ADAPTERS } from '../lib/ai/adapters'
-import { complete, resetRegistry, llmStatus } from '../lib/ai/registry'
+import { complete, resetRegistry, llmStatus, AllProvidersFailedError } from '../lib/ai/registry'
 import { LlmError, type LlmAdapter } from '../lib/ai/types'
 import { getAiTokensDashboardData } from '../lib/ai/telemetry'
 import { resetLocalState } from '../lib/ai/keyring'
@@ -78,8 +78,12 @@ async function main() {
     assert.equal(calls.filter((id) => id === 'limited').length, 1)
 
     setup([provider('invalid', 'bad_request'), provider('untouched')])
-    await assert.rejects(complete(request), LlmError)
-    assert.deepEqual(calls, ['invalid'])
+    const fallbackRes = await complete(request)
+    assert.equal(fallbackRes.providerId, 'untouched')
+    assert.deepEqual(calls, ['invalid', 'untouched'])
+
+    setup([provider('invalid_only', 'bad_request')])
+    await assert.rejects(complete(request), AllProvidersFailedError)
 
     setup([provider('ordinary'), provider('preferred')])
     assert.equal((await complete({ ...request, prefer: ['preferred'] })).providerId, 'preferred')

@@ -29,6 +29,7 @@ import { SYMBOL_PATTERN } from '@/lib/format/market'
 import { readBody } from '@/lib/member/http'
 import { ASK_TOPICS, TOPIC_INFO, buildTopicContext } from '@/lib/member/ask-context'
 import { citedSources, findNewsSources, sourcesToPrompt, toPlainText, type NewsSource } from '@/lib/member/news-context'
+import { createUserChatThread, getUserChatThread, addChatMessage } from '@/lib/db/committee-chat-queries'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -37,6 +38,8 @@ const Body = z
   .object({
     /** Tab yang dipilih pengguna. */
     topic: z.enum(ASK_TOPICS).default('saham'),
+    /** ID thread riwayat percakapan (opsional, jika kosong dibuatkan otomatis). */
+    threadId: z.number().int().positive().optional(),
     /** Instrumen opsional; tanpa ini asisten menjawab dari potret kelas asetnya. */
     market: z.enum(['CRYPTO', 'IDX', 'US', 'GLOBAL']).optional(),
     symbol: z.string().regex(SYMBOL_PATTERN, 'Symbol tidak sah').optional(),
@@ -99,7 +102,7 @@ export async function POST(request: Request) {
 
   const body = await readBody(request, Body)
   if (!body.ok) return body.response
-  const { topic, market, question, history } = body.data
+  const { topic, market, question, history, threadId } = body.data
   const symbol = body.data.symbol?.toUpperCase()
   const topicInfo = TOPIC_INFO[topic]
 
@@ -150,6 +153,35 @@ export async function POST(request: Request) {
     )
   }
 
+  // Tentukan / buat thread untuk percakapan ini
+  let activeThreadId = threadId
+  try {
+    if (activeThreadId) {
+      const existing = await getUserChatThread(user.uid, activeThreadId)
+      if (!existing) {
+        activeThreadId = undefined
+      }
+    }
+
+    if (!activeThreadId) {
+      const newThread = await createUserChatThread(user.uid, {
+        title: question.trim().slice(0, 60) || 'Percakapan',
+        topic,
+        symbol,
+        market,
+      })
+      activeThreadId = newThread.id
+    }
+
+    // Rekam pesan pengguna
+    await addChatMessage(activeThreadId, {
+      role: 'user',
+      content: question,
+    })
+  } catch (threadErr) {
+    console.error('Gagal mencatat thread chat Tanya Komite:', threadErr)
+  }
+
   try {
     const response = await complete({
         feature: 'committee-ask',
@@ -165,18 +197,35 @@ export async function POST(request: Request) {
     })
 
     const answer = toPlainText(response.text)
+    const cited = citedSources(answer, sources).map(({ n, title, source, url, publishedAt, internal }) => ({
+      n,
+      title,
+      source,
+      url,
+      publishedAt,
+      internal,
+    }))
+
+    // Rekam jawaban asisten bila thread aktif
+    if (activeThreadId) {
+      try {
+        await addChatMessage(activeThreadId, {
+          role: 'assistant',
+          content: answer,
+          meta: response.model,
+          sources: cited,
+        })
+      } catch (saveErr) {
+        console.error('Gagal menyimpan jawaban asisten:', saveErr)
+      }
+    }
+
     return NextResponse.json(
       {
+        threadId: activeThreadId,
         answer,
         // Hanya sumber yang benar-benar dikutip; sisanya tidak dipakai jawaban.
-        sources: citedSources(answer, sources).map(({ n, title, source, url, publishedAt, internal }) => ({
-          n,
-          title,
-          source,
-          url,
-          publishedAt,
-          internal,
-        })),
+        sources: cited,
         model: response.model,
         provider: response.providerId,
         premium: entitlement.isPremium,

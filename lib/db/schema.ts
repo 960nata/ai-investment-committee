@@ -1140,3 +1140,51 @@ export const premiumOrder = pgTable(
 )
 
 export type PremiumOrderRow = typeof premiumOrder.$inferSelect
+
+// ---------------------------------------------------------------------------
+// Tanya Komite: Histori Percakapan per Pengguna
+// ---------------------------------------------------------------------------
+
+export const committeeChatThread = pgTable(
+  'committee_chat_thread',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => appUser.id, { onDelete: 'cascade' }),
+    title: varchar('title', { length: 200 }).notNull(),
+    topic: varchar('topic', { length: 32 }).notNull().default('saham'),
+    symbol: varchar('symbol', { length: 32 }),
+    market: varchar('market', { length: 32 }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('committee_chat_thread_user_idx').on(t.userId, t.updatedAt),
+  ],
+)
+
+export type CommitteeChatThreadRow = typeof committeeChatThread.$inferSelect
+export type NewCommitteeChatThread = typeof committeeChatThread.$inferInsert
+
+export const committeeChatMessage = pgTable(
+  'committee_chat_message',
+  {
+    id: serial('id').primaryKey(),
+    threadId: integer('thread_id')
+      .notNull()
+      .references(() => committeeChatThread.id, { onDelete: 'cascade' }),
+    role: varchar('role', { length: 16 }).notNull(), // 'user' | 'assistant'
+    content: text('content').notNull(),
+    meta: text('meta'),
+    sources: jsonb('sources').notNull().default([]),
+    error: boolean('error').notNull().default(false),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('committee_chat_message_thread_idx').on(t.threadId, t.createdAt),
+  ],
+)
+
+export type CommitteeChatMessageRow = typeof committeeChatMessage.$inferSelect
+export type NewCommitteeChatMessage = typeof committeeChatMessage.$inferInsert

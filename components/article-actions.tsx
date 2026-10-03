@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useSyncExternalStore } from 'react'
 import {
   IconCopy,
   IconCheck,
@@ -46,11 +46,11 @@ export function ArticleActions({
   const [copiedPrompt, setCopiedPrompt] = useState(false)
   const [copiedLink, setCopiedLink] = useState(false)
   const [downloadedMd, setDownloadedMd] = useState(false)
-  const [hasNativeShare, setHasNativeShare] = useState(false)
-
-  useEffect(() => {
-    setHasNativeShare(typeof navigator !== 'undefined' && typeof navigator.share === 'function')
-  }, [])
+  const hasNativeShare = useSyncExternalStore(
+    () => () => {},
+    () => typeof navigator !== 'undefined' && typeof navigator.share === 'function',
+    () => false,
+  )
 
   // Menggunakan URL kanonikal publik (/warta/[slug]) agar siapapun yang menerima tautan
   // dapat langsung membaca tanpa terhalang dinding login terminal.

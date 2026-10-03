@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import Link from 'next/link'
-import { IconAlert, IconCalculator } from '@/components/icons'
+import { IconAlert } from '@/components/icons'
 
 export default function KalkulatorError({
   error,

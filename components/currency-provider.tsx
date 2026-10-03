@@ -4,7 +4,6 @@ import React, { createContext, useContext, useEffect, useState, useMemo, useCall
 import {
   type MajorCurrencyCode,
   MAJOR_CURRENCIES,
-  MAJOR_CURRENCY_CODES,
   LOCALE_DEFAULT_CURRENCY,
   isMajorCurrency,
 } from '@/lib/forex/types'
@@ -54,26 +53,32 @@ const STORAGE_KEY = 'komite_user_currency'
 export function CurrencyProvider({ children }: { children: React.ReactNode }) {
   const [activeCurrency, setActiveCurrencyState] = useState<MajorCurrencyCode>('IDR')
   const [rates, setRates] = useState<Record<MajorCurrencyCode, number>>(DEFAULT_RATES)
-  const [updatedAt, setUpdatedAt] = useState<number>(Date.now())
+  const [updatedAt, setUpdatedAt] = useState<number>(0)
   const [source, setSource] = useState<string>('init')
-  const [userOverridden, setUserOverridden] = useState<boolean>(false)
 
   // 1. Inisialisasi mata uang sesuai preferensi bahasa awal atau pilihan tersimpan
   useEffect(() => {
+    let initial: MajorCurrencyCode | null = null
     try {
       const saved = localStorage.getItem(STORAGE_KEY)
       if (saved && isMajorCurrency(saved)) {
-        setActiveCurrencyState(saved)
-        setUserOverridden(true)
-        return
+        initial = saved
       }
     } catch {
       // Abaikan jika localStorage diblokir
     }
 
-    const currentLocale = readPreference()
-    const mapped = LOCALE_DEFAULT_CURRENCY[currentLocale] || 'IDR'
-    setActiveCurrencyState(mapped)
+    if (!initial) {
+      const currentLocale = readPreference()
+      initial = LOCALE_DEFAULT_CURRENCY[currentLocale] || 'IDR'
+    }
+
+    if (initial !== 'IDR') {
+      const target = initial
+      queueMicrotask(() => {
+        setActiveCurrencyState(target)
+      })
+    }
   }, [])
 
   // 2. Dengarkan perubahan bahasa di header (LOCALE_EVENT)
@@ -145,7 +150,6 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
 
   const setCurrency = useCallback((code: MajorCurrencyCode) => {
     setActiveCurrencyState(code)
-    setUserOverridden(true)
     try {
       localStorage.setItem(STORAGE_KEY, code)
     } catch {}
