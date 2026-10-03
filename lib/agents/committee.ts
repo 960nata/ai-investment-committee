@@ -51,7 +51,7 @@ export { parseVerdict, type CommitteeVerdict }
  * perbaikan prompt langsung berlaku tanpa menunggu candle baru.
  */
 // 2026-09-29.1: blok fakta memuat fundamental, kepemilikan KSEI, dan skor sistem.
-export const COMMITTEE_VERSION = '2026-10-01.1'
+export const COMMITTEE_VERSION = '2026-10-03.1'
 
 
 export interface CommitteeResult {

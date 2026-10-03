@@ -109,6 +109,18 @@ export interface MarketFacts {
    * asetnya memang tidak punya (kripto, indeks, komoditas).
    */
   fundamentals?: { asOf: string; values: Record<string, number | null> } | null
+  /** Filing terakhir yang sudah terbit saat candle terakhir; angka mentahnya bukan hasil tebakan model. */
+  financialReport?: {
+    period: string
+    periodEnd: string
+    reportedAt: string
+    sourceId: string
+    accession: string
+    currency: string
+    completeness: number
+    items: Record<string, number>
+    missingItems: string[]
+  } | null
   /** Skor sistem per horizon, dengan label keyakinan yang dihitung mesin skor. */
   systemScores?: { horizon: string; asOf: string; score: number; confidence: string }[]
   warnings: string[]
@@ -492,9 +504,35 @@ export function factsToPrompt(facts: MarketFacts, detail: 'full' | 'summary' = '
         unit === 'x' ? `${round2(v)}x` : unit === 'pct' ? `${round2(v * 100)}%` : unit === 'pct-raw' ? `${round2(v)}%` : `${round2(v)}`
       const present = FUNDAMENTAL_FACTS.filter((d) => f.values[d.key] != null)
       const absent = FUNDAMENTAL_FACTS.filter((d) => f.values[d.key] == null)
-      lines.push(``, `FUNDAMENTAL & KEPEMILIKAN (laporan yang sudah terbit per ${f.asOf}):`)
+      lines.push(``, `RASIO FUNDAMENTAL & KEPEMILIKAN (fitur dihitung per ${f.asOf}):`)
       for (const d of present) lines.push(`${d.label}: ${show(f.values[d.key]!, d.unit)}`)
       if (absent.length > 0) lines.push(`Tidak tersedia: ${absent.map((d) => d.label).join(', ')}`)
+    }
+  }
+
+  if (facts.financialReport !== undefined) {
+    const report = facts.financialReport
+    if (report === null) {
+      lines.push(``, 'LAPORAN KEUANGAN: belum ada filing yang sudah terbit untuk tanggal analisis ini.')
+    } else {
+      const rawItems: { key: string; label: string }[] = [
+        { key: 'pendapatan', label: 'Pendapatan' },
+        { key: 'laba_bersih', label: 'Laba bersih' },
+        { key: 'arus_kas_operasi', label: 'Arus kas operasi' },
+        { key: 'total_aset', label: 'Total aset' },
+        { key: 'total_liabilitas', label: 'Total liabilitas' },
+      ]
+      lines.push(
+        ``,
+        `LAPORAN KEUANGAN ${report.period} (periode berakhir ${report.periodEnd}; terbit ${report.reportedAt}; sumber ${report.sourceId}; accession ${report.accession}; kelengkapan ${round2(report.completeness * 100)}%):`,
+      )
+      for (const item of rawItems) {
+        const value = report.items[item.key]
+        lines.push(`${item.label}: ${value === undefined ? 'tidak tersedia' : `${report.currency} ${new Intl.NumberFormat('id-ID').format(value)}`}`)
+      }
+      if (report.missingItems.length > 0) {
+        lines.push(`Pos wajib yang tidak tersedia: ${report.missingItems.join(', ')}`)
+      }
     }
   }
 

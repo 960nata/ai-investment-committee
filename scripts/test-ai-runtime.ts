@@ -7,8 +7,31 @@ import { resetLocalState } from '../lib/ai/keyring'
 import { reconcileSession } from '../lib/auth/verified-session'
 import { cache } from '../lib/cache/redis'
 import { cloudflareAdapter } from '../lib/ai/providers/cloudflare'
+import { factsToPrompt, type MarketFacts } from '../lib/agents/facts'
 
 async function main() {
+  const reportFacts = {
+    symbol: 'TEST', name: 'Test Corp', market: 'US', currency: 'USD', asOf: '2026-10-02',
+    staleDays: 1, candleCount: 300, historyStart: '2025-08-01', historyYears: 1,
+    lastClose: 100, returns: { d1: null, d7: null, d30: null, d90: null, d365: null, y2: null, y3: null, y5: null },
+    annualisedVolatility: null, volatilityFullHistory: null, maxDrawdown: null,
+    maxDrawdownFullHistory: null, range52w: null, historyHigh: null,
+    sma: { s20: null, s50: null, s200: null }, sma200SlopePct: null,
+    priceVsSma50Pct: null, trend: 'tidak cukup data', volumeRatio20v100: null,
+    monthly: [], yearly: [], warnings: [],
+    financialReport: {
+      period: '2026-Q2', periodEnd: '2026-06-30', reportedAt: '2026-08-01',
+      sourceId: 'sec-edgar', accession: '0000000000-26-000001', currency: 'USD',
+      completeness: 0.8, items: { pendapatan: 1000000, laba_bersih: -100000 },
+      missingItems: ['arus_kas_operasi'],
+    },
+  } satisfies MarketFacts
+  const reportPrompt = factsToPrompt(reportFacts, 'summary')
+  assert.ok(reportPrompt.includes('terbit 2026-08-01; sumber sec-edgar; accession 0000000000-26-000001'))
+  assert.ok(reportPrompt.includes('Laba bersih: USD -100.000'))
+  assert.ok(reportPrompt.includes('Arus kas operasi: tidak tersedia'))
+  assert.ok(reportPrompt.includes('Pos wajib yang tidak tersedia: arus_kas_operasi'))
+
   // No env loader and no real network: providers and storage are controlled fakes.
   const originals = [...LLM_ADAPTERS]
   const premium = [...PREMIUM_LLM_ADAPTERS]

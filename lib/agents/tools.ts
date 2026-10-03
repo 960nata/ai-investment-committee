@@ -15,7 +15,7 @@
  * bisa diuji tanpa koneksi apa pun.
  */
 
-import { getCandles, getInstrumentBySymbol, getLatestFeature, getLatestScoresForSymbol } from '@/lib/db/queries'
+import { getCandles, getFundamentalsAsOf, getInstrumentBySymbol, getLatestFeature, getLatestScoresForSymbol } from '@/lib/db/queries'
 import type { MarketCode } from '@/lib/db/schema'
 import { FEATURE_SET_VERSION } from '@/lib/features/compute'
 import { fundamentalsApply, MODEL_VERSION } from '@/lib/scoring/weights'
@@ -81,13 +81,17 @@ export async function gatherFacts(
 
   // Fakta non-harga. Pelengkap: kegagalannya tidak boleh membatalkan rapat,
   // cukup tercatat sebagai peringatan supaya komite tahu apa yang tidak ada.
-  const [feature, scores] = await Promise.all([
+  const [feature, scores, reports] = await Promise.all([
     getLatestFeature(instrument.id, FEATURE_SET_VERSION).catch(() => null),
     getLatestScoresForSymbol(symbol, MODEL_VERSION).catch(() => null),
+    fundamentalsApply(instrument.assetClass)
+      ? getFundamentalsAsOf(instrument.id, facts.asOf, 1).catch(() => null)
+      : Promise.resolve([]),
   ])
 
   if (!fundamentalsApply(instrument.assetClass)) {
     facts.fundamentals = null
+    facts.financialReport = null
   } else if (feature) {
     const values = Object.fromEntries(
       FUNDAMENTAL_FACTS.map((d) => [d.key, (feature.values as Record<string, number | null>)[d.key] ?? null]),
@@ -98,6 +102,28 @@ export async function gatherFacts(
     }
   } else {
     facts.warnings.push('Fitur fundamental belum dihitung untuk emiten ini.')
+  }
+
+  if (fundamentalsApply(instrument.assetClass)) {
+    const report = reports?.[0]
+    facts.financialReport = report
+      ? {
+          period: report.period,
+          periodEnd: report.periodEnd,
+          reportedAt: report.reportedAt,
+          sourceId: report.sourceId,
+          accession: report.sourceAccession,
+          currency: report.currency,
+          completeness: report.completeness,
+          items: report.items,
+          missingItems: report.missingItems,
+        }
+      : null
+    if (reports === null) facts.warnings.push('Basis data laporan keuangan gagal dibaca untuk analisis ini.')
+    else if (!report) facts.warnings.push('Belum ada laporan keuangan yang terbit sebelum candle terakhir.')
+    else if (Math.floor((Date.parse(facts.asOf) - Date.parse(report.reportedAt)) / 86_400_000) > 550) {
+      facts.warnings.push(`Laporan keuangan terakhir sudah lama: terbit ${report.reportedAt}.`)
+    }
   }
 
   facts.systemScores = (scores?.scores ?? []).map((s) => ({

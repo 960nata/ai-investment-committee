@@ -1625,8 +1625,11 @@ export async function getFundamentalsAsOf(
     periodType: 'kuartal' | 'tahunan'
     periodEnd: string
     reportedAt: string
+    sourceId: string
+    sourceAccession: string
     currency: string
     items: Record<string, number>
+    missingItems: string[]
     completeness: number
   }[]
 > {
@@ -1635,11 +1638,15 @@ export async function getFundamentalsAsOf(
     period_type: 'kuartal' | 'tahunan'
     period_end: string
     reported_at: string
+    source_id: string
+    source_accession: string
     currency: string
     items: Record<string, number>
+    missing_items: string[]
     completeness: string
   }>(sql`
-    select period, period_type, period_end::text, reported_at::text, currency, items, completeness
+    select period, period_type, period_end::text, reported_at::text,
+           source_id, source_accession, currency, items, missing_items, completeness
     from (
       select *, row_number() over (
         partition by period order by reported_at desc, source_accession desc
@@ -1657,8 +1664,11 @@ export async function getFundamentalsAsOf(
     periodType: r.period_type,
     periodEnd: r.period_end,
     reportedAt: r.reported_at,
+    sourceId: r.source_id,
+    sourceAccession: r.source_accession,
     currency: r.currency,
     items: r.items,
+    missingItems: r.missing_items,
     completeness: Number(r.completeness),
   }))
 }
