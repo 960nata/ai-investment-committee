@@ -6,7 +6,6 @@ import { getCurrentUser } from '@/lib/auth/user-auth'
 import { verifyAdminSession } from '@/lib/auth/admin-auth'
 import { listInstrumentQuotes, getDataFreshness, type InstrumentQuote } from '@/lib/db/queries'
 import { getMarketNewsList } from '@/lib/db/news-queries'
-import { BEAM_LAYERS } from '@/components/next-ai-landing'
 import { HeroDust } from '@/components/hero-dust'
 import { IconCalculator } from '@/components/icons'
 import { KalkulatorClient } from './kalkulator-client'
@@ -27,9 +26,19 @@ export const metadata: Metadata = {
     'Hitung investasi rutin, target dana, dana darurat, dan kenali profil risikomu — gratis, tanpa daftar. Tanya AI soal hasilnya.',
 }
 
+/** Kipas sinar radiant amber-emas di seksi hero. Didefinisikan lokal agar Server Component bebas ketergantungan Client Component. */
+const CALC_BEAM_LAYERS = [
+  { rot: 38, w: 190, blur: 46, peak: 0.55, len: 88, h: 620, dx: 0 },
+  { rot: 47, w: 130, blur: 28, peak: 0.85, len: 94, h: 620, dx: 0 },
+  { rot: 55, w: 150, blur: 15, peak: 1, len: 100, h: 620, dx: 0 },
+  { rot: 62, w: 110, blur: 26, peak: 0.85, len: 92, h: 620, dx: 0 },
+  { rot: 71, w: 170, blur: 42, peak: 0.5, len: 84, h: 620, dx: 0 },
+  { rot: 48, w: 64, blur: 12, peak: 0.95, len: 100, h: 1180, dx: 62 },
+]
+
 export default async function KalkulatorPage() {
   const [user, isAdmin, instruments, latestNews, freshness] = await Promise.all([
-    getCurrentUser(),
+    getCurrentUser().catch(() => null),
     verifyAdminSession().catch(() => false),
     listInstrumentQuotes().catch(() => []),
     getMarketNewsList({ limit: 6 }).catch(() => []),
@@ -40,7 +49,7 @@ export default async function KalkulatorPage() {
     instruments.find((i) => i.symbol === 'BTCUSDT'),
     instruments.find((i) => i.symbol === 'ETHUSDT'),
     instruments.find((i) => i.symbol === 'SOLUSDT'),
-    instruments.find((i) => i.symbol.startsWith('BBCA') || i.symbol.startsWith('BBRI')),
+    instruments.find((i) => i.symbol?.startsWith('BBCA') || i.symbol?.startsWith('BBRI')),
     instruments.find((i) => i.symbol === 'XAUUSD' || i.symbol === 'PAXGUSDT'),
     instruments.find((i) => i.symbol === 'BZ=F' || i.symbol === 'CL=F'),
   ].filter(Boolean) as InstrumentQuote[]
@@ -68,7 +77,7 @@ export default async function KalkulatorPage() {
 
           {/* Berkas cahaya amber/emas */}
           <div className="nextai-aurora-rays" aria-hidden="true">
-            {BEAM_LAYERS.map((layer, idx) => (
+            {CALC_BEAM_LAYERS.map((layer, idx) => (
               <span
                 key={layer.rot}
                 className="nextai-ray"
