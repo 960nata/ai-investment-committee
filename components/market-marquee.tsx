@@ -16,6 +16,7 @@ import Link from 'next/link'
 import { AssetIcon } from '@/components/asset-icons'
 import { IconTrendUp, IconTrendDown } from '@/components/icons'
 import { formatTickerPrice, formatChange } from '@/lib/format/market'
+import { useCurrency } from '@/components/currency-provider'
 
 export interface MarqueeTicker {
   key: string
@@ -72,6 +73,15 @@ export function MarketMarquee({ items, secondsPerItem = 3.4, className }: Props)
   )
 }
 
+function MarqueePrice({ item }: { item: MarqueeTicker }) {
+  const { format } = useCurrency()
+  if (item.assetClass === 'indeks') {
+    return <>{formatTickerPrice(item.lastClose, item.assetClass)}</>
+  }
+  const fromCurrency = item.assetClass === 'saham' ? 'IDR' : 'USD'
+  return <>{format(item.lastClose, fromCurrency)}</>
+}
+
 function MarqueeGroup({ items, clone }: { items: MarqueeTicker[]; clone?: boolean }) {
   return (
     <div className="marquee-group" aria-hidden={clone ? true : undefined}>
@@ -90,7 +100,7 @@ function MarqueeGroup({ items, clone }: { items: MarqueeTicker[]; clone?: boolea
             <AssetIcon symbol={item.symbol} size={13} />
             <span className="marquee-chip-sym mono">{item.symbol}</span>
             <span className="marquee-chip-price mono">
-              {formatTickerPrice(item.lastClose, item.assetClass)}
+              <MarqueePrice item={item} />
             </span>
             <span className={`marquee-chip-chg mono ${isPositive ? 'trend-up' : 'trend-down'}`}>
               {isPositive ? <IconTrendUp size={11} /> : <IconTrendDown size={11} />}

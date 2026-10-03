@@ -33,7 +33,8 @@
     "admin:make": "tsx scripts/make-admin.ts",
     "test:ai-runtime": "tsx scripts/test-ai-runtime.ts",
     "check:ai": "tsx scripts/check-ai-integration.ts",
-    "test:http": "node --import tsx scripts/test-http.ts"
+    "test:http": "node --import tsx scripts/test-http.ts",
+    "kurs": "tsx scripts/kurs.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

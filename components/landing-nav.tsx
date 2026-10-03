@@ -27,6 +27,7 @@ import { MarketMarquee, type MarqueeTicker } from '@/components/market-marquee'
 import { useLiveTickerFallback } from '@/components/live-ticker-fallback'
 import type { InstrumentQuote } from '@/lib/db/queries'
 import { LanguageMenu } from '@/components/language-menu'
+import { CurrencyMenu } from '@/components/currency-menu'
 import type { Locale } from '@/lib/i18n/locales'
 import { UserMenu, type UserMenuProfile } from '@/components/user-menu'
 
@@ -859,6 +860,7 @@ export function LandingNav({
 
           {/* Action Buttons Right: Sesi Pengguna / Admin */}
           <div className="landing-nav-actions">
+            <CurrencyMenu />
             <LanguageMenu available={languages} />
             {signedIn ? (
               <UserMenu user={user} isAdmin={isAdmin} variant="landing" />

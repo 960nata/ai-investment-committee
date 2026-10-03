@@ -27,6 +27,7 @@ import { publishJob, type JobPayload } from '@/lib/queue/qstash'
 import { requireCron } from '@/lib/http/auth'
 import { failure, unauthorized, NO_STORE } from '@/lib/http/errors'
 import { fromDbMarket } from '@/lib/db/schema'
+import { syncForexRates } from '@/lib/forex/rates'
 
 export const dynamic = 'force-dynamic'
 
@@ -48,6 +49,13 @@ export async function GET(request: Request) {
   const now = new Date()
 
   try {
+    // Sinkronisasi kurs dunia riil secara otomatis setiap kali dispatcher jalan
+    try {
+      await syncForexRates()
+    } catch (e) {
+      console.warn('[Dispatcher] Gagal sync kurs dunia:', e)
+    }
+
     const schedules = await listEnabledSchedules()
 
     if (schedules.length === 0) {

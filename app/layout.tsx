@@ -7,6 +7,7 @@ import { getMeasurementId } from "@/lib/analytics/ga4";
 import { VisitBeacon } from "@/components/visit-beacon";
 import { MotionProvider } from "@/components/motion-kit";
 import { SiteTranslator } from "@/components/site-translator";
+import { CurrencyProvider } from "@/components/currency-provider";
 import { SITE_NAME, SITE_DESCRIPTION, SITE_TAGLINE, getBaseUrl } from "@/lib/brand";
 import { ADSENSE_CLIENT } from "@/lib/ads/adsense";
 import { ExtensionErrorShield } from "@/components/extension-error-shield";
@@ -91,7 +92,9 @@ export default function RootLayout({
     <html lang="id" suppressHydrationWarning className={fontSans.className}>
       <body suppressHydrationWarning className={fontSans.className}>
         <ExtensionErrorShield />
-        <MotionProvider>{children}</MotionProvider>
+        <CurrencyProvider>
+          <MotionProvider>{children}</MotionProvider>
+        </CurrencyProvider>
         {/*
          * `useSearchParams` di dalam VisitBeacon membuat seluruh pohon di
          * atasnya keluar dari prarender statis kalau batasnya tidak dipasang.

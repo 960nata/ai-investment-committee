@@ -24,6 +24,7 @@ import { IconClock, IconPulse, IconMenu, IconLock } from './icons'
 import { Lamp, type State } from './ui'
 import { SECTIONS } from './rail'
 import { LanguageMenu } from './language-menu'
+import { CurrencyMenu } from './currency-menu'
 import { useSidebar } from './sidebar-context'
 import { SITE_NAME } from '@/lib/brand'
 import { UserMenu, type UserMenuProfile } from './user-menu'
@@ -108,6 +109,7 @@ export function Topbar({
 
       <div className="topbar-session">
         <NotificationBell />
+        <CurrencyMenu />
         <LanguageMenu />
         <UserMenu user={user} isAdmin={isAdmin} variant="dashboard" />
       </div>
