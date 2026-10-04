@@ -23215,6 +23215,21 @@ a.tr-chip:hover {
   animation: notif-drop-fade 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* Di layar sempit lonceng tidak berada di tepi kanan (masih ada menu bahasa dan
+   akun di sebelahnya), jadi popover yang ditambatkan ke lonceng terlempar ke
+   samping. Lepaskan dari lonceng dan taruh di tengah layar. */
+@media (max-width: 640px) {
+  .notification-dropdown {
+    position: fixed;
+    top: calc(var(--topbar) + 8px);
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-width: 400px;
+    margin: 0 auto;
+  }
+}
+
 @keyframes notif-drop-fade {
   from {
     opacity: 0;
