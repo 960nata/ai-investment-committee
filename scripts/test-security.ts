@@ -13,7 +13,10 @@
  * bahwa jalur normalnya masih jalan.
  */
 
+import { createRequire } from 'node:module'
 import { NextRequest } from 'next/server'
+import { drizzle } from 'drizzle-orm/pg-proxy'
+import * as schema from '../lib/db/schema'
 import { proxy } from '../proxy'
 import { checkBearer, requireAdmin, requireCron, timingSafeEqual } from '../lib/http/auth'
 import { RULES } from '../lib/http/ratelimit'
@@ -482,6 +485,73 @@ const run = async () => {
       assert(!isAllowedSourceUrl(bad), `seharusnya ditolak: ${bad}`)
     }
   })
+
+  // -------------------------------------------------------------------------
+  // Riwayat Tanya Komite: thread milik satu pengguna tidak boleh terbaca,
+  // terhapus, atau terdaftar untuk pengguna lain.
+  //
+  // Uji ini tanpa basis data: modul klien diganti driver pg-proxy yang hanya
+  // merekam SQL, lalu tiap kueri thread diperiksa membawa filter user_id.
+
+  {
+    const req = createRequire(__filename)
+    const recorded: { sql: string; params: unknown[] }[] = []
+    const fakeDb = drizzle(
+      async (sql, params) => {
+        recorded.push({ sql, params })
+        return { rows: [] }
+      },
+      { schema },
+    )
+    const clientPath = req.resolve('../lib/db/client')
+    const queriesPath = req.resolve('../lib/db/committee-chat-queries')
+    const previousClient = req.cache[clientPath]
+    req.cache[clientPath] = { id: clientPath, filename: clientPath, loaded: true, exports: { db: fakeDb, schema } } as never
+    delete req.cache[queriesPath]
+    globalThis.__committeeChatTablesReady = true
+    const chat = req(queriesPath) as typeof import('../lib/db/committee-chat-queries')
+
+    const OWNER = 7
+    const THREAD = 99
+    const threadQueries = () => recorded.filter((r) => r.sql.includes('from "committee_chat_thread"'))
+
+    await test('thread chat: membaca thread memfilter id DAN user_id', async () => {
+      recorded.length = 0
+      const result = await chat.getUserChatThread(OWNER, THREAD)
+      const [q] = threadQueries()
+      assert(q, 'kueri thread tidak terekam')
+      assert(/"user_id" = \$\d/.test(q.sql), `kueri tanpa filter user_id: ${q.sql}`)
+      assert(q.params.includes(OWNER) && q.params.includes(THREAD), `parameter salah: ${JSON.stringify(q.params)}`)
+      assert(result === null, 'thread yang bukan milik pengguna harus null')
+      assert(
+        !recorded.some((r) => r.sql.includes('from "committee_chat_message"')),
+        'pesan thread tidak boleh dibaca sebelum kepemilikannya terbukti',
+      )
+    })
+
+    await test('thread chat: menghapus thread memfilter user_id', async () => {
+      recorded.length = 0
+      const deleted = await chat.deleteUserChatThread(OWNER, THREAD)
+      const del = recorded.find((r) => r.sql.startsWith('delete from "committee_chat_thread"'))
+      assert(del, 'kueri hapus tidak terekam')
+      assert(/"user_id" = \$\d/.test(del.sql), `hapus tanpa filter user_id: ${del.sql}`)
+      assert(del.params.includes(OWNER), 'user_id tidak ikut sebagai parameter')
+      assert(deleted === false, 'hapus thread orang lain harus gagal')
+    })
+
+    await test('thread chat: daftar thread hanya milik pengguna', async () => {
+      recorded.length = 0
+      await chat.listUserChatThreads(OWNER)
+      const [q] = threadQueries()
+      assert(q, 'kueri daftar tidak terekam')
+      assert(/where "committee_chat_thread"\."user_id" = \$1/.test(q.sql), `daftar tanpa filter user_id: ${q.sql}`)
+      assert(q.params[0] === OWNER, 'user_id tidak ikut sebagai parameter')
+    })
+
+    if (previousClient) req.cache[clientPath] = previousClient
+    else delete req.cache[clientPath]
+    delete req.cache[queriesPath]
+  }
 
   // -------------------------------------------------------------------------
 
