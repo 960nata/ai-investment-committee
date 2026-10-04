@@ -8,7 +8,7 @@
  *   npx tsx scripts/kurs.ts                       # Lihat status & kurs aktif
  *   npx tsx scripts/kurs.ts sync                  # Ambil kurs riil dunia dari pasar forex
  *   npx tsx scripts/kurs.ts currency <KODE>       # Ganti mata uang aktif (IDR, USD, JPY, EUR, dll)
- *   npx tsx scripts/kurs.ts set <KODE> <NILAI>    # Override kurs spesifik vs USD
+ *   npx tsx scripts/kurs.ts set <KODE> <NILAI>    # Override & kunci kurs spesifik vs USD
  *   npx tsx scripts/kurs.ts live                  # Mode streaming/monitoring interaktif
  */
 
@@ -19,7 +19,6 @@ import {
   MAJOR_CURRENCIES,
   MAJOR_CURRENCY_CODES,
   isMajorCurrency,
-  type MajorCurrencyCode,
 } from '../lib/forex/types'
 import {
   getForexState,
@@ -37,9 +36,9 @@ function printHelp() {
 
 \x1b[1mPerintah yang tersedia:\x1b[0m
   \x1b[33mnpx tsx scripts/kurs.ts\x1b[0m                     Tampilkan tabel kurs mata uang utama
-  \x1b[33mnpx tsx scripts/kurs.ts sync\x1b[0m                Ambil kurs riil terbaru dari pasar dunia
+  \x1b[33mnpx tsx scripts/kurs.ts sync\x1b[0m                Ambil kurs riil terbaru dari pasar dunia (membuka kunci)
   \x1b[33mnpx tsx scripts/kurs.ts currency <KODE>\x1b[0m     Ganti mata uang aktif untuk SEMUA halaman web
-  \x1b[33mnpx tsx scripts/kurs.ts set <KODE> <NILAI>\x1b[0m  Ubah nilai kurs spesifik (patokan vs 1 USD)
+  \x1b[33mnpx tsx scripts/kurs.ts set <KODE> <NILAI>\x1b[0m  Ubah & kunci kurs spesifik (patokan vs 1 USD)
   \x1b[33mnpx tsx scripts/kurs.ts live\x1b[0m                Pantau kurs secara live tiap beberapa detik
 
 \x1b[1mMata Uang Utama yang Didukung:\x1b[0m
@@ -55,7 +54,11 @@ async function showStatus() {
   })
 
   console.log(`\n\x1b[1m\x1b[34m[STATUS KURS VALAS DUNIA]\x1b[0m`)
-  console.log(`Sumber Data : \x1b[32m${state.source}\x1b[0m (Real Market Data)`)
+  console.log(
+    state.locked
+      ? `Sumber Data : \x1b[33m${state.source}\x1b[0m (DIKUNCI manual — jalankan "sync" untuk kembali ke kurs pasar)`
+      : `Sumber Data : \x1b[32m${state.source}\x1b[0m (Real Market Data)`,
+  )
   console.log(`Pembaruan   : \x1b[33m${dateStr}\x1b[0m`)
   console.log(
     `Mata Uang   : \x1b[1m\x1b[42m\x1b[30m ${state.activeCurrency} (${MAJOR_CURRENCIES[state.activeCurrency].name}) \x1b[0m <- Sedang aktif di web\n`,
@@ -96,7 +99,7 @@ async function main() {
 
   if (cmd === 'sync') {
     console.log('\n\x1b[36m[Sync]\x1b[0m Mengambil data kurs riil dunia dari open.er-api.com...')
-    const updated = await syncForexRates()
+    const updated = await syncForexRates({ force: true })
     console.log(
       `\x1b[32m[Sukses]\x1b[0m Berhasil memperbarui kurs riil untuk ${Object.keys(updated.rates).length} mata uang dunia!`,
     )
@@ -116,7 +119,7 @@ async function main() {
       process.exit(1)
     }
 
-    const state = await setActiveCurrency(target)
+    await setActiveCurrency(target)
     console.log(
       `\n\x1b[32m[Sukses]\x1b[0m Mata uang aktif berhasil diubah menjadi: \x1b[1m\x1b[33m${target}\x1b[0m (${MAJOR_CURRENCIES[target].name})`,
     )
@@ -142,6 +145,7 @@ async function main() {
       `\n\x1b[32m[Sukses]\x1b[0m Kurs \x1b[1m${code}\x1b[0m diubah menjadi: \x1b[33m${rate}\x1b[0m per 1 USD`,
     )
     console.log(`\x1b[35m[Realtime]\x1b[0m Nilai baru sudah tersimpan di Redis dan langsung disiarkan via SSE.`)
+    console.log(`\x1b[33m[Dikunci]\x1b[0m Sync otomatis tidak akan menimpanya. Jalankan "npm run kurs -- sync" untuk kembali ke kurs pasar.`)
     return
   }
 

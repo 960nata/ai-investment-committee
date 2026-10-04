@@ -33,9 +33,6 @@ const FALLBACK_RATES: Record<MajorCurrencyCode, number> = {
   RUB: 83.5,
 }
 
-// In-memory cache jika Redis tidak terjangkau dalam serverless instance
-let localState: ForexState | null = null
-
 /**
  * Mengambil kurs live dari API publik valuta asing (open.er-api.com).
  * Menjamin 100% data nyata pasar valuta asing internasional.
@@ -107,10 +104,10 @@ export async function getForexState(): Promise<ForexState> {
       if (activeCur && isMajorCurrency(activeCur)) {
         savedRates.activeCurrency = activeCur
       }
-      localState = savedRates
 
-      // Otomatis refresh di latar belakang jika data sudah lebih dari 12 jam
-      if (Date.now() - savedRates.updatedAt > MAX_STALENESS_MS) {
+      // Otomatis refresh di latar belakang jika data sudah lebih dari 12 jam,
+      // kecuali kursnya sedang dikunci dari terminal.
+      if (!savedRates.locked && Date.now() - savedRates.updatedAt > MAX_STALENESS_MS) {
         syncForexRates().catch((err) => console.warn('[Forex] Gagal background sync:', err))
       }
 
@@ -130,7 +127,6 @@ export async function getForexState(): Promise<ForexState> {
     rates: liveRates,
   }
 
-  localState = newState
   // Simpan ke Redis tanpa menghalangi
   cache.set(REDIS_FOREX_KEY, newState).catch(() => {})
   return newState
@@ -138,10 +134,16 @@ export async function getForexState(): Promise<ForexState> {
 
 /**
  * Sinkronisasi data kurs dunia dari API live dan simpan ke Redis.
+ *
+ * Kurs yang dikunci lewat `npm run kurs -- set` dibiarkan; tanpa ini dispatcher
+ * per jam menimpanya dalam waktu kurang dari satu jam. `force` (perintah
+ * `npm run kurs -- sync`) membuka kuncinya dan kembali ke kurs pasar.
  */
-export async function syncForexRates(): Promise<ForexState> {
-  const liveRates = await fetchLiveExchangeRates()
+export async function syncForexRates({ force = false }: { force?: boolean } = {}): Promise<ForexState> {
   const currentState = await getForexState()
+  if (currentState.locked && !force) return currentState
+
+  const liveRates = await fetchLiveExchangeRates()
 
   const updatedState: ForexState = {
     base: 'USD',
@@ -151,7 +153,6 @@ export async function syncForexRates(): Promise<ForexState> {
     rates: liveRates,
   }
 
-  localState = updatedState
   await cache.set(REDIS_FOREX_KEY, updatedState)
   return updatedState
 }
@@ -164,7 +165,6 @@ export async function setActiveCurrency(currency: MajorCurrencyCode): Promise<Fo
   current.activeCurrency = currency
   current.updatedAt = Date.now()
 
-  localState = current
   await Promise.all([
     cache.set(REDIS_ACTIVE_CURRENCY_KEY, currency),
     cache.set(REDIS_FOREX_KEY, current),
@@ -180,8 +180,8 @@ export async function overrideForexRate(currency: MajorCurrencyCode, rate: numbe
   current.rates[currency] = rate
   current.updatedAt = Date.now()
   current.source = 'terminal_override'
+  current.locked = true
 
-  localState = current
   await cache.set(REDIS_FOREX_KEY, current)
   return current
 }

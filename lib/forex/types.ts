@@ -163,6 +163,8 @@ export interface ForexState {
   updatedAt: number
   source: 'open.er-api.com' | 'yahoo' | 'terminal_override' | 'cache'
   rates: Record<MajorCurrencyCode, number>
+  /** Kurs diatur manual dari terminal; sinkronisasi otomatis tidak menimpanya. */
+  locked?: boolean
 }
 
 export function isMajorCurrency(code: string): code is MajorCurrencyCode {
