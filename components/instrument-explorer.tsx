@@ -134,12 +134,17 @@ export function InstrumentExplorer({
   )
 
   const selected = instruments.find((i) => i.id === selectedId) ?? null
+  // Effect streaming di bawah bergantung pada simbol, bukan objeknya: objek
+  // `selected` baru tiap render, dan menyambung ulang WebSocket untuk tiap
+  // render itu sia-sia.
+  const selectedSymbol = selected?.symbol ?? null
+  const selectedAssetClass = selected?.assetClass ?? null
 
   // Polling intraday setiap 15 detik saat tab 1D aktif
   useEffect(() => {
-    if (!isIntraday || !selected) return
+    if (!isIntraday || !selectedSymbol) return
     let active = true
-    const sym = selected.symbol
+    const sym = selectedSymbol
 
     async function runFetch(isInitial: boolean) {
       if (isInitial) setIntradayLoading(true)
@@ -178,17 +183,17 @@ export function InstrumentExplorer({
       clearTimeout(initialTimer)
       clearInterval(interval)
     }
-  }, [isIntraday, selected?.symbol])
+  }, [isIntraday, selectedSymbol])
 
   // Stream kline 5m Binance: lilin terakhir diperbarui tiap detik dan lilin baru
   // langsung muncul saat periode 5 menit berganti, tanpa menunggu polling 15 detik.
   useEffect(() => {
-    if (!isIntraday || !selected || !isCryptoSymbol(selected.symbol)) return
+    if (!isIntraday || !selectedSymbol || !isCryptoSymbol(selectedSymbol)) return
     let active = true
     let ws: WebSocket | null = null
 
     try {
-      ws = new WebSocket(`wss://stream.binance.com:9443/ws/${selected.symbol.toLowerCase()}@kline_5m`)
+      ws = new WebSocket(`wss://stream.binance.com:9443/ws/${selectedSymbol.toLowerCase()}@kline_5m`)
       ws.onmessage = (event) => {
         if (!active) return
         try {
@@ -219,19 +224,20 @@ export function InstrumentExplorer({
         ws?.close()
       } catch {}
     }
-  }, [isIntraday, selected?.symbol])
+  }, [isIntraday, selectedSymbol])
 
   // WebSocket streaming langsung dari bursa Binance untuk Crypto (100% realtime tanpa delay)
   useEffect(() => {
-    if (!selected) return
-    const isCrypto = selected.assetClass === 'crypto' || selected.symbol.endsWith('USDT')
+    if (!selectedSymbol) return
+    const symbol = selectedSymbol
+    const isCrypto = selectedAssetClass === 'crypto' || symbol.endsWith('USDT')
     if (!isCrypto) return
 
     let ws: WebSocket | null = null
     let active = true
 
     try {
-      const streamSymbol = selected.symbol.toLowerCase()
+      const streamSymbol = symbol.toLowerCase()
       ws = new WebSocket(`wss://stream.binance.com:9443/ws/${streamSymbol}@ticker`)
 
       ws.onmessage = (event) => {
@@ -252,7 +258,7 @@ export function InstrumentExplorer({
               if (changePct !== null) {
                 setLiveQuotes((prev) => ({
                   ...prev,
-                  [selected.symbol]: {
+                  [symbol]: {
                     price: nextPrice,
                     changePct,
                     time: Date.now(),
@@ -278,7 +284,7 @@ export function InstrumentExplorer({
         } catch {}
       }
     }
-  }, [selected?.symbol, selected?.assetClass])
+  }, [selectedSymbol, selectedAssetClass])
 
   // Polling kutipan harga realtime untuk instrumen terpilih dan baris yang sedang terlihat.
   // Selain kripto (yang punya WebSocket sendiri), harga di sini juga yang

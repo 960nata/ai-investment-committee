@@ -356,6 +356,11 @@ export function IntradayChart({
   const lastCandleRef = useRef<IntradayCandle | null>(null)
   const livePriceRef = useRef(livePrice)
   useEffect(() => { livePriceRef.current = livePrice }, [livePrice])
+  // Pustaka grafik dimuat async. Data yang tiba sebelum pustakanya siap
+  // dilewati effect pembaruan (chart belum ada), jadi inisialisasi harus
+  // membaca data terbaru, bukan data dari render pertama.
+  const dataRef = useRef(data)
+  useEffect(() => { dataRef.current = data }, [data])
 
   // Inisialisasi chart hanya sekali saat container siap
   useEffect(() => {
@@ -419,7 +424,7 @@ export function IntradayChart({
         candleSeriesRef.current = candleSeries
         volumeSeriesRef.current = volumeSeries
 
-        const sorted = cleanSeries(data, (d) => d.time)
+        const sorted = cleanSeries(dataRef.current, (d) => d.time)
         if (sorted.length > 0) {
           sortedRef.current = sorted
           lastCandleRef.current = { ...sorted[sorted.length - 1] }
