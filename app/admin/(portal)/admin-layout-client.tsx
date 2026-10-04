@@ -14,7 +14,6 @@ import {
   IconLock,
   IconMenu,
   IconClose,
-  IconDatabase,
   IconRadar,
   IconShield,
   IconMegaphone,

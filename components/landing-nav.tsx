@@ -163,7 +163,6 @@ export function LandingNav({
   // Sesi admin lewat PIN juga terhitung "sudah masuk": pemiliknya bisa membuka
   // terminal, dan menampilkan tombol "Masuk" kepadanya tidak masuk akal.
   const signedIn = Boolean(user) || isAdmin
-  const firstName = user?.name.split(' ')[0] ?? null
 
   function handleMouseEnter(menuName: string) {
     if (menuTimeoutRef.current) clearTimeout(menuTimeoutRef.current)

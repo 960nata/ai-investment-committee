@@ -2,12 +2,7 @@
 
 import { useState } from 'react'
 import {
-  IconTarget,
   IconCheck,
-  IconAlert,
-  IconEye,
-  IconEyeOff,
-  IconExternalLink,
 } from '@/components/icons'
 import type { AdSettingsRow } from '@/lib/db/schema'
 

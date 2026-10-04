@@ -11,7 +11,6 @@ import {
   IconPlus,
   IconClose,
   IconTrash,
-  IconExternalLink,
 } from '@/components/icons'
 import type { MarketNewsRow } from '@/lib/db/schema'
 
@@ -41,7 +40,7 @@ export function NewsForm({ initialData, isEdit = false }: NewsFormProps) {
   const [sentiment, setSentiment] = useState(initialData?.sentiment || 'neutral')
   const [impactScore, setImpactScore] = useState<number>(initialData?.impactScore ?? 7)
   const [author, setAuthor] = useState(initialData?.author || 'AI Intelligence Desk')
-  const [readingTime, setReadingTime] = useState<number>(initialData?.readingTimeMinutes ?? 3)
+  const [readingTime] = useState<number>(initialData?.readingTimeMinutes ?? 3)
   const [contentMarkdown, setContentMarkdown] = useState(initialData?.contentMarkdown || '')
 
   // Featured Image
@@ -108,7 +107,7 @@ export function NewsForm({ initialData, isEdit = false }: NewsFormProps) {
 
       setImageUrl(data.publicUrl)
       if (!imageCredit) setImageCredit('Dokumen Redaksi / Supabase Storage')
-    } catch (err) {
+    } catch {
       setUploadError('Kesalahan jaringan saat mengunggah.')
     } finally {
       setUploadingImage(false)
@@ -202,7 +201,7 @@ export function NewsForm({ initialData, isEdit = false }: NewsFormProps) {
         router.push('/admin/berita')
         router.refresh()
       }, 1000)
-    } catch (err) {
+    } catch {
       setError('Gagal menghubungi server database.')
       setSubmitting(false)
     }

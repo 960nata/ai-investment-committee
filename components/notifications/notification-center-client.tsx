@@ -10,7 +10,6 @@ import {
   IconCheck,
   IconRefresh,
   IconSearch,
-  IconExternalLink,
   IconArrowRight,
 } from '@/components/icons'
 import type { NotificationItem } from '@/lib/notifications/types'

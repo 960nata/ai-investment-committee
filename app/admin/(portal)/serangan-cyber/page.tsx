@@ -28,7 +28,6 @@ import {
   IconLock,
   IconRadar,
   IconShield,
-  IconActivity,
 } from '@/components/icons'
 import {
   CYBER_TIME_RANGES,

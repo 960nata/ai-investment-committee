@@ -2,21 +2,17 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import {
   IconEdit,
   IconTrash,
   IconExternalLink,
   IconSearch,
   IconCheck,
-  IconAlert,
-  IconVideo,
   IconEye,
 } from '@/components/icons'
 import type { MarketNewsRow } from '@/lib/db/schema'
 
 export function NewsTableClient({ initialNews }: { initialNews: MarketNewsRow[] }) {
-  const router = useRouter()
   const [news, setNews] = useState<MarketNewsRow[]>(initialNews)
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('semua')

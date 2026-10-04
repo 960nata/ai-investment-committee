@@ -53,7 +53,7 @@ ${itemsXml}
         'Cache-Control': 'public, max-age=300, s-maxage=600',
       },
     })
-  } catch (err) {
+  } catch {
     return new NextResponse('<error>Gagal membuat feed RSS</error>', { status: 500 })
   }
 }

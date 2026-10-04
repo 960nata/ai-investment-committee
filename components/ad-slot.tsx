@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import type { AdSettingsRow } from '@/lib/db/schema'
 import { IconExternalLink } from './icons'
 import { AdsenseUnit } from './adsense-unit'

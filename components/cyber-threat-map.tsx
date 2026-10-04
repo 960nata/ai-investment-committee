@@ -15,12 +15,8 @@ import { useEffect, useRef, useState } from 'react'
 import 'leaflet/dist/leaflet.css'
 import type { ThreatAttack, CyberTimeRange } from '@/lib/security/threat-data'
 import {
-  IconShield,
-  IconAlert,
-  IconPulse,
   IconRadar,
   IconBolt,
-  IconLock,
 } from '@/components/icons'
 
 /** Ubin peta ArcGIS World Dark Gray (Bebas API Key & Tanpa Watermark). */
@@ -125,7 +121,7 @@ export function CyberThreatMap({ attacks, range, totalBlocked }: CyberThreatMapP
         // 3. Tambahkan Titik Asal Serangan & Busur Lintasan
         const points = filteredAttacks.slice(0, 35)
 
-        points.forEach((att, idx) => {
+        points.forEach((att) => {
           const originCoords: [number, number] = [att.origin.lat, att.origin.lng]
 
           // Warna sesuai tingkat bahaya

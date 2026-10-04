@@ -15,7 +15,6 @@ import {
   IconDatabase,
   IconLock,
   IconArrowRight,
-  IconRadar,
   IconPulse,
   IconShield,
 } from '@/components/icons'

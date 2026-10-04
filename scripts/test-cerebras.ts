@@ -42,7 +42,6 @@ async function main() {
 
   // 2. Tes Panggilan Format JSON (Komite Investasi)
   console.log('2. Menguji mode JSON komite (putusan ketua)...')
-  const t1 = Date.now()
   const res2 = await complete({
     prefer: ['cerebras'],
     json: true,
@@ -61,7 +60,6 @@ async function main() {
       },
     ],
   })
-  const dur2 = Date.now() - t1
 
   console.log(`✅ Sukses JSON via provider: ${res2.providerId} (${res2.model}) [${res2.latencyMs}ms]`)
   console.log(`💬 JSON Mentah:\n${res2.text}\n`)

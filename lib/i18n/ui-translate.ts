@@ -180,7 +180,6 @@ export async function translateUiTexts(
   await ensureTable()
 
   const unique = [...new Set(texts)]
-  const hashes = unique.map(hashOf)
 
   const cached = new Map<string, string>()
 

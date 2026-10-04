@@ -237,7 +237,3 @@ export function NewsPortalClient({
     </div>
   )
 }
-
-function clampText(min: number, max: number): string {
-  return `clamp(${min}px, 2.5vw, ${max}px)`
-}

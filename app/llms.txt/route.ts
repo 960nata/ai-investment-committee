@@ -14,7 +14,7 @@ export async function GET() {
         'Cache-Control': 'public, max-age=3600, s-maxage=86400',
       },
     })
-  } catch (err) {
+  } catch {
     return new NextResponse('# AI Investdesk\nhttps://aiinvestdesk.com', {
       headers: { 'Content-Type': 'text/plain; charset=utf-8' },
     })

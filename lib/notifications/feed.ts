@@ -9,7 +9,7 @@ import {
 import { ensureNewsTable } from '@/lib/db/news-queries'
 import { ensureMemberTables, createAnnouncement } from '@/lib/db/member-queries'
 import { seedInitialNewsArticles } from '@/lib/agents/news-agent'
-import type { NotificationItem, NotificationType } from './types'
+import type { NotificationItem } from './types'
 
 let seededAnnouncements = false
 
