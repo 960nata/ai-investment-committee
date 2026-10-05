@@ -220,3 +220,15 @@ export const nvidiaAdapter = createOpenAiCompatibleAdapter({
   // dan jawabannya terpotong di `max_tokens`. Dengan 'low': 4,5 detik, utuh.
   extraBody: { reasoning_effort: 'low' },
 })
+
+export const zaiAdapter = createOpenAiCompatibleAdapter({
+  id: 'zai',
+  name: 'Z.ai',
+  baseUrl: process.env.ZAI_BASE_URL ?? 'https://api.z.ai/api/paas/v4',
+  // glm-4.5-flash gratis. glm-4.7-flash juga gratis tapi sering 429 "overloaded".
+  model: process.env.ZAI_MODEL ?? 'glm-4.5-flash',
+  envPrefix: 'ZAI_API_KEY',
+  // GLM menalar dulu secara bawaan: dengan max_tokens kecil `content` pulang
+  // kosong karena semua token habis di `reasoning_content`.
+  extraBody: { thinking: { type: 'disabled' } },
+})

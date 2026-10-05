@@ -18,6 +18,7 @@ import {
   nvidiaAdapter,
   openRouterAdapter,
   premiumAdapter,
+  zaiAdapter,
 } from './providers/openai-compatible'
 import type { LlmAdapter } from './types'
 
@@ -31,6 +32,7 @@ export const LLM_ADAPTERS: LlmAdapter[] = [
   deepSeekAdapter,
   mistralAdapter,
   nvidiaAdapter,
+  zaiAdapter, // GLM gratis, konkurensi kecil — cadangan terakhir
 ]
 
 /**
