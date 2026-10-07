@@ -19,6 +19,7 @@ import {
   IconMegaphone,
   IconHeart,
   IconCrown,
+  IconActivity,
 } from '@/components/icons'
 import { AdminLogoutButton } from './admin-logout-btn'
 
@@ -54,6 +55,8 @@ export function AdminLayoutClient({ children }: AdminLayoutClientProps) {
     moduleTitle = 'Manajemen Pengguna'
   } else if (pathname.startsWith('/admin/pengumuman')) {
     moduleTitle = 'Pengumuman Dashboard'
+  } else if (pathname.startsWith('/admin/simulator')) {
+    moduleTitle = 'Simulator Trading AI'
   }
 
   return (
@@ -231,6 +234,15 @@ export function AdminLayoutClient({ children }: AdminLayoutClientProps) {
             >
               <IconCrown size={15} />
               <span>Premium &amp; Harga</span>
+            </Link>
+
+            <Link
+              href="/admin/simulator"
+              className={`admin-nav-link ${pathname.startsWith('/admin/simulator') ? 'active' : ''}`}
+              onClick={() => setMobileOpen(false)}
+            >
+              <IconActivity size={15} />
+              <span>Simulator Trading</span>
             </Link>
 
             <Link

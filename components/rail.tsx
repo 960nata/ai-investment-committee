@@ -30,6 +30,7 @@ import {
   IconGlobe,
   IconUsers,
   IconChat,
+  IconActivity,
 } from './icons'
 import { useSidebar } from './sidebar-context'
 import { MadeBy } from './credit'
@@ -40,6 +41,8 @@ interface RailLink {
   icon: (props: { size?: number }) => React.ReactNode
   /** Fitur yang masih diuji; diberi penanda kecil di rel. */
   beta?: boolean
+  /** Hanya tampil bila admin sudah membuka simulator untuk Premium. */
+  simulator?: boolean
 }
 
 export const SECTIONS: { label: string; links: RailLink[] }[] = [
@@ -60,6 +63,7 @@ export const SECTIONS: { label: string; links: RailLink[] }[] = [
       { href: '/screener', label: 'Screener', icon: IconFilter, beta: true },
       { href: '/bandingkan', label: 'Bandingkan', icon: IconScales, beta: true },
       { href: '/tanya-komite', label: 'Tanya Komite', icon: IconChat, beta: true },
+      { href: '/simulator', label: 'Simulator Trading', icon: IconActivity, simulator: true },
     ],
   },
   {
@@ -85,7 +89,7 @@ export const SECTIONS: { label: string; links: RailLink[] }[] = [
   },
 ]
 
-export function Rail() {
+export function Rail({ showSimulator = false }: { showSimulator?: boolean }) {
   const pathname = usePathname()
   const { open, close } = useSidebar()
 
@@ -122,7 +126,9 @@ export function Rail() {
         {SECTIONS.map((section) => (
           <nav key={section.label} className="rail-group">
             <span className="rail-label">{section.label}</span>
-            {section.links.map(({ href, label, icon: Icon, beta }) => (
+            {section.links
+              .filter((link) => showSimulator || !link.simulator)
+              .map(({ href, label, icon: Icon, beta, simulator }) => (
               <Link
                 key={href}
                 href={href}
@@ -133,6 +139,7 @@ export function Rail() {
                 <Icon size={16} />
                 {label}
                 {beta && <span className="rail-beta">beta</span>}
+                {simulator && <span className="rail-beta">premium</span>}
               </Link>
             ))}
           </nav>

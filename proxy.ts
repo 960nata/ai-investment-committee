@@ -221,6 +221,11 @@ function ruleFor(pathname: string, method: string): PathPolicy {
       ? { scope: 'read', rule: RULES.read, strict: false }
       : { scope: 'committee', rule: RULES.committee, strict: true }
   }
+  // Desk simulator memanggil empat model per sidang; jatahnya sama dengan rapat
+  // komite. Trading manual di simulator cukup kuota pembacaan biasa.
+  if (pathname === '/api/v1/simulator/desk') {
+    return { scope: 'committee', rule: RULES.committee, strict: true }
+  }
   // Endpoint masuk dan daftar adalah sasaran tebakan beruntun, jadi kuotanya
   // jauh lebih sempit daripada pembacaan biasa. Masuk admin termasuk — dulu ia
   // ikut kuota baca, 120 tebakan PIN per menit.

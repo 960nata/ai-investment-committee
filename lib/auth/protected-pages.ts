@@ -20,4 +20,5 @@ export const PROTECTED_PAGE_PREFIXES = [
   '/kepemilikan',
   '/makro',
   '/notifikasi',
+  '/simulator',
 ] as const

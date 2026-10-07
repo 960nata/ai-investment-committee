@@ -24,14 +24,18 @@ import { SidebarProvider } from '@/components/sidebar-context'
 import { describeAge, getDataFreshness } from '@/lib/db/queries'
 import { verifyAdminSession } from '@/lib/auth/admin-auth'
 import { getCurrentUser } from '@/lib/auth/user-auth'
+import { getSimSettings } from '@/lib/db/simulator-queries'
 
 export const dynamic = 'force-dynamic'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const [status, isAdmin, session] = await Promise.all([
+  const [status, isAdmin, session, simulatorOpen] = await Promise.all([
     freshnessStatus(),
     verifyAdminSession().catch(() => false),
     getCurrentUser(),
+    getSimSettings()
+      .then((s) => s.premiumEnabled)
+      .catch(() => false),
   ])
 
   return (
@@ -57,7 +61,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           }
         />
         <div className="shell" suppressHydrationWarning>
-          <Rail />
+          <Rail showSimulator={isAdmin || simulatorOpen} />
           <main className="main" suppressHydrationWarning>
             {children}
           </main>
