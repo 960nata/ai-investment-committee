@@ -1321,6 +1321,22 @@ export interface ScoreInputRow {
   groups: Record<string, unknown>[]
 }
 
+/**
+ * Buang seluruh skor satu instrumen untuk satu versi model.
+ *
+ * Dipakai saat perdagangannya dihentikan: skor yang dihitung dari candle
+ * pengisi bervolume nol bukan penilaian, dan membiarkan yang lama tampil sama
+ * saja mengaku masih menilainya. Skor adalah turunan, jadi begitu perdagangan
+ * dibuka lagi seluruhnya bisa dihitung ulang.
+ */
+export async function deleteScoresForInstrument(instrumentId: number, modelVersion: string): Promise<number> {
+  const deleted = await db
+    .delete(scoreDaily)
+    .where(and(eq(scoreDaily.instrumentId, instrumentId), eq(scoreDaily.modelVersion, modelVersion)))
+    .returning({ date: scoreDaily.date })
+  return deleted.length
+}
+
 export async function upsertScores(rows: ScoreInputRow[], chunkSize = 300): Promise<number> {
   if (rows.length === 0) return 0
 

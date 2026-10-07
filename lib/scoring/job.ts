@@ -8,17 +8,20 @@
  */
 
 import {
+  deleteScoresForInstrument,
   getCandles,
   getInstrumentBySymbol,
+  getLatestCandle,
   getLatestFeature,
   upsertScores,
   type ScoreInputRow,
 } from '@/lib/db/queries'
 import type { AssetClass, MarketCode } from '@/lib/db/schema'
 import { FEATURE_SET_VERSION } from '@/lib/features/compute'
+import { runFeatureJob } from '@/lib/features/job'
 import { latestMacro } from '@/lib/db/macro-queries'
 import { scoreInstrument } from './engine'
-import { fundamentalsApply } from './weights'
+import { fundamentalsApply, MODEL_VERSION } from './weights'
 
 /**
  * Ambang likuiditas per pasar, dalam mata uang instrumennya.
@@ -46,6 +49,17 @@ const TURNOVER_THRESHOLD: Record<MarketCode, number> = {
  */
 /** Porsi open interest yang dianggap berpindah tangan tiap hari; lihat `recentContext`. */
 const OI_DAILY_TURNOVER = 0.05
+
+/**
+ * Candle bervolume nol dengan harga tak bergerak, berturut-turut sampai hari
+ * fitur, yang dianggap tanda perdagangan dihentikan.
+ *
+ * Yahoo terus menerbitkan candle untuk saham yang disuspensi bursa: harga
+ * penutupan terakhir diulang, volumenya nol. Dari candle itu momentum dan
+ * volatilitas tetap bisa dihitung, tetapi yang terukur adalah diamnya papan,
+ * bukan pasar. Lima hari bursa cukup jauh dari satu-dua hari sepi.
+ */
+const SUSPENDED_MIN_DAYS = 5
 
 const CONTRACT_MULTIPLIER: Record<string, number> = {
   'CL=F': 1_000,
@@ -102,6 +116,8 @@ export async function runScoreJob(input: ScoreJobInput): Promise<ScoreJobResult>
 
   const rows: ScoreInputRow[] = []
 
+  await catchUpFeatures(symbols, market)
+
   for (const symbol of symbols) {
     try {
       const instrument = await getInstrumentBySymbol(market, symbol)
@@ -117,12 +133,19 @@ export async function runScoreJob(input: ScoreJobInput): Promise<ScoreJobResult>
         continue
       }
 
-      const { staleDays, turnover } = await recentContext(
+      const { staleDays, turnover, suspendedDays } = await recentContext(
         instrument.id,
         instrument.symbol,
         instrument.assetClass,
         feature.date,
       )
+
+      if (suspendedDays >= SUSPENDED_MIN_DAYS) {
+        await deleteScoresForInstrument(instrument.id, MODEL_VERSION)
+        result.skipped.push({ symbol, reason: `perdagangan dihentikan, ${suspendedDays} hari tanpa transaksi` })
+        result.itemsProcessed++
+        continue
+      }
 
       const scored = scoreInstrument({
         values: feature.values,
@@ -163,6 +186,36 @@ export async function runScoreJob(input: ScoreJobInput): Promise<ScoreJobResult>
 }
 
 /**
+ * Hitung fitur lebih dulu untuk simbol yang candle-nya sudah lebih baru.
+ *
+ * Job fitur dan job skor bisa berjalan bersamaan dari jalur berbeda (QStash dan
+ * pemicu kunjungan), dan skor yang lebih dulu selesai memakai fitur kemarin —
+ * lalu dihukum "data berumur dua hari" padahal candle hari ini sudah ada di
+ * tabel. Yang tertinggal dihitung di sini; yang sudah segar tidak disentuh.
+ */
+async function catchUpFeatures(symbols: string[], market: MarketCode): Promise<void> {
+  const lagging: string[] = []
+  for (const symbol of symbols) {
+    const instrument = await getInstrumentBySymbol(market, symbol)
+    if (!instrument) continue
+    const [candle, feature] = await Promise.all([
+      getLatestCandle(instrument.id),
+      getLatestFeature(instrument.id, FEATURE_SET_VERSION),
+    ])
+    if (candle && feature && candle.date > feature.date) lagging.push(symbol)
+  }
+  if (lagging.length === 0) return
+
+  try {
+    await runFeatureJob({ symbols: lagging, market })
+  } catch (err) {
+    // Gagal di sini bukan alasan berhenti: skor tetap dihitung dari fitur yang
+    // ada, dan umurnya tetap diakui lewat staleDays.
+    console.error('[Skor] susulan fitur gagal:', err instanceof Error ? err.message : err)
+  }
+}
+
+/**
  * Umur data dan nilai transaksi harian rata-rata dua puluh hari terakhir.
  *
  * Umur dihitung terhadap tanggal fitur, bukan terhadap hari ini saja: skor yang
@@ -182,7 +235,7 @@ async function recentContext(
   symbol: string,
   assetClass: AssetClass,
   featureDate: string,
-): Promise<{ staleDays: number; turnover: number | null }> {
+): Promise<{ staleDays: number; turnover: number | null; suspendedDays: number }> {
   const to = featureDate
   const from = new Date(new Date(`${featureDate}T00:00:00Z`).getTime() - 40 * 86_400_000)
     .toISOString()
@@ -216,7 +269,18 @@ async function recentContext(
 
   const staleDays = elapsedDays(featureDate, new Date(), assetClass !== 'crypto' && assetClass !== 'memecoin')
 
-  return { staleDays, turnover }
+  // Indeks memang tidak punya volume, dan volume berjangka jatuh ke nol di
+  // sekitar pergantian kontrak; keduanya tidak bisa disebut disuspensi.
+  let suspendedDays = 0
+  if (assetClass !== 'indeks' && assetClass !== 'komoditi') {
+    for (let i = candles.length - 1; i > 0; i--) {
+      const c = candles[i]
+      if (Number(c.volume) !== 0 || Number(c.close) !== Number(candles[i - 1].close)) break
+      suspendedDays++
+    }
+  }
+
+  return { staleDays, turnover, suspendedDays }
 }
 
 /** Hari yang lewat sejak `date` sampai `now`, tanpa Sabtu-Minggu bila `weekdaysOnly`. */
