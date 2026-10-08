@@ -41,6 +41,10 @@ export const simAccount = pgTable(
     resetCount: integer('reset_count').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     resetAt: timestamp('reset_at', { withTimezone: true }).notNull().defaultNow(),
+    /** Autopilot server: desk dijalankan cron walau halaman tidak dibuka. */
+    autopilot: boolean('autopilot').notNull().default(false),
+    /** Kunci sidang: dua cron yang tumpang-tindih tidak bersidang di dompet yang sama. */
+    lastDeskAt: timestamp('last_desk_at', { withTimezone: true }),
   },
   (t) => [uniqueIndex('sim_account_owner_mode_uq').on(t.ownerKey, t.mode)],
 )

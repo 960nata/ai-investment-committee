@@ -48,7 +48,7 @@ export interface ModeInfo {
   horizonDays: number | null
   /** Skor sistem yang dibaca desk untuk mode ini. */
   scoreHorizon: 'pendek' | 'menengah' | 'panjang' | null
-  /** Jeda autopilot, dalam detik. Null = autopilot tidak tersedia. */
+  /** Jeda minimum antar-sidang autopilot server, dalam detik. Binary memakai pemindai setup. */
   autopilotSeconds: number | null
   description: string
 }
@@ -80,7 +80,7 @@ export const MODE_INFO: Record<SimMode, ModeInfo> = {
     short: 'Bulanan',
     horizonDays: 30,
     scoreHorizon: 'menengah',
-    autopilotSeconds: null,
+    autopilotSeconds: 6 * 3600,
     description:
       'Swing trade sampai 30 hari. Desk membaca candle harian, skor jangka menengah, dan jejak akumulasi.',
   },
@@ -90,7 +90,7 @@ export const MODE_INFO: Record<SimMode, ModeInfo> = {
     short: 'Tahunan',
     horizonDays: 365,
     scoreHorizon: 'panjang',
-    autopilotSeconds: null,
+    autopilotSeconds: 24 * 3600,
     description:
       'Posisi sampai 1 tahun. Desk membaca tren panjang, fundamental, dan arus kepemilikan asing (KSEI).',
   },

@@ -144,6 +144,7 @@ export interface SimState {
     startingBalance: number
     equity: number
     resetCount: number
+    autopilot: boolean
     resetAt: string
   }
   open: MarkedPosition[]
@@ -265,6 +266,7 @@ export async function getSimState(ownerKey: string, mode: SimMode): Promise<SimS
       startingBalance: starting,
       equity,
       resetCount: account.resetCount,
+      autopilot: account.autopilot,
       resetAt: account.resetAt.toISOString(),
     },
     open: marked,

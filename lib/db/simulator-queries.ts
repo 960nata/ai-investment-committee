@@ -21,8 +21,13 @@ export async function ensureSimulatorTables(): Promise<void> {
 
   // Jalur hangat: satu kueri, bukan sembilan DDL. Tiap cold start serverless
   // melewati fungsi ini, dan rapat desk punya batas 60 detik.
+  // Kolom terbaru sebagai penanda versi: tabel lama tanpa kolom autopilot
+  // tetap melewati ALTER di bawah.
   const probe = await db.execute<{ ready: boolean }>(
-    sql`SELECT to_regclass('public.sim_desk_run') IS NOT NULL AS ready`,
+    sql`SELECT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_schema = 'public' AND table_name = 'sim_account' AND column_name = 'last_desk_at'
+        ) AS ready`,
   )
   if (probe[0]?.ready) {
     globalThis.__simTablesReady = true
@@ -50,6 +55,8 @@ export async function ensureSimulatorTables(): Promise<void> {
     )
   `)
   await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS sim_account_owner_mode_uq ON sim_account (owner_key, mode)`)
+  await db.execute(sql`ALTER TABLE sim_account ADD COLUMN IF NOT EXISTS autopilot BOOLEAN NOT NULL DEFAULT FALSE`)
+  await db.execute(sql`ALTER TABLE sim_account ADD COLUMN IF NOT EXISTS last_desk_at TIMESTAMPTZ`)
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS sim_position (
       id SERIAL PRIMARY KEY,
@@ -154,6 +161,37 @@ export async function resetAccount(ownerKey: string, mode: SimMode): Promise<Sim
       .returning()
     return row
   })
+}
+
+export async function setAutopilot(ownerKey: string, mode: SimMode, enabled: boolean): Promise<void> {
+  const account = await getOrCreateAccount(ownerKey, mode)
+  await db.update(simAccount).set({ autopilot: enabled }).where(eq(simAccount.id, account.id))
+}
+
+/** Dompet yang autopilotnya menyala, yang paling lama tidak bersidang lebih dulu. */
+export async function listAutopilotAccounts(limit = 50): Promise<SimAccountRow[]> {
+  await ensureSimulatorTables()
+  return db
+    .select()
+    .from(simAccount)
+    .where(eq(simAccount.autopilot, true))
+    .orderBy(sql`${simAccount.lastDeskAt} ASC NULLS FIRST`)
+    .limit(limit)
+}
+
+/**
+ * Klaim slot sidang secara atomik. Mengembalikan false bila dompet ini baru
+ * bersidang kurang dari `minGapSeconds` lalu — termasuk oleh cron lain yang
+ * berjalan bersamaan.
+ */
+export async function claimDeskSlot(accountId: number, minGapSeconds: number): Promise<boolean> {
+  const rows = await db.execute<{ id: number }>(sql`
+    UPDATE sim_account SET last_desk_at = NOW()
+    WHERE id = ${accountId}
+      AND (last_desk_at IS NULL OR last_desk_at < NOW() - make_interval(secs => ${minGapSeconds}))
+    RETURNING id
+  `)
+  return rows.length > 0
 }
 
 // ---------------------------------------------------------------------------

@@ -180,7 +180,6 @@ export function SimulatorClient({ instruments }: { instruments: SimInstrumentOpt
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [deskNote, setDeskNote] = useState<string | null>(null)
-  const [autopilot, setAutopilot] = useState(false)
   const [selected, setSelected] = useState<Selected>(BTC)
   const [interval, setIntervalId] = useState<ChartInterval>(DEFAULT_INTERVAL.binary)
   const [livePrice, setLivePrice] = useState<{ symbol: string; price: number } | null>(null)
@@ -247,7 +246,6 @@ export function SimulatorClient({ instruments }: { instruments: SimInstrumentOpt
     seenClosed.current = null
     setMode(m)
     setState(null)
-    setAutopilot(false)
     setDeskNote(null)
     setError(null)
     setIntervalId(DEFAULT_INTERVAL[m])
@@ -300,7 +298,6 @@ export function SimulatorClient({ instruments }: { instruments: SimInstrumentOpt
       return true
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
-      setAutopilot(false)
       return false
     } finally {
       setBusy(null)
@@ -308,33 +305,18 @@ export function SimulatorClient({ instruments }: { instruments: SimInstrumentOpt
   }, [accept, toast])
 
   const autopilotEvery = MODE_INFO[mode].autopilotSeconds
-  const { setups, scannedAt } = useSetups(mode === 'binary')
+  const { setups } = useSetups(mode === 'binary')
   const heldSymbols = useMemo(() => new Set((state?.open ?? []).map((p) => p.symbol)), [state])
   const freshSetups = useMemo(() => setups.filter((x) => !heldSymbols.has(x.symbol)), [setups, heldSymbols])
-  const lastDeskAt = useRef(0)
+  // Autopilot berjalan di server (cron), bukan di tab ini: tetap jalan walau
+  // halaman ditutup. Sakelarnya disimpan di dompet.
+  const autopilot = state?.account.autopilot ?? false
+  const toggleAutopilot = (enabled: boolean) => void post('autopilot', { action: 'autopilot', mode, enabled })
 
-  // Autopilot investasi: sidang berkala.
-  useEffect(() => {
-    if (!autopilot || !autopilotEvery || mode === 'binary') return
-    const first = setTimeout(() => void runDesk(), 0)
-    const id = setInterval(() => {
-      if (document.visibilityState === 'visible') void runDesk()
-    }, autopilotEvery * 1000)
-    return () => {
-      clearTimeout(first)
-      clearInterval(id)
-    }
-  }, [autopilot, autopilotEvery, mode, runDesk])
-
-  // Autopilot binary: desk dipanggil hanya saat pemindai menemukan setup teruji
-  // yang belum dipegang — tanpa setup, sidang cuma membakar kuota untuk lempar koin.
-  useEffect(() => {
-    if (!autopilot || mode !== 'binary' || busy !== null || freshSetups.length === 0) return
-    if (Date.now() - lastDeskAt.current < 60_000) return
-    lastDeskAt.current = Date.now()
-    const t = setTimeout(() => void runDesk(), 0)
-    return () => clearTimeout(t)
-  }, [autopilot, mode, busy, freshSetups, scannedAt, runDesk])
+  const autopilotLabel =
+    mode === 'binary'
+      ? 'Masuk otomatis saat sinyal teruji muncul'
+      : `Sidang otomatis tiap ${autopilotEvery && autopilotEvery >= 3600 ? `${autopilotEvery / 3600} jam` : `${Math.round((autopilotEvery ?? 0) / 60)} menit`}`
 
   const reset = () => {
     if (!window.confirm(`Reset dompet ${MODE_INFO[mode].label} ke $${STARTING_BALANCE_USD.toLocaleString('en-US')}? Semua riwayat di mode ini dihapus.`)) return
@@ -410,6 +392,15 @@ export function SimulatorClient({ instruments }: { instruments: SimInstrumentOpt
             <span className={s.pillValue}>{st?.winRate != null ? `${st.winRate.toFixed(0)}%` : '—'}</span>
           </div>
           <div className={s.topActions}>
+            <button
+              type="button"
+              className={`btn ${autopilot ? 'btn-signal' : ''}`}
+              disabled={busy !== null || !state}
+              onClick={() => toggleAutopilot(!autopilot)}
+              title={autopilotLabel}
+            >
+              {autopilot ? '● Autopilot ON' : '○ Autopilot OFF'}
+            </button>
             <button type="button" className="btn btn-primary" disabled={busy !== null} onClick={() => void runDesk()}>
               {busy === 'desk' ? 'Desk bersidang…' : '🤖 Desk AI'}
             </button>
@@ -505,18 +496,16 @@ export function SimulatorClient({ instruments }: { instruments: SimInstrumentOpt
                 jejak akumulasi/distribusi pemain besar, Manajer Risiko memveto dan menetapkan ukuran, Kepala Desk
                 memutuskan — lalu trade dieksekusi otomatis.
               </span>
-              {autopilotEvery && (
-                <label className={s.switch}>
-                  <input type="checkbox" checked={autopilot} onChange={(e) => setAutopilot(e.target.checked)} />
-                  {mode === 'binary' ? 'Autopilot: entry otomatis saat setup teruji muncul' : `Autopilot tiap ${Math.round(autopilotEvery / 60)} menit`}
-                </label>
-              )}
+              <label className={s.switch}>
+                <input type="checkbox" checked={autopilot} disabled={busy !== null || !state} onChange={(e) => toggleAutopilot(e.target.checked)} />
+                Autopilot — {autopilotLabel}
+              </label>
             </div>
             {autopilot && (
               <div className={s.notice}>
                 {mode === 'binary'
-                  ? `Autopilot aktif selama tab ini terbuka. Pasar dipindai tiap 30 detik tanpa AI; desk hanya bersidang (1 jatah AI) saat setup teruji muncul${freshSetups.length ? ` — sekarang: ${freshSetups.map((x) => displaySymbol(x.symbol)).join(', ')}` : ' — sekarang belum ada'}.`
-                  : 'Autopilot aktif selama tab ini terbuka. Tiap sidang memakai satu jatah AI harian.'}
+                  ? `Autopilot aktif di server — tetap jalan walau halaman ini ditutup. Pasar dipindai tiap beberapa menit tanpa AI; desk hanya bersidang (1 jatah AI) saat sinyal teruji muncul${freshSetups.length ? ` — sekarang: ${freshSetups.map((x) => displaySymbol(x.symbol)).join(', ')}` : ' — sekarang belum ada'}.`
+                  : 'Autopilot aktif di server — tetap jalan walau halaman ini ditutup. Tiap sidang memakai satu jatah AI harian.'}
               </div>
             )}
             {lastRun ? <DeskRunView run={lastRun} /> : <div className={s.empty}>Belum ada sidang desk di mode ini. Tekan 🤖 Desk AI.</div>}

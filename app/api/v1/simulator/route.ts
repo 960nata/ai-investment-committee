@@ -16,7 +16,7 @@ import { z } from 'zod'
 import { ACCESS_MESSAGE, resolveSimAccess } from '@/lib/simulator/access'
 import { OpenTradeSchema, SimModeSchema } from '@/lib/simulator/config'
 import { SimRejectError, closeTradeNow, getSimState, openTrade } from '@/lib/simulator/engine'
-import { resetAccount } from '@/lib/db/simulator-queries'
+import { resetAccount, setAutopilot } from '@/lib/db/simulator-queries'
 import { badRequest, failure, NO_STORE } from '@/lib/http/errors'
 import { readBody } from '@/lib/member/http'
 
@@ -27,6 +27,7 @@ const Body = z.discriminatedUnion('action', [
   z.object({ action: z.literal('open'), trade: OpenTradeSchema }),
   z.object({ action: z.literal('close'), mode: SimModeSchema, positionId: z.number().int().positive() }),
   z.object({ action: z.literal('reset'), mode: SimModeSchema }),
+  z.object({ action: z.literal('autopilot'), mode: SimModeSchema, enabled: z.boolean() }),
 ])
 
 function denied(reason: 'login' | 'disabled' | 'premium') {
@@ -63,6 +64,10 @@ export async function POST(req: Request) {
     }
     if (body.action === 'close') {
       await closeTradeNow(access.ownerKey, body.mode, body.positionId)
+      return NextResponse.json({ data: await getSimState(access.ownerKey, body.mode) }, { headers: NO_STORE })
+    }
+    if (body.action === 'autopilot') {
+      await setAutopilot(access.ownerKey, body.mode, body.enabled)
       return NextResponse.json({ data: await getSimState(access.ownerKey, body.mode) }, { headers: NO_STORE })
     }
     await resetAccount(access.ownerKey, body.mode)

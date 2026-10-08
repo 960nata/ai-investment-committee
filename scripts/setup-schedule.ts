@@ -16,13 +16,16 @@
  * `job_schedule` sebelum bertindak, jadi dipanggil dua kali dalam satu jam
  * tidak menggandakan pekerjaan apa pun.
  *
- * Jalankan: npx tsx scripts/setup-schedule.ts [--cron "0 * * * *"] [--delete]
+ * Jalankan: npx tsx scripts/setup-schedule.ts [--cron "0 * * * *"] [--path /api/cron/dispatcher] [--delete]
+ *
+ * Autopilot simulator trading memakai endpoint terpisah dan jadwal lebih rapat:
+ *   npx tsx scripts/setup-schedule.ts --path /api/cron/simulator --cron "*\/3 * * * *"
  */
 
 import './load-env'
 import { Client } from '@upstash/qstash'
 
-const DEST_PATH = '/api/cron/dispatcher'
+const DEFAULT_PATH = '/api/cron/dispatcher'
 const DEFAULT_CRON = '0 * * * *'
 
 function arg(name: string): string | undefined {
@@ -58,7 +61,7 @@ async function main() {
   }
 
   const client = new Client({ token })
-  const destination = `${appUrl()}${DEST_PATH}`
+  const destination = `${appUrl()}${arg('path') ?? DEFAULT_PATH}`
   const cron = arg('cron') ?? DEFAULT_CRON
 
   // Jadwal lama dibersihkan dulu supaya menjalankan skrip ini dua kali tidak
