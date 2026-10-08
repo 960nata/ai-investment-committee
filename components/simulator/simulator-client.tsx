@@ -1,12 +1,13 @@
 'use client'
 
 /**
- * Simulator trading: empat dompet terpisah (binary, harian, bulanan, tahunan),
- * trading manual, dan desk AI yang bisa dijalankan sekali atau dibiarkan
- * berjalan otomatis selama tab terbuka.
+ * Simulator trading bergaya platform trading: bar akun di atas, daftar pasar
+ * | grafik realtime | tiket order, lalu panel tab (posisi, riwayat, desk AI,
+ * radar) di bawah.
  *
- * Semua angka uang datang dari server. Komponen ini hanya mengirim niat —
- * simbol, arah, stake — dan menggambar ulang dari keadaan yang dikembalikan.
+ * Empat dompet terpisah (binary, harian, bulanan, tahunan). Semua angka uang
+ * datang dari server; komponen ini hanya mengirim niat — simbol, arah,
+ * stake — dan menggambar ulang dari keadaan yang dikembalikan.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -14,14 +15,18 @@ import {
   BINARY_EXPIRIES,
   BINARY_PAYOUT,
   BINARY_SYMBOLS,
+  CHART_INTERVALS,
+  DEFAULT_INTERVAL,
   MODE_INFO,
   SIM_MODES,
   STARTING_BALANCE_USD,
+  type ChartInterval,
   type SimMode,
 } from '@/lib/simulator/config'
-import type { SimState } from '@/lib/simulator/engine'
+import type { MarkedPosition, SimState } from '@/lib/simulator/engine'
 import type { DeskDecision, DeskTurn, ExecutedAction } from '@/lib/simulator/desk'
 import type { SignalReport } from '@/lib/simulator/signals'
+import { TradeChart, formatPrice, type ChartLine } from './trade-chart'
 import s from './simulator.module.css'
 
 export interface SimInstrumentOption {
@@ -31,6 +36,27 @@ export interface SimInstrumentOption {
   assetClass: string
 }
 
+interface Selected {
+  symbol: string
+  market: string
+  name: string
+}
+
+const CRYPTO_NAMES: Record<string, string> = {
+  BTCUSDT: 'Bitcoin',
+  ETHUSDT: 'Ethereum',
+  BNBUSDT: 'BNB',
+  SOLUSDT: 'Solana',
+  XRPUSDT: 'XRP',
+  DOGEUSDT: 'Dogecoin',
+  ADAUSDT: 'Cardano',
+  AVAXUSDT: 'Avalanche',
+  LINKUSDT: 'Chainlink',
+  DOTUSDT: 'Polkadot',
+}
+
+const BTC: Selected = { symbol: 'BTCUSDT', market: 'CRYPTO', name: 'Bitcoin' }
+
 const usd = (v: number | null | undefined, sign = false) =>
   v === null || v === undefined || !Number.isFinite(v)
     ? '—'
@@ -39,13 +65,11 @@ const usd = (v: number | null | undefined, sign = false) =>
 const pct = (v: number | null | undefined) =>
   v === null || v === undefined || !Number.isFinite(v) ? '—' : `${v > 0 ? '+' : ''}${v.toFixed(2)}%`
 
-const price = (v: number | null | undefined) => {
-  if (v === null || v === undefined || !Number.isFinite(v)) return '—'
-  const digits = v >= 1000 ? 2 : v >= 1 ? 4 : 6
-  return v.toLocaleString('en-US', { maximumFractionDigits: digits })
-}
-
 const tone = (v: number | null | undefined) => (v === null || v === undefined || v === 0 ? '' : v > 0 ? s.up : s.down)
+
+const displaySymbol = (sym: string) => (sym.endsWith('USDT') ? `${sym.slice(0, -4)}/USDT` : sym.replace(/\.JK$/, ''))
+
+const isBinarySide = (side: string) => side === 'up' || side === 'down'
 
 const AGENT_LABEL: Record<DeskTurn['agent'], string> = {
   radar: 'Pemburu Sinyal',
@@ -55,47 +79,67 @@ const AGENT_LABEL: Record<DeskTurn['agent'], string> = {
 }
 
 const REASON_LABEL: Record<string, string> = {
-  manual: 'manual',
-  ai: 'desk AI',
+  manual: 'ditutup manual',
+  ai: 'ditutup desk AI',
   stop_loss: 'stop loss',
-  take_profit: 'target',
+  take_profit: 'target tercapai',
   expired: 'jatuh tempo',
   settled: 'kedaluwarsa',
 }
 
 async function api<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
-    ...init,
-    headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) },
-  })
+  const res = await fetch(url, { ...init, headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) } })
   const body = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error(body?.error ?? `Permintaan gagal (HTTP ${res.status}).`)
   return body.data as T
 }
 
-function useNow(intervalMs: number) {
+function useNow(intervalMs: number, enabled = true) {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
+    if (!enabled) return
     const id = setInterval(() => setNow(Date.now()), intervalMs)
     return () => clearInterval(id)
-  }, [intervalMs])
+  }, [intervalMs, enabled])
   return now
 }
 
-function Sparkline({ points }: { points: number[] }) {
-  if (points.length < 2) return <svg className={s.spark} aria-hidden="true" />
-  const min = Math.min(...points)
-  const max = Math.max(...points)
-  const span = max - min || 1
-  const d = points
-    .map((p, i) => `${i === 0 ? 'M' : 'L'}${((i / (points.length - 1)) * 100).toFixed(2)},${(36 - ((p - min) / span) * 32 - 2).toFixed(2)}`)
-    .join(' ')
-  const rising = points[points.length - 1] >= points[0]
-  return (
-    <svg className={s.spark} viewBox="0 0 100 36" preserveAspectRatio="none" role="img" aria-label="Grafik harga terbaru">
-      <path d={d} fill="none" stroke={rising ? 'var(--measured)' : 'var(--halted)'} strokeWidth="1.2" vectorEffect="non-scaling-stroke" />
-    </svg>
-  )
+const countdown = (until: string, now: number) => {
+  const left = Math.max(0, Math.round((Date.parse(until) - now) / 1000))
+  return `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`
+}
+
+/** Harga ringkas untuk daftar pasar, satu permintaan untuk semua simbol yang terlihat. */
+function useQuotes(symbols: string[]) {
+  const [quotes, setQuotes] = useState<Record<string, { price: number; changePct: number }>>({})
+  const key = symbols.slice(0, 15).join(',')
+  useEffect(() => {
+    if (!key) return
+    let cancelled = false
+    const tick = async () => {
+      if (document.visibilityState !== 'visible') return
+      try {
+        const res = await fetch(`/api/quotes/live?symbols=${encodeURIComponent(key)}`)
+        const body = await res.json()
+        if (!cancelled && body?.quotes) setQuotes((prev) => ({ ...prev, ...body.quotes }))
+      } catch {
+        // detak berikutnya mencoba lagi
+      }
+    }
+    void tick()
+    const id = setInterval(tick, 6_000)
+    return () => {
+      cancelled = true
+      clearInterval(id)
+    }
+  }, [key])
+  return quotes
+}
+
+interface Toast {
+  id: number
+  kind: 'win' | 'loss' | 'info'
+  text: string
 }
 
 // ---------------------------------------------------------------------------
@@ -107,50 +151,85 @@ export function SimulatorClient({ instruments }: { instruments: SimInstrumentOpt
   const [busy, setBusy] = useState<string | null>(null)
   const [deskNote, setDeskNote] = useState<string | null>(null)
   const [autopilot, setAutopilot] = useState(false)
+  const [selected, setSelected] = useState<Selected>(BTC)
+  const [interval, setIntervalId] = useState<ChartInterval>(DEFAULT_INTERVAL.binary)
+  const [livePrice, setLivePrice] = useState<{ symbol: string; price: number } | null>(null)
+  const [tab, setTab] = useState<'open' | 'history' | 'desk' | 'radar' | 'stats'>('open')
+  const [toasts, setToasts] = useState<Toast[]>([])
   const modeRef = useRef<SimMode>('binary')
+  const seenClosed = useRef<Set<number> | null>(null)
 
-  const load = useCallback(async (m: SimMode) => {
-    try {
-      const data = await api<SimState>(`/api/v1/simulator?mode=${m}`)
-      if (modeRef.current === m) {
-        setState(data)
-        setError(null)
-      }
-    } catch (err) {
-      if (modeRef.current === m) setError(err instanceof Error ? err.message : String(err))
-    }
+  const toast = useCallback((kind: Toast['kind'], text: string) => {
+    const id = Date.now() + Math.random()
+    setToasts((t) => [...t.slice(-3), { id, kind, text }])
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 6_000)
   }, [])
+
+  /** Terima keadaan baru, dan umumkan trade yang baru selesai seperti platform binary. */
+  const accept = useCallback(
+    (next: SimState) => {
+      const seen = seenClosed.current
+      if (seen) {
+        for (const c of next.closed) {
+          if (seen.has(c.id)) continue
+          const label = `${displaySymbol(c.symbol)} ${c.side.toUpperCase()}`
+          if (c.pnlUsd > 0) toast('win', `✓ ${label} untung ${usd(c.pnlUsd, true)}`)
+          else if (c.pnlUsd < 0) toast('loss', `✗ ${label} rugi ${usd(c.pnlUsd)}`)
+          else toast('info', `${label} impas — stake kembali`)
+        }
+      }
+      seenClosed.current = new Set(next.closed.map((c) => c.id))
+      setState(next)
+    },
+    [toast],
+  )
+
+  const load = useCallback(
+    async (m: SimMode) => {
+      try {
+        const data = await api<SimState>(`/api/v1/simulator?mode=${m}`)
+        if (modeRef.current === m) {
+          accept(data)
+          setError(null)
+        }
+      } catch (err) {
+        if (modeRef.current === m) setError(err instanceof Error ? err.message : String(err))
+      }
+    },
+    [accept],
+  )
 
   useEffect(() => {
     const first = setTimeout(() => void load(mode), 0)
-    return () => clearTimeout(first)
+    const every = mode === 'binary' ? 8_000 : mode === 'harian' ? 20_000 : 60_000
+    const id = setInterval(() => {
+      if (document.visibilityState === 'visible') void load(mode)
+    }, every)
+    return () => {
+      clearTimeout(first)
+      clearInterval(id)
+    }
   }, [mode, load])
 
   const changeMode = (m: SimMode) => {
     if (m === mode) return
     modeRef.current = m
+    seenClosed.current = null
     setMode(m)
     setState(null)
     setAutopilot(false)
     setDeskNote(null)
     setError(null)
+    setIntervalId(DEFAULT_INTERVAL[m])
+    if (m === 'binary' && !BINARY_SYMBOLS.includes(selected.symbol as (typeof BINARY_SYMBOLS)[number])) setSelected(BTC)
   }
-
-  // Segarkan keadaan: binary dan harian lebih sering karena harganya bergerak per menit.
-  useEffect(() => {
-    const every = mode === 'binary' ? 10_000 : mode === 'harian' ? 20_000 : 60_000
-    const id = setInterval(() => {
-      if (document.visibilityState === 'visible') void load(mode)
-    }, every)
-    return () => clearInterval(id)
-  }, [mode, load])
 
   const post = useCallback(
     async (label: string, body: unknown) => {
       setBusy(label)
       setError(null)
       try {
-        setState(await api<SimState>('/api/v1/simulator', { method: 'POST', body: JSON.stringify(body) }))
+        accept(await api<SimState>('/api/v1/simulator', { method: 'POST', body: JSON.stringify(body) }))
         return true
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err))
@@ -159,7 +238,7 @@ export function SimulatorClient({ instruments }: { instruments: SimInstrumentOpt
         setBusy(null)
       }
     },
-    [],
+    [accept],
   )
 
   const runDesk = useCallback(async () => {
@@ -171,13 +250,15 @@ export function SimulatorClient({ instruments }: { instruments: SimInstrumentOpt
         '/api/v1/simulator/desk',
         { method: 'POST', body: JSON.stringify({ mode: modeRef.current }) },
       )
-      setState(data.state)
-      const opened = data.result.executed.filter((e) => e.ok).length
-      setDeskNote(
-        data.result.decision
-          ? `Desk selesai: ${data.result.decision.actions.length} aksi diputuskan, ${opened} tereksekusi.`
-          : 'Desk tidak bersidang — tidak ada instrumen dengan data cukup atau pasar tutup.',
-      )
+      accept(data.state)
+      const opened = data.result.executed.filter((e) => e.ok)
+      const note = data.result.decision
+        ? opened.length > 0
+          ? `Desk AI mengeksekusi ${opened.length} trade: ${opened.map((e) => e.message).join(' ')}`
+          : `Desk AI memutuskan tidak trade. ${data.result.decision.summary}`
+        : 'Desk tidak bersidang — tidak ada instrumen dengan data cukup atau pasar tutup.'
+      setDeskNote(note)
+      toast('info', opened.length > 0 ? `🤖 Desk AI membuka ${opened.length} posisi` : '🤖 Desk AI: tidak ada trade')
       return true
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -186,9 +267,8 @@ export function SimulatorClient({ instruments }: { instruments: SimInstrumentOpt
     } finally {
       setBusy(null)
     }
-  }, [])
+  }, [accept, toast])
 
-  // Autopilot: desk berjalan berkala selama tab ini terbuka dan terlihat.
   const autopilotEvery = MODE_INFO[mode].autopilotSeconds
   useEffect(() => {
     if (!autopilot || !autopilotEvery) return
@@ -204,553 +284,720 @@ export function SimulatorClient({ instruments }: { instruments: SimInstrumentOpt
 
   const reset = () => {
     if (!window.confirm(`Reset dompet ${MODE_INFO[mode].label} ke $${STARTING_BALANCE_USD.toLocaleString('en-US')}? Semua riwayat di mode ini dihapus.`)) return
+    seenClosed.current = null
     void post('reset', { action: 'reset', mode })
   }
 
-  const info = MODE_INFO[mode]
+  // --- garis posisi di grafik --------------------------------------------
+  const openHere = useMemo(() => (state?.open ?? []).filter((p) => p.symbol === selected.symbol), [state, selected.symbol])
+  const hasBinaryHere = openHere.some((p) => isBinarySide(p.side))
+  const now = useNow(1_000, hasBinaryHere)
+  const lines = useMemo<ChartLine[]>(() => {
+    const out: ChartLine[] = []
+    for (const p of openHere) {
+      const upish = p.side === 'up' || p.side === 'long'
+      const color = upish ? '#4f9d8e' : '#b3564e'
+      if (isBinarySide(p.side)) {
+        out.push({
+          price: p.entryPrice,
+          color,
+          title: `${p.side === 'up' ? '▲' : '▼'} ${usd(p.stakeUsd)}${p.expiresAt ? ` · ${countdown(p.expiresAt, now)}` : ''}`,
+        })
+      } else {
+        out.push({ price: p.entryPrice, color, title: `${p.side.toUpperCase()} ${usd(p.stakeUsd)}` })
+        if (p.stopLoss) out.push({ price: p.stopLoss, color: '#b3564e', title: 'SL', dashed: true })
+        if (p.takeProfit) out.push({ price: p.takeProfit, color: '#4f9d8e', title: 'TP', dashed: true })
+      }
+    }
+    return out
+  }, [openHere, now])
+
+  const onPrice = useCallback((price: number) => setLivePrice({ symbol: selected.symbol, price }), [selected.symbol])
+  const current = livePrice?.symbol === selected.symbol ? livePrice.price : null
+
   const lastRun = state?.deskRuns[0]
+  const lastSignals = (Array.isArray(lastRun?.signals) ? lastRun.signals : []) as SignalReport[]
+  const a = state?.account
+  const st = state?.stats
 
   return (
     <div className={s.root}>
-      <div className={s.tabs} role="tablist" aria-label="Mode simulator">
-        {SIM_MODES.map((m) => (
-          <button
-            key={m}
-            type="button"
-            role="tab"
-            aria-selected={mode === m}
-            className={`${s.tab} ${mode === m ? s.tabActive : ''}`}
-            onClick={() => changeMode(m)}
-          >
-            {MODE_INFO[m].label}
-          </button>
-        ))}
+      {/* Bar akun */}
+      <div className={s.topbar}>
+        <div className={s.modes} role="tablist" aria-label="Mode simulator">
+          {SIM_MODES.map((m) => (
+            <button
+              key={m}
+              type="button"
+              role="tab"
+              aria-selected={mode === m}
+              className={`${s.mode} ${mode === m ? s.modeActive : ''}`}
+              onClick={() => changeMode(m)}
+            >
+              {MODE_INFO[m].label}
+            </button>
+          ))}
+        </div>
+        <div className={s.account}>
+          <div className={s.pill}>
+            <span className={s.pillLabel}>Ekuitas</span>
+            <span className={s.pillValue}>{usd(a?.equity)}</span>
+          </div>
+          <div className={s.pill}>
+            <span className={s.pillLabel}>Kas</span>
+            <span className={s.pillValue}>{usd(a?.cash)}</span>
+          </div>
+          <div className={s.pill}>
+            <span className={s.pillLabel}>P/L</span>
+            <span className={`${s.pillValue} ${tone(st?.returnPct)}`}>{pct(st?.returnPct)}</span>
+          </div>
+          <div className={s.pill}>
+            <span className={s.pillLabel}>Win</span>
+            <span className={s.pillValue}>{st?.winRate != null ? `${st.winRate.toFixed(0)}%` : '—'}</span>
+          </div>
+          <div className={s.topActions}>
+            <button type="button" className="btn btn-primary" disabled={busy !== null} onClick={() => void runDesk()}>
+              {busy === 'desk' ? 'Desk bersidang…' : '🤖 Desk AI'}
+            </button>
+            <button type="button" className="btn" disabled={busy !== null || !state} onClick={reset} title="Reset dompet ke $1.000">
+              ⟲ Reset
+            </button>
+          </div>
+        </div>
       </div>
-      <p className={s.modeNote}>{info.description} Tiap mode punya dompet $1.000 sendiri.</p>
 
       {error && <div className={s.error}>{error}</div>}
+      {deskNote && <div className={s.notice}>{deskNote}</div>}
 
-      <AccountStats state={state} onReset={reset} busy={busy} />
+      <div className={s.workspace}>
+        <MarketList mode={mode} instruments={instruments} selected={selected} onSelect={setSelected} />
 
-      <div className={s.grid}>
-        {mode === 'binary' ? (
-          <BinaryTicket
-            busy={busy}
-            cash={state?.account.cash ?? 0}
-            onTrade={(t) => post('open', { action: 'open', trade: { kind: 'binary', ...t } })}
-          />
-        ) : (
-          <InvestTicket
-            key={mode}
+        <section className={s.panel}>
+          <ChartHeader selected={selected} price={current} interval={interval} onInterval={setIntervalId} />
+          <TradeChart symbol={selected.symbol} interval={interval} lines={lines} onPrice={onPrice} />
+        </section>
+
+        <section className={s.panel}>
+          <div className={s.panelHead}>
+            <span>{mode === 'binary' ? 'Binary Option' : 'Order'}</span>
+            <span>{displaySymbol(selected.symbol)}</span>
+          </div>
+          {mode === 'binary' ? (
+            <BinaryTicket
+              busy={busy}
+              cash={a?.cash ?? 0}
+              price={current}
+              onTrade={(t) => post('open', { action: 'open', trade: { kind: 'binary', symbol: selected.symbol, ...t } })}
+            />
+          ) : (
+            <InvestTicket
+              key={mode}
+              mode={mode}
+              busy={busy}
+              cash={a?.cash ?? 0}
+              price={current}
+              selected={selected}
+              onTrade={(t) =>
+                post('open', { action: 'open', trade: { kind: 'invest', mode, market: selected.market, symbol: selected.symbol, ...t } })
+              }
+            />
+          )}
+        </section>
+      </div>
+
+      {/* Panel bawah */}
+      <section className={s.panel}>
+        <div className={s.bottomTabs} role="tablist">
+          {(
+            [
+              ['open', `Posisi terbuka (${state?.open.length ?? 0})`],
+              ['history', `Riwayat (${st?.trades ?? 0})`],
+              ['desk', 'Desk AI'],
+              ['radar', 'Radar & Bandar'],
+              ['stats', 'Statistik'],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={tab === id}
+              className={`${s.bottomTab} ${tab === id ? s.bottomTabActive : ''}`}
+              onClick={() => setTab(id)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {tab === 'open' && (
+          <OpenPositions
+            state={state}
             mode={mode}
-            instruments={instruments}
             busy={busy}
-            cash={state?.account.cash ?? 0}
-            onTrade={(t) => post('open', { action: 'open', trade: { kind: 'invest', mode, ...t } })}
+            onSelect={(p) => setSelected({ symbol: p.symbol, market: p.market, name: p.name })}
+            onClose={(id) => post(`close-${id}`, { action: 'close', mode, positionId: id })}
           />
         )}
-
-        <section className={s.card}>
-          <div className={s.cardHead}>
-            <h2 className={s.cardTitle}>Desk AI</h2>
-            <div className={s.deskControls}>
+        {tab === 'history' && <History state={state} />}
+        {tab === 'desk' && (
+          <div className={s.desk}>
+            <div className={s.deskBar}>
+              <span className={s.hint}>
+                Empat AI dari penyedia berbeda bersidang: Pemburu Sinyal membaca radar teknikal, Pelacak Bandar mencari
+                jejak akumulasi/distribusi pemain besar, Manajer Risiko memveto dan menetapkan ukuran, Kepala Desk
+                memutuskan — lalu trade dieksekusi otomatis.
+              </span>
               {autopilotEvery && (
                 <label className={s.switch}>
                   <input type="checkbox" checked={autopilot} onChange={(e) => setAutopilot(e.target.checked)} />
                   Autopilot tiap {Math.round(autopilotEvery / 60)} menit
                 </label>
               )}
-              <button type="button" className="btn btn-primary" disabled={busy !== null} onClick={() => void runDesk()}>
-                {busy === 'desk' ? 'Desk bersidang…' : 'Jalankan Desk AI'}
-              </button>
             </div>
-          </div>
-          <div className={s.cardBody}>
-            <p className={s.modeNote}>
-              Empat AI dari penyedia berbeda bersidang: Pemburu Sinyal membaca radar teknikal, Pelacak Bandar mencari
-              jejak akumulasi/distribusi pemain besar, Manajer Risiko memveto dan menetapkan ukuran, Kepala Desk
-              memutuskan — lalu trade dieksekusi otomatis di dompet ini.
-            </p>
-            {deskNote && <div className={s.notice}>{deskNote}</div>}
             {autopilot && <div className={s.notice}>Autopilot aktif selama tab ini terbuka. Tiap sidang memakai satu jatah AI harian.</div>}
-            {lastRun ? <DeskRunView run={lastRun} /> : <div className={s.empty}>Belum ada sidang desk di mode ini.</div>}
+            {lastRun ? <DeskRunView run={lastRun} /> : <div className={s.empty}>Belum ada sidang desk di mode ini. Tekan 🤖 Desk AI.</div>}
           </div>
-        </section>
-      </div>
+        )}
+        {tab === 'radar' &&
+          (lastSignals.length > 0 ? (
+            <SignalTable
+              signals={lastSignals}
+              onSelect={(sig) => setSelected({ symbol: sig.symbol, market: sig.market, name: sig.name })}
+            />
+          ) : (
+            <div className={s.empty}>Radar terisi setelah desk AI bersidang.</div>
+          ))}
+        {tab === 'stats' && <Stats state={state} />}
+      </section>
 
-      <OpenPositions
-        state={state}
-        mode={mode}
-        busy={busy}
-        onClose={(id) => post(`close-${id}`, { action: 'close', mode, positionId: id })}
-        onSettled={() => void load(mode)}
-      />
-      <History state={state} />
-      <p className={`${s.subtle}`}>
-        Simulasi dengan uang virtual untuk belajar dan menguji strategi — bukan saran investasi. Posisi investasi
-        memeriksa stop loss/target saat halaman diperbarui, jadi harga keluar bisa sedikit melewati levelnya.
+      <p className={s.disclaimer}>
+        {MODE_INFO[mode].description} Simulasi dengan uang virtual untuk belajar dan menguji strategi — bukan saran
+        investasi. Posisi investasi memeriksa stop loss/target saat data diperbarui, jadi harga keluar bisa sedikit
+        melewati levelnya.
       </p>
+
+      <div className={s.toasts} aria-live="polite">
+        {toasts.map((t) => (
+          <div key={t.id} className={`${s.toast} ${t.kind === 'win' ? s.toastWin : t.kind === 'loss' ? s.toastLoss : s.toastInfo}`}>
+            {t.text}
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
 
 // ---------------------------------------------------------------------------
 
-function AccountStats({ state, onReset, busy }: { state: SimState | null; onReset: () => void; busy: string | null }) {
-  const a = state?.account
-  const st = state?.stats
+const POPULAR = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BBCA.JK', 'BBRI.JK', 'TLKM.JK', 'AAPL', 'NVDA', 'TSLA', 'GC=F']
+
+function MarketList({
+  mode,
+  instruments,
+  selected,
+  onSelect,
+}: {
+  mode: SimMode
+  instruments: SimInstrumentOption[]
+  selected: Selected
+  onSelect: (s: Selected) => void
+}) {
+  const [query, setQuery] = useState('')
+  const rows = useMemo<Selected[]>(() => {
+    if (mode === 'binary') return BINARY_SYMBOLS.map((sym) => ({ symbol: sym, market: 'CRYPTO', name: CRYPTO_NAMES[sym] ?? sym }))
+    const q = query.trim().toLowerCase()
+    const list = q
+      ? instruments.filter((i) => i.symbol.toLowerCase().includes(q) || i.name.toLowerCase().includes(q))
+      : [
+          ...POPULAR.map((sym) => instruments.find((i) => i.symbol === sym)).filter((i): i is SimInstrumentOption => Boolean(i)),
+          ...instruments.filter((i) => !POPULAR.includes(i.symbol)),
+        ]
+    return list.slice(0, 40).map((i) => ({ symbol: i.symbol, market: i.market, name: i.name }))
+  }, [mode, instruments, query])
+
+  const quotes = useQuotes(rows.slice(0, 15).map((r) => r.symbol))
+
   return (
-    <div>
-      <div className={s.stats}>
-        <div className={s.stat}>
-          <span className={s.statLabel}>Ekuitas</span>
-          <span className={s.statValue}>{usd(a?.equity)}</span>
-        </div>
-        <div className={s.stat}>
-          <span className={s.statLabel}>Kas</span>
-          <span className={s.statValue}>{usd(a?.cash)}</span>
-        </div>
-        <div className={s.stat}>
-          <span className={s.statLabel}>Imbal hasil</span>
-          <span className={`${s.statValue} ${tone(st?.returnPct)}`}>{pct(st?.returnPct)}</span>
-        </div>
-        <div className={s.stat}>
-          <span className={s.statLabel}>Laba terealisasi</span>
-          <span className={`${s.statValue} ${tone(st?.realizedPnl)}`}>{usd(st?.realizedPnl, true)}</span>
-        </div>
-        <div className={s.stat}>
-          <span className={s.statLabel}>Win rate</span>
-          <span className={s.statValue}>
-            {st?.winRate != null ? `${st.winRate.toFixed(0)}%` : '—'}
-            <span className={s.subtle}> {st ? `${st.wins}/${st.trades}` : ''}</span>
-          </span>
+    <section className={`${s.panel} ${s.markets}`}>
+      <div className={s.panelHead}>
+        <span>Pasar</span>
+        <span>{mode === 'binary' ? 'Kripto 24/7' : `${instruments.length} instrumen`}</span>
+      </div>
+      {mode !== 'binary' && (
+        <input className={s.search} placeholder="Cari BBCA, AAPL, BTC, emas…" value={query} onChange={(e) => setQuery(e.target.value)} />
+      )}
+      <div className={s.marketList}>
+        {rows.map((r) => {
+          const q = quotes[r.symbol]
+          return (
+            <button
+              key={`${r.market}:${r.symbol}`}
+              type="button"
+              className={`${s.marketRow} ${r.symbol === selected.symbol ? s.marketRowActive : ''}`}
+              onClick={() => onSelect(r)}
+            >
+              <span className={s.marketSym}>{displaySymbol(r.symbol)}</span>
+              <span className={s.marketPrice}>{q ? formatPrice(q.price) : ''}</span>
+              <span className={s.marketName}>{r.name}</span>
+              <span className={`${s.marketChg} ${tone(q?.changePct)}`}>{q ? pct(q.changePct) : ''}</span>
+            </button>
+          )
+        })}
+        {rows.length === 0 && <div className={s.empty}>Tidak ada instrumen yang cocok.</div>}
+      </div>
+    </section>
+  )
+}
+
+function ChartHeader({
+  selected,
+  price,
+  interval,
+  onInterval,
+}: {
+  selected: Selected
+  price: number | null
+  interval: ChartInterval
+  onInterval: (i: ChartInterval) => void
+}) {
+  const quotes = useQuotes([selected.symbol])
+  const q = quotes[selected.symbol]
+  const shown = price ?? q?.price ?? null
+  return (
+    <div className={s.chartHead}>
+      <div className={s.chartSymbol}>
+        <strong>{displaySymbol(selected.symbol)}</strong>
+        <span className={s.subtle}>
+          {selected.name} · {selected.market}
+        </span>
+      </div>
+      <span className={`${s.chartPrice} ${tone(q?.changePct)}`}>{formatPrice(shown)}</span>
+      <div className={s.chartStats}>
+        <div className={s.chartStat}>
+          <span className={s.subtle}>Perubahan 24j</span>
+          <b className={tone(q?.changePct)}>{q ? pct(q.changePct) : '—'}</b>
         </div>
       </div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8, alignItems: 'center' }}>
-        {a && <span className={s.subtle}>Reset {a.resetCount}× · sejak {new Date(a.resetAt).toLocaleString('id-ID')}</span>}
-        <button type="button" className="btn btn-danger" disabled={busy !== null || !state} onClick={onReset}>
-          {busy === 'reset' ? 'Mereset…' : 'Reset $1.000'}
-        </button>
+      <div className={s.intervals}>
+        {CHART_INTERVALS.map((i) => (
+          <button
+            key={i}
+            type="button"
+            className={`${s.interval} ${i === interval ? s.intervalActive : ''}`}
+            onClick={() => onInterval(i)}
+          >
+            {i === '1d' ? '1D' : i === '1w' ? '1W' : i}
+          </button>
+        ))}
       </div>
     </div>
   )
 }
 
-function useLivePrice(symbol: string) {
-  // Disimpan bersama simbolnya: berganti simbol langsung mengosongkan tampilan
-  // tanpa harus mereset state di dalam effect.
-  const [data, setData] = useState<{ symbol: string; quote: { price: number; changePct: number }; ticks: number[] } | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    const tick = async () => {
-      if (document.visibilityState !== 'visible') return
-      try {
-        const res = await fetch(`/api/quotes/live?symbols=${encodeURIComponent(symbol)}`)
-        const body = await res.json()
-        const q = body?.quotes?.[symbol]
-        if (!cancelled && q && Number.isFinite(q.price)) {
-          setData((prev) => ({
-            symbol,
-            quote: { price: q.price, changePct: q.changePct },
-            ticks: [...(prev?.symbol === symbol ? prev.ticks.slice(-89) : []), q.price],
-          }))
-        }
-      } catch {
-        // jaringan putus sesaat; detak berikutnya mencoba lagi
-      }
-    }
-    void tick()
-    const id = setInterval(tick, 3_000)
-    return () => {
-      cancelled = true
-      clearInterval(id)
-    }
-  }, [symbol])
-
-  return data?.symbol === symbol ? { quote: data.quote, ticks: data.ticks } : { quote: null, ticks: [] as number[] }
+function AmountInput({ value, onChange, step }: { value: string; onChange: (v: string) => void; step: number }) {
+  const n = Number(value) || 0
+  return (
+    <div className={s.amount}>
+      <button type="button" aria-label="Kurangi" onClick={() => onChange(String(Math.max(1, +(n - step).toFixed(2))))}>
+        −
+      </button>
+      <input inputMode="decimal" value={value} onChange={(e) => onChange(e.target.value.replace(/[^0-9.]/g, ''))} aria-label="Jumlah USD" />
+      <button type="button" aria-label="Tambah" onClick={() => onChange(String(+(n + step).toFixed(2)))}>
+        +
+      </button>
+    </div>
+  )
 }
 
 function BinaryTicket({
   busy,
   cash,
+  price,
   onTrade,
 }: {
   busy: string | null
   cash: number
-  onTrade: (t: { symbol: string; direction: 'up' | 'down'; stake: number; expirySeconds: number }) => Promise<boolean>
+  price: number | null
+  onTrade: (t: { direction: 'up' | 'down'; stake: number; expirySeconds: number }) => Promise<boolean>
 }) {
-  const [symbol, setSymbol] = useState<string>(BINARY_SYMBOLS[0])
   const [stake, setStake] = useState('10')
-  const [expiry, setExpiry] = useState<number>(300)
-  const { quote, ticks } = useLivePrice(symbol)
+  const [expiry, setExpiry] = useState<number>(60)
   const stakeNum = Number(stake)
   const valid = stakeNum >= 1 && stakeNum <= cash
 
   return (
-    <section className={s.card}>
-      <div className={s.cardHead}>
-        <h2 className={s.cardTitle}>Tiket Binary</h2>
-        <span className={s.subtle}>Bayaran {Math.round(BINARY_PAYOUT * 100)}%</span>
+    <div className={s.ticket}>
+      <div className={s.field}>
+        <span className={s.fieldLabel}>
+          <span>Waktu</span>
+          <span>{expiry < 3600 ? `${expiry / 60} menit` : '1 jam'}</span>
+        </span>
+        <div className={s.chips}>
+          {BINARY_EXPIRIES.map((sec) => (
+            <button key={sec} type="button" className={`${s.chip} ${sec === expiry ? s.chipActive : ''}`} onClick={() => setExpiry(sec)}>
+              {sec < 3600 ? `${sec / 60}m` : '1j'}
+            </button>
+          ))}
+        </div>
       </div>
-      <div className={s.cardBody}>
-        <div className={s.row}>
-          <label className={s.field}>
-            <span className={s.label}>Aset</span>
-            <select className={s.input} value={symbol} onChange={(e) => setSymbol(e.target.value)}>
-              {BINARY_SYMBOLS.map((sym) => (
-                <option key={sym} value={sym}>
-                  {sym.replace('USDT', '')}/USDT
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className={s.field}>
-            <span className={s.label}>Kedaluwarsa</span>
-            <select className={s.input} value={expiry} onChange={(e) => setExpiry(Number(e.target.value))}>
-              {BINARY_EXPIRIES.map((sec) => (
-                <option key={sec} value={sec}>
-                  {sec < 3600 ? `${sec / 60} menit` : '1 jam'}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className={s.field}>
-            <span className={s.label}>Stake (USD)</span>
-            <input className={s.input} inputMode="decimal" value={stake} onChange={(e) => setStake(e.target.value)} />
-          </label>
-        </div>
 
-        <div className={s.ticker}>
-          <span className={s.tickerPrice}>{quote ? price(quote.price) : '…'}</span>
-          <span className={tone(quote?.changePct)}>{quote ? `${pct(quote.changePct)} 24j` : ''}</span>
+      <div className={s.field}>
+        <span className={s.fieldLabel}>
+          <span>Jumlah</span>
+          <span>Kas {usd(cash)}</span>
+        </span>
+        <AmountInput value={stake} onChange={setStake} step={5} />
+        <div className={s.chips}>
+          {[5, 10, 25, 50, 100].map((v) => (
+            <button key={v} type="button" className={`${s.chip} ${stakeNum === v ? s.chipActive : ''}`} onClick={() => setStake(String(v))}>
+              ${v}
+            </button>
+          ))}
         </div>
-        <Sparkline points={ticks} />
-
-        <div className={s.dirButtons}>
-          <button
-            type="button"
-            className={s.btnUp}
-            disabled={busy !== null || !valid}
-            onClick={() => void onTrade({ symbol, direction: 'up', stake: stakeNum, expirySeconds: expiry })}
-          >
-            ▲ NAIK
-          </button>
-          <button
-            type="button"
-            className={s.btnDown}
-            disabled={busy !== null || !valid}
-            onClick={() => void onTrade({ symbol, direction: 'down', stake: stakeNum, expirySeconds: expiry })}
-          >
-            ▼ TURUN
-          </button>
-        </div>
-        {!valid && <span className={s.subtle}>Stake harus antara $1 dan kas tersedia ({usd(cash)}).</span>}
-        {valid && (
-          <span className={s.subtle}>
-            Menang: +{usd(stakeNum * BINARY_PAYOUT)} · Kalah: -{usd(stakeNum)}
-          </span>
-        )}
       </div>
-    </section>
+
+      <div className={s.payout}>
+        <span className={s.subtle}>Pembayaran {Math.round(BINARY_PAYOUT * 100)}%</span>
+        <span className={s.payoutValue}>{valid ? usd(stakeNum * BINARY_PAYOUT, true) : '—'}</span>
+        <span className={s.subtle}>Harga masuk ≈ {formatPrice(price)}</span>
+      </div>
+
+      <div className={s.binaryButtons}>
+        <button
+          type="button"
+          className={s.bigUp}
+          disabled={busy !== null || !valid}
+          onClick={() => void onTrade({ direction: 'up', stake: stakeNum, expirySeconds: expiry })}
+        >
+          ▲ NAIK
+        </button>
+        <button
+          type="button"
+          className={s.bigDown}
+          disabled={busy !== null || !valid}
+          onClick={() => void onTrade({ direction: 'down', stake: stakeNum, expirySeconds: expiry })}
+        >
+          ▼ TURUN
+        </button>
+      </div>
+      <span className={s.hint}>
+        {valid
+          ? `Benar: dapat ${usd(stakeNum * (1 + BINARY_PAYOUT))}. Salah: kehilangan ${usd(stakeNum)}. Harga penutupan = transaksi Binance pada detik kedaluwarsa.`
+          : `Jumlah harus antara $1 dan ${usd(cash)}.`}
+      </span>
+    </div>
   )
+}
+
+const SLTP_DEFAULTS: Record<Exclude<SimMode, 'binary'>, [string, string]> = {
+  harian: ['1.5', '3'],
+  bulanan: ['8', '16'],
+  tahunan: ['20', '50'],
 }
 
 function InvestTicket({
   mode,
-  instruments,
   busy,
   cash,
+  price,
+  selected,
   onTrade,
 }: {
-  mode: SimMode
-  instruments: SimInstrumentOption[]
+  mode: Exclude<SimMode, 'binary'>
   busy: string | null
   cash: number
-  onTrade: (t: {
-    market: string
-    symbol: string
-    side: 'long' | 'short'
-    stake: number
-    stopLossPct: number | null
-    takeProfitPct: number | null
-  }) => Promise<boolean>
+  price: number | null
+  selected: Selected
+  onTrade: (t: { side: 'long' | 'short'; stake: number; stopLossPct: number | null; takeProfitPct: number | null }) => Promise<boolean>
 }) {
-  const [query, setQuery] = useState('')
-  const [picked, setPicked] = useState<SimInstrumentOption | null>(instruments.find((i) => i.symbol === 'BTCUSDT') ?? instruments[0] ?? null)
   const [side, setSide] = useState<'long' | 'short'>('long')
   const [stake, setStake] = useState('100')
-  const defaults = mode === 'harian' ? ['1.5', '3'] : mode === 'bulanan' ? ['8', '16'] : ['20', '50']
-  const [sl, setSl] = useState(defaults[0])
-  const [tp, setTp] = useState(defaults[1])
-  const { quote, ticks } = useLivePrice(picked?.symbol ?? 'BTCUSDT')
-
-  const matches = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    if (!q) return []
-    return instruments
-      .filter((i) => i.symbol.toLowerCase().includes(q) || i.name.toLowerCase().includes(q))
-      .slice(0, 8)
-  }, [query, instruments])
-
+  const [sl, setSl] = useState(SLTP_DEFAULTS[mode][0])
+  const [tp, setTp] = useState(SLTP_DEFAULTS[mode][1])
   const stakeNum = Number(stake)
-  const valid = picked !== null && stakeNum >= 1 && stakeNum <= cash
+  const valid = stakeNum >= 1 && stakeNum <= cash
+  const sign = side === 'long' ? 1 : -1
+  const slNum = Number(sl)
+  const tpNum = Number(tp)
+  const slPrice = price && slNum >= 0.2 ? price * (1 - (sign * slNum) / 100) : null
+  const tpPrice = price && tpNum >= 0.2 ? price * (1 + (sign * tpNum) / 100) : null
 
   return (
-    <section className={s.card}>
-      <div className={s.cardHead}>
-        <h2 className={s.cardTitle}>Tiket Investasi</h2>
-        <span className={s.subtle}>Tutup otomatis {MODE_INFO[mode].horizonDays} hari</span>
-      </div>
-      <div className={s.cardBody}>
-        <label className={s.field}>
-          <span className={s.label}>Cari instrumen</span>
-          <input
-            className={s.input}
-            placeholder="BBCA, AAPL, BTC, emas…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </label>
-        {matches.length > 0 && (
-          <div className={s.tableWrap}>
-            <table className={s.table}>
-              <tbody>
-                {matches.map((m) => (
-                  <tr
-                    key={`${m.market}:${m.symbol}`}
-                    style={{ cursor: 'pointer' }}
-                    onClick={() => {
-                      setPicked(m)
-                      setQuery('')
-                    }}
-                  >
-                    <td className={s.sym}>{m.symbol}</td>
-                    <td>{m.name}</td>
-                    <td className={s.subtle}>{m.market}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        {picked && (
-          <div className={s.ticker}>
-            <span>
-              <span className={s.sym}>{picked.symbol}</span> <span className={s.subtle}>{picked.name}</span>
-            </span>
-            <span className={s.tickerPrice}>{quote ? price(quote.price) : '…'}</span>
-          </div>
-        )}
-        <Sparkline points={ticks} />
-        <div className={s.row}>
-          <label className={s.field}>
-            <span className={s.label}>Arah</span>
-            <select className={s.input} value={side} onChange={(e) => setSide(e.target.value as 'long' | 'short')}>
-              <option value="long">Long (naik)</option>
-              <option value="short">Short (turun)</option>
-            </select>
-          </label>
-          <label className={s.field}>
-            <span className={s.label}>Stake (USD)</span>
-            <input className={s.input} inputMode="decimal" value={stake} onChange={(e) => setStake(e.target.value)} />
-          </label>
-          <label className={s.field}>
-            <span className={s.label}>Stop loss %</span>
-            <input className={s.input} inputMode="decimal" value={sl} onChange={(e) => setSl(e.target.value)} />
-          </label>
-          <label className={s.field}>
-            <span className={s.label}>Target %</span>
-            <input className={s.input} inputMode="decimal" value={tp} onChange={(e) => setTp(e.target.value)} />
-          </label>
-        </div>
-        <button
-          type="button"
-          className={side === 'long' ? s.btnUp : s.btnDown}
-          disabled={busy !== null || !valid}
-          onClick={() =>
-            picked &&
-            void onTrade({
-              market: picked.market,
-              symbol: picked.symbol,
-              side,
-              stake: stakeNum,
-              stopLossPct: Number(sl) >= 0.2 ? Number(sl) : null,
-              takeProfitPct: Number(tp) >= 0.2 ? Number(tp) : null,
-            })
-          }
-        >
-          {busy === 'open' ? 'Membuka…' : `Buka ${side === 'long' ? 'LONG' : 'SHORT'}`}
+    <div className={s.ticket}>
+      <div className={s.sideTabs}>
+        <button type="button" className={`${s.sideTab} ${side === 'long' ? s.sideLong : ''}`} onClick={() => setSide('long')}>
+          LONG ▲
         </button>
-        {!valid && <span className={s.subtle}>Pilih instrumen dan stake antara $1 dan {usd(cash)}.</span>}
+        <button type="button" className={`${s.sideTab} ${side === 'short' ? s.sideShort : ''}`} onClick={() => setSide('short')}>
+          SHORT ▼
+        </button>
       </div>
-    </section>
+
+      <div className={s.field}>
+        <span className={s.fieldLabel}>
+          <span>Jumlah (USD)</span>
+          <span>Kas {usd(cash)}</span>
+        </span>
+        <AmountInput value={stake} onChange={setStake} step={10} />
+        <div className={s.chips}>
+          {[10, 25, 50, 100].map((p) => (
+            <button key={p} type="button" className={s.chip} onClick={() => setStake(String(Math.floor((cash * p) / 100)))}>
+              {p}%
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className={s.inputRow}>
+        <label className={s.field}>
+          <span className={s.fieldLabel}>Stop loss %</span>
+          <input className={s.input} inputMode="decimal" value={sl} onChange={(e) => setSl(e.target.value)} />
+        </label>
+        <label className={s.field}>
+          <span className={s.fieldLabel}>Target %</span>
+          <input className={s.input} inputMode="decimal" value={tp} onChange={(e) => setTp(e.target.value)} />
+        </label>
+      </div>
+
+      <div className={s.summary}>
+        <div>
+          <span>Harga masuk</span>
+          <b>{formatPrice(price)}</b>
+        </div>
+        <div>
+          <span>Stop loss</span>
+          <b className={s.down}>{formatPrice(slPrice)}</b>
+        </div>
+        <div>
+          <span>Target</span>
+          <b className={s.up}>{formatPrice(tpPrice)}</b>
+        </div>
+        <div>
+          <span>Risiko / potensi</span>
+          <b>
+            {valid && slNum >= 0.2 ? usd(-(stakeNum * slNum) / 100) : '—'} / {valid && tpNum >= 0.2 ? usd((stakeNum * tpNum) / 100, true) : '—'}
+          </b>
+        </div>
+        <div>
+          <span>Tutup otomatis</span>
+          <b>{MODE_INFO[mode].horizonDays} hari</b>
+        </div>
+      </div>
+
+      <button
+        type="button"
+        className={side === 'long' ? s.bigUp : s.bigDown}
+        disabled={busy !== null || !valid}
+        onClick={() =>
+          void onTrade({
+            side,
+            stake: stakeNum,
+            stopLossPct: slNum >= 0.2 ? slNum : null,
+            takeProfitPct: tpNum >= 0.2 ? tpNum : null,
+          })
+        }
+      >
+        {busy === 'open' ? 'Membuka…' : `${side === 'long' ? 'LONG' : 'SHORT'} ${displaySymbol(selected.symbol)}`}
+      </button>
+      {!valid && <span className={s.hint}>Jumlah harus antara $1 dan {usd(cash)}.</span>}
+    </div>
   )
 }
 
-function Countdown({ until, onDone }: { until: string; onDone: () => void }) {
-  const now = useNow(1_000)
-  const left = Math.max(0, Math.round((Date.parse(until) - now) / 1000))
-  const fired = useRef(false)
-  useEffect(() => {
-    if (left === 0 && !fired.current) {
-      fired.current = true
-      // Beri Binance beberapa detik untuk mencatat transaksi pada detik kedaluwarsa.
-      setTimeout(onDone, 4_000)
-    }
-  }, [left, onDone])
-  if (left === 0) return <span className={s.subtle}>menyelesaikan…</span>
-  const m = Math.floor(left / 60)
-  const sec = left % 60
-  return <span>{`${m}:${String(sec).padStart(2, '0')}`}</span>
-}
+// ---------------------------------------------------------------------------
 
 function OpenPositions({
   state,
   mode,
   busy,
+  onSelect,
   onClose,
-  onSettled,
 }: {
   state: SimState | null
   mode: SimMode
   busy: string | null
+  onSelect: (p: MarkedPosition) => void
   onClose: (id: number) => void
-  onSettled: () => void
 }) {
   const open = state?.open ?? []
+  const now = useNow(1_000, mode === 'binary' && open.length > 0)
+  if (open.length === 0) return <div className={s.empty}>{state ? 'Tidak ada posisi terbuka.' : 'Memuat…'}</div>
   return (
-    <section className={s.card}>
-      <div className={s.cardHead}>
-        <h2 className={s.cardTitle}>Posisi terbuka</h2>
-        <span className={s.subtle}>{open.length} posisi</span>
-      </div>
-      {open.length === 0 ? (
-        <div className={s.empty}>{state ? 'Tidak ada posisi terbuka.' : 'Memuat…'}</div>
-      ) : (
-        <div className={s.tableWrap}>
-          <table className={s.table}>
-            <thead>
-              <tr>
-                <th>Instrumen</th>
-                <th>Arah</th>
-                <th>Stake</th>
-                <th>Masuk</th>
-                <th>Sekarang</th>
-                <th>PnL</th>
-                <th>{mode === 'binary' ? 'Sisa' : 'SL / Target'}</th>
-                <th>Oleh</th>
-                {mode !== 'binary' && <th />}
-              </tr>
-            </thead>
-            <tbody>
-              {open.map((p) => (
-                <tr key={p.id}>
-                  <td>
-                    <span className={s.sym}>{p.symbol}</span>
-                    <div className={s.subtle}>{p.name}</div>
-                  </td>
-                  <td className={p.side === 'long' || p.side === 'up' ? s.up : s.down}>{p.side.toUpperCase()}</td>
-                  <td>{usd(p.stakeUsd)}</td>
-                  <td>{price(p.entryPrice)}</td>
-                  <td>{price(p.markPrice)}</td>
-                  <td className={tone(p.pnlUsd)}>
-                    {usd(p.pnlUsd, true)}
-                    <div className={s.subtle}>{pct(p.pnlPct)}</div>
-                  </td>
-                  <td>
-                    {mode === 'binary' && p.expiresAt ? (
-                      <Countdown until={p.expiresAt} onDone={onSettled} />
-                    ) : (
-                      <>
-                        {price(p.stopLoss)} / {price(p.takeProfit)}
-                        {p.expiresAt && <div className={s.subtle}>s.d. {new Date(p.expiresAt).toLocaleString('id-ID')}</div>}
-                      </>
-                    )}
-                  </td>
-                  <td>
-                    <span className={`${s.badge} ${p.openedBy === 'ai' ? s.badgeAi : ''}`} title={p.note ?? undefined}>
-                      {p.openedBy === 'ai' ? 'AI' : 'manual'}
-                    </span>
-                  </td>
-                  {mode !== 'binary' && (
-                    <td>
-                      <button type="button" className="btn btn-quiet" disabled={busy !== null} onClick={() => onClose(p.id)}>
-                        Tutup
-                      </button>
-                    </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </section>
+    <div className={s.tableWrap}>
+      <table className={s.table}>
+        <thead>
+          <tr>
+            <th>Instrumen</th>
+            <th>Arah</th>
+            <th>Jumlah</th>
+            <th>Masuk</th>
+            <th>Sekarang</th>
+            <th>P/L</th>
+            <th>{mode === 'binary' ? 'Sisa waktu' : 'SL / TP'}</th>
+            <th>Oleh</th>
+            {mode !== 'binary' && <th />}
+          </tr>
+        </thead>
+        <tbody>
+          {open.map((p) => (
+            <tr key={p.id} className={s.clickable} onClick={() => onSelect(p)}>
+              <td>
+                <span className={s.sym}>{displaySymbol(p.symbol)}</span> <span className={s.subtle}>{p.name}</span>
+              </td>
+              <td className={p.side === 'long' || p.side === 'up' ? s.up : s.down}>
+                {p.side === 'up' ? '▲ NAIK' : p.side === 'down' ? '▼ TURUN' : p.side.toUpperCase()}
+              </td>
+              <td>{usd(p.stakeUsd)}</td>
+              <td>{formatPrice(p.entryPrice)}</td>
+              <td>{formatPrice(p.markPrice)}</td>
+              <td className={tone(p.pnlUsd)}>
+                {usd(p.pnlUsd, true)} <span className={s.subtle}>{pct(p.pnlPct)}</span>
+              </td>
+              <td>
+                {mode === 'binary' && p.expiresAt ? (
+                  Date.parse(p.expiresAt) > now ? (
+                    countdown(p.expiresAt, now)
+                  ) : (
+                    <span className={s.subtle}>menyelesaikan…</span>
+                  )
+                ) : (
+                  `${formatPrice(p.stopLoss)} / ${formatPrice(p.takeProfit)}`
+                )}
+              </td>
+              <td>
+                <span className={`${s.badge} ${p.openedBy === 'ai' ? s.badgeAi : ''}`} title={p.note ?? undefined}>
+                  {p.openedBy === 'ai' ? 'AI' : 'manual'}
+                </span>
+              </td>
+              {mode !== 'binary' && (
+                <td>
+                  <button
+                    type="button"
+                    className={s.closeBtn}
+                    disabled={busy !== null}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onClose(p.id)
+                    }}
+                  >
+                    Tutup
+                  </button>
+                </td>
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }
 
 function History({ state }: { state: SimState | null }) {
   const closed = state?.closed ?? []
+  if (closed.length === 0) return <div className={s.empty}>Belum ada trade selesai.</div>
+  return (
+    <div className={s.tableWrap}>
+      <table className={s.table}>
+        <thead>
+          <tr>
+            <th>Ditutup</th>
+            <th>Instrumen</th>
+            <th>Arah</th>
+            <th>Jumlah</th>
+            <th>Masuk → Keluar</th>
+            <th>P/L</th>
+            <th>Sebab</th>
+            <th>Oleh</th>
+          </tr>
+        </thead>
+        <tbody>
+          {closed.map((c) => (
+            <tr key={c.id}>
+              <td className={s.subtle}>{c.closedAt ? new Date(c.closedAt).toLocaleString('id-ID') : '—'}</td>
+              <td className={s.sym}>{displaySymbol(c.symbol)}</td>
+              <td className={c.side === 'long' || c.side === 'up' ? s.up : s.down}>{c.side.toUpperCase()}</td>
+              <td>{usd(c.stakeUsd)}</td>
+              <td>
+                {formatPrice(c.entryPrice)} → {formatPrice(c.exitPrice)}
+              </td>
+              <td className={tone(c.pnlUsd)}>{usd(c.pnlUsd, true)}</td>
+              <td>{REASON_LABEL[c.closeReason ?? ''] ?? c.closeReason ?? '—'}</td>
+              <td>
+                <span className={`${s.badge} ${c.openedBy === 'ai' ? s.badgeAi : ''}`} title={c.note ?? undefined}>
+                  {c.openedBy === 'ai' ? 'AI' : 'manual'}
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function Stats({ state }: { state: SimState | null }) {
   const curve = useMemo(() => {
     if (!state) return []
     let eq = state.account.startingBalance
     return [eq, ...[...state.closed].reverse().map((c) => (eq += c.pnlUsd))]
   }, [state])
-
+  if (!state) return <div className={s.empty}>Memuat…</div>
+  const st = state.stats
+  const min = Math.min(...curve)
+  const max = Math.max(...curve)
+  const span = max - min || 1
+  const path = curve
+    .map((p, i) => `${i === 0 ? 'M' : 'L'}${((i / Math.max(1, curve.length - 1)) * 100).toFixed(2)},${(38 - ((p - min) / span) * 34 - 2).toFixed(2)}`)
+    .join(' ')
   return (
-    <section className={s.card}>
-      <div className={s.cardHead}>
-        <h2 className={s.cardTitle}>Riwayat trade</h2>
-        <span className={s.subtle}>{state?.stats.trades ?? 0} selesai</span>
+    <>
+      <div className={s.statsGrid}>
+        <div className={s.statCell}>
+          <span className={s.subtle}>Modal awal</span>
+          <b>{usd(state.account.startingBalance)}</b>
+        </div>
+        <div className={s.statCell}>
+          <span className={s.subtle}>Ekuitas</span>
+          <b>{usd(state.account.equity)}</b>
+        </div>
+        <div className={s.statCell}>
+          <span className={s.subtle}>Laba terealisasi</span>
+          <b className={tone(st.realizedPnl)}>{usd(st.realizedPnl, true)}</b>
+        </div>
+        <div className={s.statCell}>
+          <span className={s.subtle}>Menang / kalah</span>
+          <b>
+            {st.wins} / {st.losses}
+          </b>
+        </div>
+        <div className={s.statCell}>
+          <span className={s.subtle}>Trade terbaik</span>
+          <b className={s.up}>{usd(st.bestTrade, true)}</b>
+        </div>
+        <div className={s.statCell}>
+          <span className={s.subtle}>Trade terburuk</span>
+          <b className={s.down}>{usd(st.worstTrade, true)}</b>
+        </div>
+        <div className={s.statCell}>
+          <span className={s.subtle}>Direset</span>
+          <b>{state.account.resetCount}×</b>
+        </div>
       </div>
       {curve.length > 2 && (
-        <div style={{ padding: '12px 18px 0' }}>
-          <span className={s.label}>Kurva modal terealisasi</span>
-          <Sparkline points={curve} />
+        <div style={{ padding: '12px 16px' }}>
+          <span className={s.subtle}>Kurva modal terealisasi</span>
+          <svg className={s.curve} viewBox="0 0 100 40" preserveAspectRatio="none" role="img" aria-label="Kurva modal">
+            <path
+              d={path}
+              fill="none"
+              stroke={curve[curve.length - 1] >= curve[0] ? 'var(--measured)' : 'var(--halted)'}
+              strokeWidth="1.5"
+              vectorEffect="non-scaling-stroke"
+            />
+          </svg>
         </div>
       )}
-      {closed.length === 0 ? (
-        <div className={s.empty}>Belum ada trade selesai.</div>
-      ) : (
-        <div className={s.tableWrap}>
-          <table className={s.table}>
-            <thead>
-              <tr>
-                <th>Ditutup</th>
-                <th>Instrumen</th>
-                <th>Arah</th>
-                <th>Stake</th>
-                <th>Masuk → Keluar</th>
-                <th>PnL</th>
-                <th>Sebab</th>
-                <th>Oleh</th>
-              </tr>
-            </thead>
-            <tbody>
-              {closed.map((c) => (
-                <tr key={c.id}>
-                  <td className={s.subtle}>{c.closedAt ? new Date(c.closedAt).toLocaleString('id-ID') : '—'}</td>
-                  <td className={s.sym}>{c.symbol}</td>
-                  <td className={c.side === 'long' || c.side === 'up' ? s.up : s.down}>{c.side.toUpperCase()}</td>
-                  <td>{usd(c.stakeUsd)}</td>
-                  <td>
-                    {price(c.entryPrice)} → {price(c.exitPrice)}
-                  </td>
-                  <td className={tone(c.pnlUsd)}>{usd(c.pnlUsd, true)}</td>
-                  <td>{REASON_LABEL[c.closeReason ?? ''] ?? c.closeReason ?? '—'}</td>
-                  <td>
-                    <span className={`${s.badge} ${c.openedBy === 'ai' ? s.badgeAi : ''}`} title={c.note ?? undefined}>
-                      {c.openedBy === 'ai' ? 'AI' : 'manual'}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </section>
+    </>
   )
 }
 
@@ -758,8 +1005,6 @@ function DeskRunView({ run }: { run: SimState['deskRuns'][number] }) {
   const turns = (Array.isArray(run.turns) ? run.turns : []) as DeskTurn[]
   const decision = run.decision as DeskDecision | null
   const executed = (Array.isArray(run.executed) ? run.executed : []) as ExecutedAction[]
-  const signals = (Array.isArray(run.signals) ? run.signals : []) as SignalReport[]
-  const [showSignals, setShowSignals] = useState(false)
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>
@@ -799,20 +1044,11 @@ function DeskRunView({ run }: { run: SimState['deskRuns'][number] }) {
           ))}
         </div>
       )}
-      {signals.length > 0 && (
-        <>
-          <button type="button" className="btn btn-quiet" style={{ justifySelf: 'start' }} onClick={() => setShowSignals((v) => !v)}>
-            {showSignals ? 'Sembunyikan radar & bandar' : `Lihat radar & bandar (${signals.length} instrumen)`}
-          </button>
-          {showSignals && <SignalTable signals={signals} />}
-        </>
-      )}
     </div>
   )
 }
 
-/** Radar teknikal dan jejak bandar yang dibaca desk pada sidang itu. */
-function SignalTable({ signals }: { signals: SignalReport[] }) {
+function SignalTable({ signals, onSelect }: { signals: SignalReport[]; onSelect: (s: SignalReport) => void }) {
   return (
     <div className={s.tableWrap}>
       <table className={s.table}>
@@ -823,21 +1059,25 @@ function SignalTable({ signals }: { signals: SignalReport[] }) {
             <th>Harga</th>
             <th>Tren</th>
             <th>RSI</th>
-            <th>Skor</th>
+            <th>Skor radar</th>
             <th>Bandar</th>
+            <th>Jejak</th>
           </tr>
         </thead>
         <tbody>
           {signals.map((sig) => (
-            <tr key={`${sig.market}:${sig.symbol}`}>
-              <td className={s.sym}>{sig.symbol}</td>
+            <tr key={`${sig.market}:${sig.symbol}`} className={s.clickable} onClick={() => onSelect(sig)}>
+              <td className={s.sym}>{displaySymbol(sig.symbol)}</td>
               <td>{sig.timeframe}</td>
-              <td>{price(sig.price)}</td>
+              <td>{formatPrice(sig.price)}</td>
               <td>{sig.trend}</td>
               <td>{sig.rsi14 ?? '—'}</td>
               <td className={tone(sig.score)}>{sig.score}</td>
-              <td title={sig.bandar.evidence.join('\n')} className={tone(sig.bandar.score)}>
+              <td className={tone(sig.bandar.score)}>
                 {sig.bandar.label} ({sig.bandar.score})
+              </td>
+              <td style={{ whiteSpace: 'normal', minWidth: 280 }} className={s.subtle}>
+                {sig.bandar.evidence.join(' ')}
               </td>
             </tr>
           ))}

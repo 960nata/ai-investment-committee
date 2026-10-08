@@ -126,3 +126,14 @@ export const OpenTradeSchema = z.discriminatedUnion('kind', [
 ])
 
 export type OpenTradeInput = z.infer<typeof OpenTradeSchema>
+
+/** Timeframe grafik simulator. Nama mengikuti Binance; Yahoo dipetakan di server. */
+export const CHART_INTERVALS = ['1m', '5m', '15m', '1h', '4h', '1d', '1w'] as const
+export type ChartInterval = (typeof CHART_INTERVALS)[number]
+
+export const DEFAULT_INTERVAL: Record<SimMode, ChartInterval> = {
+  binary: '1m',
+  harian: '15m',
+  bulanan: '1d',
+  tahunan: '1w',
+}

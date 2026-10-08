@@ -1,92 +1,18 @@
-/* Simulator trading — dipakai portal admin dan halaman Premium. */
+/*
+ * Simulator trading — tata letak platform trading:
+ * bar akun di atas, daftar pasar | grafik | tiket order, lalu panel tab di bawah.
+ * Warna memakai token terminal supaya grafik dan angka serupa halaman Instrumen.
+ */
 
 .root {
   display: grid;
-  gap: var(--space-4);
+  /* Tanpa ini jalur implisit grid melebar ke min-content anak (tab, tabel)
+     dan seluruh halaman meluber di layar ponsel. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
   margin-top: var(--space-4);
   min-width: 0;
-}
-
-.tabs {
-  display: flex;
-  gap: 2px;
-  padding: 3px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--surface-1);
-  overflow-x: auto;
-}
-
-.tab {
-  flex: 1 0 auto;
-  padding: 9px 14px;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--ink-soft);
-  font-family: var(--mono);
-  font-size: var(--t-small);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.tab:hover {
-  color: var(--ink);
-  background: var(--surface-2);
-}
-
-.tabActive {
-  color: var(--surface-0);
-  background: var(--signal);
-}
-
-.tabActive:hover {
-  color: var(--surface-0);
-  background: var(--signal);
-}
-
-.modeNote {
-  margin: 0;
-  color: var(--ink-soft);
-  font-size: var(--t-body);
-  line-height: 1.55;
-}
-
-.stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 1px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--line);
-  overflow: hidden;
-}
-
-.stat {
-  padding: var(--space-3) var(--space-4);
-  background: var(--surface-1);
-  min-width: 0;
-}
-
-.statLabel {
-  display: block;
-  color: var(--ink-mute);
-  font-family: var(--mono);
-  font-size: var(--t-micro);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.statValue {
-  display: block;
-  margin-top: 4px;
-  color: var(--ink);
-  font-family: var(--mono);
-  font-size: 20px;
   font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
 }
 
 .up {
@@ -97,69 +23,505 @@
   color: var(--halted);
 }
 
-.grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
-  gap: var(--space-4);
-  align-items: start;
+.subtle {
+  color: var(--ink-mute);
+  font-size: var(--t-micro);
 }
 
-@media (max-width: 960px) {
-  .grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
+.mono {
+  font-family: var(--mono);
 }
 
-.card {
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--surface-1);
-  min-width: 0;
-}
+/* --- Bar atas ------------------------------------------------------------ */
 
-.cardHead {
+.topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  border-bottom: 1px solid var(--line);
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+}
+
+.modes {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-0);
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.mode {
+  padding: 7px 12px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--ink-soft);
+  font-family: var(--mono);
+  font-size: var(--t-small);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.mode:hover {
+  color: var(--ink);
+  background: var(--surface-2);
+}
+
+.modeActive,
+.modeActive:hover {
+  color: var(--surface-0);
+  background: var(--signal);
+}
+
+.account {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   flex-wrap: wrap;
 }
 
-.cardTitle {
-  margin: 0;
-  color: var(--ink);
+.pill {
+  display: grid;
+  flex: 1 1 auto;
+  gap: 1px;
+  padding: 4px 12px;
+  border-left: 1px solid var(--line);
+  min-width: 0;
+}
+
+.pill:first-child {
+  border-left: 0;
+}
+
+.pillLabel {
+  color: var(--ink-mute);
   font-family: var(--mono);
-  font-size: var(--t-small);
+  font-size: 9px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
-.cardBody {
-  padding: var(--space-4);
-  display: grid;
-  gap: var(--space-3);
+.pillValue {
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 14px;
+  white-space: nowrap;
 }
 
-.row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: var(--space-3);
+.topActions {
+  display: flex;
+  gap: 6px;
+  margin-left: 6px;
 }
 
-.field {
+/* --- Tata letak utama ---------------------------------------------------- */
+
+.workspace {
   display: grid;
-  gap: 5px;
+  grid-template-columns: 230px minmax(0, 1fr) 300px;
+  gap: 10px;
+  align-items: stretch;
   min-width: 0;
 }
 
-.label {
+@media (max-width: 1280px) {
+  .workspace {
+    grid-template-columns: minmax(0, 1fr) 290px;
+  }
+  .markets {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    max-height: 260px;
+  }
+}
+
+@media (max-width: 860px) {
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  /* Di ponsel: grafik dan tiket dulu, daftar pasar sesudahnya. */
+  .markets {
+    grid-row: auto;
+    order: 3;
+  }
+  .topbar {
+    padding: 6px;
+  }
+  .account {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .pill {
+    padding: 4px 8px;
+  }
+  .pillValue {
+    font-size: 13px;
+  }
+  .topActions {
+    width: 100%;
+    margin-left: 0;
+  }
+  .topActions > * {
+    flex: 1;
+    justify-content: center;
+  }
+  .intervals {
+    margin-left: 0;
+    width: 100%;
+  }
+  .chartPrice {
+    font-size: 18px;
+  }
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  overflow: hidden;
+}
+
+.panelHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
   color: var(--ink-mute);
   font-family: var(--mono);
   font-size: var(--t-micro);
   letter-spacing: 0.1em;
   text-transform: uppercase;
+}
+
+/* --- Daftar pasar -------------------------------------------------------- */
+
+.markets {
+  max-height: 640px;
+}
+
+.search {
+  margin: 8px;
+  padding: 7px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-0);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: var(--t-small);
+}
+
+.search:focus {
+  outline: none;
+  border-color: var(--signal);
+}
+
+.marketList {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.marketRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 8px;
+  width: 100%;
+  padding: 7px 12px;
+  border: 0;
+  border-left: 2px solid transparent;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.marketRow:hover {
+  background: var(--surface-2);
+}
+
+.marketRowActive {
+  border-left-color: var(--signal);
+  background: var(--surface-2);
+}
+
+.marketSym {
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: var(--t-small);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.marketName {
+  color: var(--ink-mute);
+  font-size: var(--t-micro);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.marketPrice {
+  color: var(--ink-soft);
+  font-family: var(--mono);
+  font-size: var(--t-small);
+  text-align: right;
+}
+
+.marketChg {
+  font-family: var(--mono);
+  font-size: var(--t-micro);
+  text-align: right;
+}
+
+/* --- Grafik -------------------------------------------------------------- */
+
+.chartHead {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.chartSymbol {
+  display: grid;
+}
+
+.chartSymbol strong {
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 16px;
+  letter-spacing: 0.02em;
+}
+
+.chartPrice {
+  font-family: var(--mono);
+  font-size: 22px;
+}
+
+.chartStats {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.chartStat {
+  display: grid;
+  gap: 1px;
+}
+
+.chartStat b {
+  color: var(--ink-soft);
+  font-family: var(--mono);
+  font-size: var(--t-small);
+  font-weight: 400;
+}
+
+.intervals {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+.interval {
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--ink-mute);
+  font-family: var(--mono);
+  font-size: var(--t-small);
+  cursor: pointer;
+}
+
+.interval:hover {
+  color: var(--ink);
+}
+
+.intervalActive {
+  color: var(--signal);
+  background: var(--signal-dim);
+}
+
+.chartBox {
+  position: relative;
+  flex: 1;
+  min-height: 460px;
+}
+
+@media (max-width: 860px) {
+  .chartBox {
+    min-height: 360px;
+  }
+}
+
+.chartCanvas {
+  position: absolute;
+  inset: 0;
+}
+
+.chartLegend {
+  position: absolute;
+  top: 8px;
+  left: 12px;
+  right: 70px;
+  z-index: 2;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  color: var(--ink-mute);
+  font-family: var(--mono);
+  font-size: var(--t-micro);
+  pointer-events: none;
+}
+
+.chartLegend b {
+  color: var(--ink-soft);
+  font-weight: 400;
+}
+
+.chartStatus {
+  color: var(--measured);
+}
+
+/* --- Tiket order --------------------------------------------------------- */
+
+.ticket {
+  padding: 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  align-content: start;
+}
+
+.sideTabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 3px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-0);
+}
+
+.sideTab {
+  padding: 8px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--ink-soft);
+  font-family: var(--mono);
+  font-size: var(--t-small);
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+
+.sideLong {
+  color: #fff;
+  background: var(--measured);
+}
+
+.sideShort {
+  color: #fff;
+  background: var(--halted);
+}
+
+.fieldLabel {
+  display: flex;
+  justify-content: space-between;
+  color: var(--ink-mute);
+  font-family: var(--mono);
+  font-size: var(--t-micro);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.amount {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 36px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-0);
+  overflow: hidden;
+}
+
+.amount button {
+  border: 0;
+  background: var(--surface-2);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.amount input {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 6px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 18px;
+  text-align: center;
+}
+
+.amount input:focus,
+.input:focus {
+  outline: none;
+}
+
+.chips {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(44px, 1fr));
+  gap: 4px;
+}
+
+.chip {
+  padding: 5px 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--ink-soft);
+  font-family: var(--mono);
+  font-size: var(--t-micro);
+  cursor: pointer;
+}
+
+.chip:hover {
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
+.chipActive {
+  border-color: var(--signal);
+  color: var(--signal);
+  background: var(--signal-dim);
+}
+
+.inputRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
 }
 
 .input {
@@ -175,61 +537,123 @@
 }
 
 .input:focus {
-  outline: none;
   border-color: var(--signal);
 }
 
-.ticker {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-
-.tickerPrice {
-  font-family: var(--mono);
-  font-size: 28px;
-  color: var(--ink);
-  font-variant-numeric: tabular-nums;
-}
-
-.spark {
-  width: 100%;
-  height: 72px;
-  display: block;
-}
-
-.dirButtons {
+.payout {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-3);
+  gap: 2px;
+  padding: 10px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-0);
+  text-align: center;
 }
 
-.btnUp,
-.btnDown {
-  padding: 12px;
+.payoutValue {
+  color: var(--measured);
+  font-family: var(--mono);
+  font-size: 24px;
+}
+
+.summary {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-0);
+  font-family: var(--mono);
+  font-size: var(--t-small);
+}
+
+.summary div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--ink-mute);
+}
+
+.summary b {
+  color: var(--ink-soft);
+  font-weight: 400;
+}
+
+.bigUp,
+.bigDown {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 14px;
   border: 0;
   border-radius: var(--radius-sm);
   color: #fff;
   font-family: var(--mono);
-  font-size: var(--t-body);
+  font-size: 15px;
   letter-spacing: 0.08em;
   cursor: pointer;
+  transition: filter 0.12s;
 }
 
-.btnUp {
+.bigUp {
   background: var(--measured);
 }
 
-.btnDown {
+.bigDown {
   background: var(--halted);
 }
 
-.btnUp:disabled,
-.btnDown:disabled {
-  opacity: 0.5;
+.bigUp:hover:not(:disabled),
+.bigDown:hover:not(:disabled) {
+  filter: brightness(1.12);
+}
+
+.bigUp:disabled,
+.bigDown:disabled {
+  opacity: 0.45;
   cursor: not-allowed;
+}
+
+.binaryButtons {
+  display: grid;
+  gap: 8px;
+}
+
+.hint {
+  color: var(--ink-mute);
+  font-size: var(--t-micro);
+  line-height: 1.5;
+}
+
+/* --- Panel bawah --------------------------------------------------------- */
+
+.bottomTabs {
+  display: flex;
+  gap: 2px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+}
+
+.bottomTab {
+  padding: 10px 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--ink-mute);
+  font-family: var(--mono);
+  font-size: var(--t-small);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.bottomTab:hover {
+  color: var(--ink);
+}
+
+.bottomTabActive {
+  color: var(--ink);
+  border-bottom-color: var(--signal);
 }
 
 .tableWrap {
@@ -243,7 +667,7 @@
 }
 
 .table th {
-  padding: 8px 10px;
+  padding: 8px 12px;
   border-bottom: 1px solid var(--line);
   color: var(--ink-mute);
   font-family: var(--mono);
@@ -256,30 +680,32 @@
 }
 
 .table td {
-  padding: 8px 10px;
+  padding: 8px 12px;
   border-bottom: 1px solid var(--line);
   color: var(--ink-soft);
   font-family: var(--mono);
-  font-variant-numeric: tabular-nums;
   white-space: nowrap;
-  vertical-align: top;
+  vertical-align: middle;
+}
+
+.table tbody tr:hover td {
+  background: var(--surface-2);
 }
 
 .table tr:last-child td {
   border-bottom: 0;
 }
 
+.clickable {
+  cursor: pointer;
+}
+
 .sym {
   color: var(--ink);
 }
 
-.subtle {
-  color: var(--ink-mute);
-  font-size: var(--t-micro);
-}
-
 .empty {
-  padding: var(--space-4);
+  padding: 28px 16px;
   color: var(--ink-mute);
   font-size: var(--t-body);
   text-align: center;
@@ -302,29 +728,63 @@
   color: var(--signal);
 }
 
-.error {
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--halted);
-  border-radius: var(--radius-sm);
-  background: var(--halted-dim);
-  color: var(--ink);
-  font-size: var(--t-body);
-}
-
-.notice {
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
+.closeBtn {
+  padding: 3px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-xs);
+  background: transparent;
   color: var(--ink-soft);
-  font-size: var(--t-small);
-  line-height: 1.5;
+  font-family: var(--mono);
+  font-size: var(--t-micro);
+  cursor: pointer;
 }
 
-.deskControls {
+.closeBtn:hover:not(:disabled) {
+  border-color: var(--halted);
+  color: var(--halted);
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1px;
+  background: var(--line);
+}
+
+.statCell {
+  padding: 12px 16px;
+  background: var(--surface-1);
+}
+
+.statCell b {
+  display: block;
+  margin-top: 3px;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 18px;
+  font-weight: 400;
+}
+
+.curve {
+  width: 100%;
+  height: 90px;
+  display: block;
+}
+
+/* --- Desk AI ------------------------------------------------------------- */
+
+.desk {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  padding: 14px;
+}
+
+.deskBar {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  justify-content: space-between;
+  gap: 10px;
   flex-wrap: wrap;
 }
 
@@ -341,11 +801,11 @@
 .agents {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: var(--space-3);
+  gap: 8px;
 }
 
 .agent {
-  padding: var(--space-3);
+  padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--surface-0);
@@ -378,7 +838,7 @@
 }
 
 .decision {
-  padding: var(--space-3) var(--space-4);
+  padding: 10px 14px;
   border-left: 3px solid var(--signal);
   background: var(--signal-dim);
   color: var(--ink);
@@ -393,6 +853,78 @@
   font-size: var(--t-small);
   line-height: 1.6;
 }
+
+/* --- Pesan --------------------------------------------------------------- */
+
+.error {
+  padding: 10px 14px;
+  border: 1px solid var(--halted);
+  border-radius: var(--radius-sm);
+  background: var(--halted-dim);
+  color: var(--ink);
+  font-size: var(--t-body);
+}
+
+.notice {
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--ink-soft);
+  font-size: var(--t-small);
+  line-height: 1.5;
+}
+
+.toasts {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 60;
+  display: grid;
+  gap: 8px;
+  max-width: min(360px, calc(100vw - 32px));
+}
+
+.toast {
+  padding: 12px 16px;
+  border: 1px solid var(--line-strong);
+  border-left-width: 4px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: var(--t-small);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  animation: toastIn 0.18s ease-out;
+}
+
+.toastWin {
+  border-left-color: var(--measured);
+}
+
+.toastLoss {
+  border-left-color: var(--halted);
+}
+
+.toastInfo {
+  border-left-color: var(--signal);
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.disclaimer {
+  margin: 0;
+  color: var(--ink-mute);
+  font-size: var(--t-micro);
+  line-height: 1.5;
+}
+
+/* --- Halaman terkunci & pengaturan admin --------------------------------- */
 
 .lock {
   display: grid;

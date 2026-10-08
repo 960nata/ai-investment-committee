@@ -167,9 +167,9 @@ export async function cryptoBars(symbol: string, interval: string, limit: number
   }))
 }
 
-/** Candle 15 menit Yahoo, lima hari terakhir. */
-export async function yahooIntradayBars(symbol: string): Promise<Bar[]> {
-  const result = await yahooChart(symbol, '5d', '15m')
+/** Candle Yahoo pada rentang dan interval apa pun yang didukung Yahoo. */
+export async function yahooBars(symbol: string, range: string, interval: string): Promise<Bar[]> {
+  const result = await yahooChart(symbol, range, interval)
   const ts: number[] = result.timestamp ?? []
   const q = result.indicators?.quote?.[0]
   if (!q) return []
@@ -188,6 +188,11 @@ export async function yahooIntradayBars(symbol: string): Promise<Bar[]> {
     })
   }
   return bars
+}
+
+/** Candle 15 menit Yahoo, lima hari terakhir. */
+export function yahooIntradayBars(symbol: string): Promise<Bar[]> {
+  return yahooBars(symbol, '5d', '15m')
 }
 
 export interface OrderBookSnapshot {
