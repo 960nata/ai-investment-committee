@@ -253,7 +253,7 @@ const RULES = [
   '- Ini SIMULASI dengan uang virtual. Tugas desk adalah mengambil keputusan trading terbaik di dompet simulasi ini.',
   '- ANGKA: hanya dari blok FAKTA. Jangan mengarang harga, level, atau berita.',
   '- "Bandar" = jejak pemain besar yang terbaca di data (arus volume, penyerapan, buku order, KSEI). Jangan menuduh manipulasi.',
-  '- TIDAK TRADE itu sah. Lebih baik diam daripada memaksakan sinyal lemah.',
+  '- SIMULATOR LATIHAN: tujuan desk adalah berlatih trading dan mengumpulkan rekam jejak, jadi desk harus aktif. Kandidat dengan |skor radar| ≥ 35 layak ditradingkan dengan stake kecil; diam hanya bila semua kandidat lemah (|skor| < 35) atau bandar berlawanan kuat.',
   '- FORMAT: maksimum 10 baris "LABEL: isi", Bahasa Indonesia lugas, tanpa markdown.',
 ].join('\n')
 
@@ -312,7 +312,8 @@ const ROLES: DeskRole[] = [
       [
         'Kamu Manajer Risiko. Serang usulan dua agen sebelumnya dan tetapkan batasnya berdasarkan DOMPET di FAKTA.',
         'Hasilkan: usulan yang kamu veto dan alasannya; ukuran stake maksimum per usulan (persen kas, total semua posisi baru ≤ 40% kas); stop loss dan target dalam persen dari ATR; posisi terbuka yang sebaiknya ditutup.',
-        'Bila dompet sedang rugi beruntun, perkecil ukuran. Bila sinyal dan bandar bertentangan, veto.',
+        'Bila dompet sedang rugi beruntun, perkecil ukuran. Pertentangan kecil antara sinyal dan bandar BUKAN alasan veto — kecilkan stake (2–5% kas). Veto HANYA bila skor bandar berlawanan arah dengan selisih ≥ 25 poin, atau |skor radar| < 35.',
+        'Sebut minimal satu usulan yang LOLOS beserta stake-nya, kecuali semua kandidat memenuhi syarat veto.',
         modeBrief(mode),
         RULES,
       ].join('\n'),
@@ -334,6 +335,8 @@ const ROLES: DeskRole[] = [
         `Maksimal ${MAX_ACTIONS} aksi. "actions": [] bila tidak ada peluang yang lolos risiko. stake_pct adalah persen dari KAS.`,
         'summary maksimal 2 kalimat pendek; tiap reason maksimal 15 kata.',
         'Hormati veto Manajer Risiko kecuali kamu menjelaskan di reason kenapa veto itu keliru.',
+        'Bila ada kandidat dengan |skor radar| ≥ 35 yang tidak diveto karena bandar berlawanan kuat, WAJIB buka minimal satu posisi (stake 2–10% kas) di kandidat terkuat. "actions": [] hanya bila tidak ada kandidat seperti itu.',
+        'Tulis "symbol" persis seperti di FAKTA tanpa awalan pasar, contoh "ETHUSDT" atau "BBCA.JK" (bukan "CRYPTO:ETHUSDT").',
         modeBrief(mode),
       ].join('\n'),
   },
@@ -486,7 +489,13 @@ async function execute(
       }
 
       // Simbol harus berasal dari blok fakta — desk tidak boleh membuka instrumen yang tidak ia baca.
-      const sig = signals.find((s) => s.symbol.toUpperCase() === String(action.symbol ?? '').toUpperCase())
+      // Model kadang menyalin format judul FAKTA ("CRYPTO:ETHUSDT") atau menulis "ETH/USDT".
+      const wanted = String(action.symbol ?? '')
+        .toUpperCase()
+        .replace(/^(CRYPTO|IDX|US|GLOBAL):/, '')
+        .replace('/', '')
+        .trim()
+      const sig = signals.find((s) => s.symbol.toUpperCase() === wanted)
       if (!sig) throw new Error(`${action.symbol} tidak ada di radar desk.`)
       const pct = Math.max(1, Math.min(MAX_STAKE_PCT, Number(action.stake_pct) || 5))
       const stake = Math.floor(cash * (pct / 100) * 100) / 100
