@@ -288,7 +288,15 @@ export function SimulatorClient({ instruments }: { instruments: SimInstrumentOpt
           : `Desk AI memutuskan tidak trade. ${data.result.decision.summary}`
         : 'Desk tidak bersidang — tidak ada instrumen dengan data cukup atau pasar tutup.'
       setDeskNote(note)
-      toast('info', opened.length > 0 ? `🤖 Desk AI membuka ${opened.length} posisi` : '🤖 Desk AI: tidak ada trade')
+      const waiting = modeRef.current === 'binary' && data.result.decision?.summary.startsWith('Tidak ada setup teruji')
+      toast(
+        'info',
+        opened.length > 0
+          ? `🤖 Desk AI membuka ${opened.length} posisi`
+          : waiting
+            ? '🤖 Belum ada sinyal teruji — AI menunggu RSI ekstrem (<25 / >75)'
+            : '🤖 Desk AI: tidak ada trade',
+      )
       return true
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
