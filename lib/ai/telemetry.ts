@@ -303,17 +303,38 @@ function rangeBuckets(range: TimeRange, now: number): { granularity: Granularity
   return { granularity, buckets }
 }
 
+/**
+ * Redis terpasang tetapi tidak menjawab (timeout, kuota Upstash habis).
+ *
+ * Dilempar alih-alih jatuh ke memori: memori proses serverless hampir selalu
+ * kosong, dan dashboard yang menerima angka kosong itu menimpa data lengkap
+ * yang sedang tampil — dari sisi admin terlihat seperti seluruh riwayat
+ * lenyap. Dengan galat, klien mempertahankan data terakhirnya.
+ */
+export class TelemetryUnavailableError extends Error {
+  constructor() {
+    super('Redis telemetri tidak menjawab.')
+    this.name = 'TelemetryUnavailableError'
+  }
+}
+
 /** Isi tiap ember sebagai peta field → angka, dari Redis atau dari memori. */
 async function loadBuckets(
   granularity: Granularity,
   buckets: Bucket[],
+  allowMemoryFallback: boolean,
 ): Promise<{ cells: Record<string, number>[]; lastUsed: Record<string, number>; storage: AiTokensDashboardData['storage']; recentCalls: LlmCallEvent[] }> {
   if (cache.isAvailable()) {
-    const results = await cache.pipeline((p) => {
-      for (const b of buckets) p.hgetall(bucketKey(granularity, b.id))
-      p.hgetall(LAST_USED_KEY)
-      p.lrange(RECENT_KEY, 0, 99)
-    })
+    const read = () =>
+      cache.pipeline((p) => {
+        for (const b of buckets) p.hgetall(bucketKey(granularity, b.id))
+        p.hgetall(LAST_USED_KEY)
+        p.lrange(RECENT_KEY, 0, 99)
+      })
+    // Gangguan Upstash umumnya sesaat; satu percobaan ulang menyelamatkan
+    // sebagian besar penyegaran tanpa membuat admin melihat galat.
+    const results = (await read()) ?? (await read())
+    if (results === null && !allowMemoryFallback) throw new TelemetryUnavailableError()
     const toNumbers = (raw: unknown): Record<string, number> => {
       const out: Record<string, number> = {}
       if (raw && typeof raw === 'object') {
@@ -360,10 +381,13 @@ async function loadBuckets(
 /**
  * Ambil seluruh data analitik AI Token & API Keys untuk dashboard dan popup chart.
  */
-export async function getAiTokensDashboardData(range: TimeRange = '24h'): Promise<AiTokensDashboardData> {
+export async function getAiTokensDashboardData(
+  range: TimeRange = '24h',
+  { allowMemoryFallback = false }: { allowMemoryFallback?: boolean } = {},
+): Promise<AiTokensDashboardData> {
   const { granularity, buckets } = rangeBuckets(range, Date.now())
   const n = buckets.length
-  const { cells, lastUsed, storage, recentCalls } = await loadBuckets(granularity, buckets)
+  const { cells, lastUsed, storage, recentCalls } = await loadBuckets(granularity, buckets, allowMemoryFallback)
 
   // 1. Pecah field menjadi deret per kunci×model.
   //    keyModels: "penyedia|sidik" → model → deret

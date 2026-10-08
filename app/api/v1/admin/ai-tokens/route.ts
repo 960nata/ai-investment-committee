@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { verifyAdminSession, isRequestAdminAuthenticated } from '@/lib/auth/admin-auth'
-import { getAiTokensDashboardData, TIME_RANGES, type TimeRange } from '@/lib/ai/telemetry'
+import { getAiTokensDashboardData, TelemetryUnavailableError, TIME_RANGES, type TimeRange } from '@/lib/ai/telemetry'
 import { unauthorized, failure, NO_STORE } from '@/lib/http/errors'
 
 export const dynamic = 'force-dynamic'
@@ -25,6 +25,10 @@ export async function GET(request: Request) {
       },
     })
   } catch (err) {
+    // 503, bukan data kosong: klien mempertahankan angka terakhir yang tampil.
+    if (err instanceof TelemetryUnavailableError) {
+      return NextResponse.json({ error: err.message }, { status: 503, headers: NO_STORE })
+    }
     return failure('api/v1/admin/ai-tokens', err)
   }
 }

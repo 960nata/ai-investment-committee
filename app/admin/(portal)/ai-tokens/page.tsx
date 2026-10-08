@@ -17,7 +17,10 @@ export default async function AdminAiTokensPage() {
     notFound()
   }
 
-  const initialData = await getAiTokensDashboardData('24h')
+  // Muatan pertama tetap tampil walau Redis sedang terganggu (dengan penanda
+  // "Terganggu"); penyegaran berkala justru menolak angka memori agar tidak
+  // menimpa data lengkap yang sudah tampil.
+  const initialData = await getAiTokensDashboardData('24h', { allowMemoryFallback: true })
 
   return <AiTokensDashboardClient initialData={initialData} />
 }

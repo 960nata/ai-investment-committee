@@ -59,7 +59,7 @@ export function AiTokensDashboardClient({ initialData }: AiTokensDashboardClient
       const res = await fetch(`/api/v1/admin/ai-tokens?range=${nextRange}`, {
         cache: 'no-store', signal: controller.signal,
       })
-      if (!res.ok) throw new Error(res.status === 401 ? 'Sesi admin berakhir. Masuk kembali.' : 'Monitoring gagal diperbarui; data terakhir tetap ditampilkan.')
+      if (!res.ok) throw new Error(res.status === 401 ? 'Sesi admin berakhir. Masuk kembali.' : res.status === 503 ? 'Redis telemetri sedang tidak menjawab; data terakhir tetap ditampilkan.' : 'Monitoring gagal diperbarui; data terakhir tetap ditampilkan.')
       const next = await res.json() as AiTokensDashboardData
       if (!controller.signal.aborted) { setData(next); setRefreshError(null) }
     } catch (err) {

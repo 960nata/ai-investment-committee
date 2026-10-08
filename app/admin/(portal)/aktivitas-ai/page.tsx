@@ -11,7 +11,10 @@ export const metadata = {
 
 export default async function AiActivityPage() {
   await requireAdmin()
-  const data = await getAiTokensDashboardData('24h')
+  // Muatan pertama tetap tampil walau Redis sedang terganggu (dengan penanda
+  // "Terganggu"); penyegaran berkala justru menolak angka memori agar tidak
+  // menimpa data lengkap yang sudah tampil.
+  const data = await getAiTokensDashboardData('24h', { allowMemoryFallback: true })
   const committee = [ANALIS, STRATEG, RISIKO, KETUA].map((role) => ({
     name: role.title,
     provider: role.provider,
