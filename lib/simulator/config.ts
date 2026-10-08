@@ -19,7 +19,7 @@ export const STARTING_BALANCE_USD = 1_000
 export const BINARY_PAYOUT = 0.85
 
 /** Pilihan kedaluwarsa binary, dalam detik. */
-export const BINARY_EXPIRIES = [60, 300, 900, 1800, 3600] as const
+export const BINARY_EXPIRIES = [60, 300, 600, 900, 1800, 3600] as const
 
 /**
  * Binary hanya untuk kripto. Pasar kripto buka 24 jam dan Binance memberi

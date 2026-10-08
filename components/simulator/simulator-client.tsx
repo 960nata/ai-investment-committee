@@ -26,6 +26,7 @@ import {
 import type { MarkedPosition, SimState } from '@/lib/simulator/engine'
 import type { DeskDecision, DeskTurn, ExecutedAction } from '@/lib/simulator/desk'
 import type { SignalReport } from '@/lib/simulator/signals'
+import { PLAYBOOK, playbookRecord, type PlaybookSetup } from '@/lib/simulator/playbook'
 import { TradeChart, formatPrice, type ChartLine } from './trade-chart'
 import s from './simulator.module.css'
 
@@ -134,6 +135,35 @@ function useQuotes(symbols: string[]) {
     }
   }, [key])
   return quotes
+}
+
+/** Setup binary teruji dari pemindai server (tanpa AI), tiap 30 detik. */
+function useSetups(enabled: boolean) {
+  const [setups, setSetups] = useState<PlaybookSetup[]>([])
+  const [scannedAt, setScannedAt] = useState<number | null>(null)
+  useEffect(() => {
+    if (!enabled) return
+    let cancelled = false
+    const tick = async () => {
+      if (document.visibilityState !== 'visible') return
+      try {
+        const data = await api<{ setups: PlaybookSetup[]; scannedAt: number }>('/api/v1/simulator/scan')
+        if (!cancelled) {
+          setSetups(data.setups)
+          setScannedAt(data.scannedAt)
+        }
+      } catch {
+        // pemindaian berikutnya mencoba lagi
+      }
+    }
+    void tick()
+    const id = setInterval(tick, 30_000)
+    return () => {
+      cancelled = true
+      clearInterval(id)
+    }
+  }, [enabled])
+  return { setups: enabled ? setups : [], scannedAt }
 }
 
 interface Toast {
@@ -270,8 +300,14 @@ export function SimulatorClient({ instruments }: { instruments: SimInstrumentOpt
   }, [accept, toast])
 
   const autopilotEvery = MODE_INFO[mode].autopilotSeconds
+  const { setups, scannedAt } = useSetups(mode === 'binary')
+  const heldSymbols = useMemo(() => new Set((state?.open ?? []).map((p) => p.symbol)), [state])
+  const freshSetups = useMemo(() => setups.filter((x) => !heldSymbols.has(x.symbol)), [setups, heldSymbols])
+  const lastDeskAt = useRef(0)
+
+  // Autopilot investasi: sidang berkala.
   useEffect(() => {
-    if (!autopilot || !autopilotEvery) return
+    if (!autopilot || !autopilotEvery || mode === 'binary') return
     const first = setTimeout(() => void runDesk(), 0)
     const id = setInterval(() => {
       if (document.visibilityState === 'visible') void runDesk()
@@ -280,7 +316,17 @@ export function SimulatorClient({ instruments }: { instruments: SimInstrumentOpt
       clearTimeout(first)
       clearInterval(id)
     }
-  }, [autopilot, autopilotEvery, runDesk])
+  }, [autopilot, autopilotEvery, mode, runDesk])
+
+  // Autopilot binary: desk dipanggil hanya saat pemindai menemukan setup teruji
+  // yang belum dipegang — tanpa setup, sidang cuma membakar kuota untuk lempar koin.
+  useEffect(() => {
+    if (!autopilot || mode !== 'binary' || busy !== null || freshSetups.length === 0) return
+    if (Date.now() - lastDeskAt.current < 60_000) return
+    lastDeskAt.current = Date.now()
+    const t = setTimeout(() => void runDesk(), 0)
+    return () => clearTimeout(t)
+  }, [autopilot, mode, busy, freshSetups, scannedAt, runDesk])
 
   const reset = () => {
     if (!window.confirm(`Reset dompet ${MODE_INFO[mode].label} ke $${STARTING_BALANCE_USD.toLocaleString('en-US')}? Semua riwayat di mode ini dihapus.`)) return
@@ -387,6 +433,10 @@ export function SimulatorClient({ instruments }: { instruments: SimInstrumentOpt
               busy={busy}
               cash={a?.cash ?? 0}
               price={current}
+              setups={freshSetups}
+              record={playbookRecord(state?.closed ?? [])}
+              selectedSymbol={selected.symbol}
+              onPick={(sym) => setSelected({ symbol: sym, market: 'CRYPTO', name: CRYPTO_NAMES[sym] ?? sym })}
               onTrade={(t) => post('open', { action: 'open', trade: { kind: 'binary', symbol: selected.symbol, ...t } })}
             />
           ) : (
@@ -450,11 +500,17 @@ export function SimulatorClient({ instruments }: { instruments: SimInstrumentOpt
               {autopilotEvery && (
                 <label className={s.switch}>
                   <input type="checkbox" checked={autopilot} onChange={(e) => setAutopilot(e.target.checked)} />
-                  Autopilot tiap {Math.round(autopilotEvery / 60)} menit
+                  {mode === 'binary' ? 'Autopilot: entry otomatis saat setup teruji muncul' : `Autopilot tiap ${Math.round(autopilotEvery / 60)} menit`}
                 </label>
               )}
             </div>
-            {autopilot && <div className={s.notice}>Autopilot aktif selama tab ini terbuka. Tiap sidang memakai satu jatah AI harian.</div>}
+            {autopilot && (
+              <div className={s.notice}>
+                {mode === 'binary'
+                  ? `Autopilot aktif selama tab ini terbuka. Pasar dipindai tiap 30 detik tanpa AI; desk hanya bersidang (1 jatah AI) saat setup teruji muncul${freshSetups.length ? ` — sekarang: ${freshSetups.map((x) => displaySymbol(x.symbol)).join(', ')}` : ' — sekarang belum ada'}.`
+                  : 'Autopilot aktif selama tab ini terbuka. Tiap sidang memakai satu jatah AI harian.'}
+              </div>
+            )}
             {lastRun ? <DeskRunView run={lastRun} /> : <div className={s.empty}>Belum ada sidang desk di mode ini. Tekan 🤖 Desk AI.</div>}
           </div>
         )}
@@ -613,20 +669,66 @@ function BinaryTicket({
   busy,
   cash,
   price,
+  setups,
+  record,
+  selectedSymbol,
+  onPick,
   onTrade,
 }: {
   busy: string | null
   cash: number
   price: number | null
+  setups: PlaybookSetup[]
+  record: ReturnType<typeof playbookRecord>
+  selectedSymbol: string
+  onPick: (symbol: string) => void
   onTrade: (t: { direction: 'up' | 'down'; stake: number; expirySeconds: number }) => Promise<boolean>
 }) {
   const [stake, setStake] = useState('10')
-  const [expiry, setExpiry] = useState<number>(60)
+  const [expiry, setExpiry] = useState<number>(PLAYBOOK.expirySeconds)
   const stakeNum = Number(stake)
   const valid = stakeNum >= 1 && stakeNum <= cash
+  const here = setups.find((x) => x.symbol === selectedSymbol)
 
   return (
     <div className={s.ticket}>
+      <div className={s.setupBox}>
+        <div className={s.fieldLabel}>
+          <span>Sinyal teruji</span>
+          <span>
+            uji {PLAYBOOK.backtestWinRate}% · impas {PLAYBOOK.breakevenWinRate}%
+          </span>
+        </div>
+        {setups.length === 0 ? (
+          <span className={s.hint}>
+            Belum ada. Menunggu RSI 1m &lt; {PLAYBOOK.rsiLow} (NAIK) atau &gt; {PLAYBOOK.rsiHigh} (TURUN). Di luar itu
+            arah 1–15 menit ±50% — lempar koin.
+          </span>
+        ) : (
+          setups.map((x) => (
+            <button
+              key={x.symbol}
+              type="button"
+              className={`${s.setupRow} ${x.symbol === selectedSymbol ? s.setupRowActive : ''}`}
+              onClick={() => {
+                onPick(x.symbol)
+                setExpiry(PLAYBOOK.expirySeconds)
+              }}
+            >
+              <span className={s.sym}>{displaySymbol(x.symbol)}</span>
+              <span className={x.direction === 'up' ? s.up : s.down}>{x.direction === 'up' ? '▲ NAIK' : '▼ TURUN'}</span>
+              <span className={s.subtle}>RSI {x.rsi}</span>
+            </button>
+          ))
+        )}
+        {record.trades > 0 && (
+          <span className={s.hint}>
+            Rekam jejak playbook AI-mu: {record.wins}/{record.trades} menang ({record.winRate?.toFixed(0)}%)
+            {record.paused ? ' — rem otomatis aktif.' : '.'}
+          </span>
+        )}
+      </div>
+
       <div className={s.field}>
         <span className={s.fieldLabel}>
           <span>Waktu</span>
@@ -669,7 +771,7 @@ function BinaryTicket({
           disabled={busy !== null || !valid}
           onClick={() => void onTrade({ direction: 'up', stake: stakeNum, expirySeconds: expiry })}
         >
-          ▲ NAIK
+          ▲ NAIK{here?.direction === 'up' ? ' · sesuai sinyal' : ''}
         </button>
         <button
           type="button"
@@ -677,7 +779,7 @@ function BinaryTicket({
           disabled={busy !== null || !valid}
           onClick={() => void onTrade({ direction: 'down', stake: stakeNum, expirySeconds: expiry })}
         >
-          ▼ TURUN
+          ▼ TURUN{here?.direction === 'down' ? ' · sesuai sinyal' : ''}
         </button>
       </div>
       <span className={s.hint}>

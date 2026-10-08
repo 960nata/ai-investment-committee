@@ -27,7 +27,6 @@ import { getOrCreateAccount, recordDeskRun, updateDeskRunExecuted } from '@/lib/
 import { FEATURE_SET_VERSION } from '@/lib/features/compute'
 import { loadMarketView, type MarketRow } from '@/lib/member/market-view'
 import {
-  BINARY_EXPIRIES,
   BINARY_SYMBOLS,
   MIN_STAKE_USD,
   MODE_INFO,
@@ -37,6 +36,7 @@ import {
 import { closeTradeNow, getSimState, openTrade, type SimState } from './engine'
 import { cryptoBars, cryptoOrderBook, isCryptoSymbol, yahooIntradayBars, type Bar } from './prices'
 import { computeSignal, signalToPrompt, type SignalReport } from './signals'
+import { PLAYBOOK, binarySetup, playbookRecord, type PlaybookSetup } from './playbook'
 
 export interface DeskTurn {
   agent: 'radar' | 'bandar' | 'risiko' | 'kepala'
@@ -125,8 +125,13 @@ function weekly(bars: Bar[]): Bar[] {
 
 const isoDaysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10)
 
+export const closedBars = (bars: Bar[], periodMs: number) => bars.filter((b) => b.time + periodMs <= Date.now())
+
 async function cryptoSignal(symbol: string, name: string, interval: '1m' | '15m'): Promise<SignalReport | null> {
-  const [bars, book] = await Promise.all([cryptoBars(symbol, interval, 150), cryptoOrderBook(symbol)])
+  const [raw, book] = await Promise.all([cryptoBars(symbol, interval, 150), cryptoOrderBook(symbol)])
+  // Hanya candle yang sudah tutup, sama seperti uji playbook: candle berjalan
+  // bervolume hampir nol dan membuat volume relatif selalu tampak sepi.
+  const bars = interval === '1m' ? closedBars(raw, 60_000) : raw
   return computeSignal({ market: 'CRYPTO', symbol, name, timeframe: interval }, bars, { orderBook: book })
 }
 
@@ -193,7 +198,9 @@ async function gatherSignals(mode: SimMode, state: SimState, gatherDeadline: num
 
   if (mode === 'binary') {
     const reports = await settled(BINARY_SYMBOLS.map((s) => cryptoSignal(s, s.replace('USDT', ''), '1m')))
-    return rank(reports, held, 5)
+    // Koin dengan setup teruji selalu masuk radar, apa pun skor momentumnya.
+    const withSetup = reports.filter((r) => binarySetup(r))
+    return [...withSetup, ...rank(reports.filter((r) => !binarySetup(r)), held, Math.max(0, 5 - withSetup.length))]
   }
 
   // `candleCount` di market view hanya menghitung dua candle terakhir (untuk
@@ -269,7 +276,11 @@ interface DeskRole {
 
 const modeBrief = (mode: SimMode) =>
   mode === 'binary'
-    ? 'MODE: binary option kripto. Pilihan arah "up" atau "down", kedaluwarsa 60/300/900/1800/3600 detik, bayaran 85% bila benar, stake hangus bila salah. Sinyal dari candle 1 menit dan buku order.'
+    ? [
+        'MODE: binary option kripto, bayaran 85% bila benar, stake hangus bila salah — butuh ≥ 54,1% menang hanya untuk impas.',
+        `PLAYBOOK TERUJI (satu-satunya pemicu entry): ${PLAYBOOK.name} — RSI14 1m < ${PLAYBOOK.rsiLow} → "up", > ${PLAYBOOK.rsiHigh} → "down", volume relatif < ${PLAYBOOK.maxRelVolume}×, kedaluwarsa ${PLAYBOOK.expirySeconds} detik. Uji 7 hari: ${PLAYBOOK.backtestWinRate}% menang (${PLAYBOOK.backtestSamples} kejadian).`,
+        'Skor radar momentum sudah diuji HANYA ±50% (lempar koin) untuk binary dan SELALU tampak berlawanan dengan setup pantulan (RSI tinggi = momentum naik) — itu wajar dan BUKAN alasan veto. Satu-satunya veto sah: skor bandar berlawanan arah setup ≥ 50.',
+      ].join(' ')
     : `MODE: ${MODE_INFO[mode].label}. Posisi "long" atau "short", ditutup otomatis setelah ${MODE_INFO[mode].horizonDays} hari. ${MODE_INFO[mode].description}`
 
 const ROLES: DeskRole[] = [
@@ -314,6 +325,7 @@ const ROLES: DeskRole[] = [
         'Hasilkan: usulan yang kamu veto dan alasannya; ukuran stake maksimum per usulan (persen kas, total semua posisi baru ≤ 40% kas); stop loss dan target dalam persen dari ATR; posisi terbuka yang sebaiknya ditutup.',
         'Bila dompet sedang rugi beruntun, perkecil ukuran. Pertentangan kecil antara sinyal dan bandar BUKAN alasan veto — kecilkan stake (2–5% kas). Veto HANYA bila skor bandar berlawanan arah dengan selisih ≥ 25 poin, atau |skor radar| < 35.',
         'Sebut minimal satu usulan yang LOLOS beserta stake-nya, kecuali semua kandidat memenuhi syarat veto.',
+        'Binary: hanya SETUP AKTIF yang boleh diusulkan; veto setup bila skor bandar berlawanan arah ≥ 50.',
         modeBrief(mode),
         RULES,
       ].join('\n'),
@@ -330,12 +342,14 @@ const ROLES: DeskRole[] = [
         'Kamu Kepala Desk. Timbang tiga laporan, lalu putuskan. Keputusanmu langsung dieksekusi di dompet simulasi.',
         'Balas HANYA satu objek JSON tanpa teks lain:',
         mode === 'binary'
-          ? '{"summary":"<2 kalimat>","confidence":<0-100>,"actions":[{"type":"open","symbol":"<simbol dari FAKTA>","market":"CRYPTO","direction":"up"|"down","stake_pct":<1-25>,"expiry_seconds":60|300|900|1800|3600,"reason":"<1 kalimat>"}]}'
+          ? `{"summary":"<2 kalimat>","confidence":<0-100>,"actions":[{"type":"open","symbol":"<simbol SETUP AKTIF>","market":"CRYPTO","direction":"<arah setup>","stake_pct":<1-${PLAYBOOK.maxStakePct}>,"expiry_seconds":${PLAYBOOK.expirySeconds},"reason":"<1 kalimat>"}]}`
           : '{"summary":"<2 kalimat>","confidence":<0-100>,"actions":[{"type":"open","symbol":"<simbol dari FAKTA>","market":"<market dari FAKTA>","direction":"long"|"short","stake_pct":<1-25>,"stop_loss_pct":<angka>,"take_profit_pct":<angka>,"reason":"<1 kalimat>"},{"type":"close","position_id":<id>,"reason":"<1 kalimat>"}]}',
         `Maksimal ${MAX_ACTIONS} aksi. "actions": [] bila tidak ada peluang yang lolos risiko. stake_pct adalah persen dari KAS.`,
         'summary maksimal 2 kalimat pendek; tiap reason maksimal 15 kata.',
         'Hormati veto Manajer Risiko kecuali kamu menjelaskan di reason kenapa veto itu keliru.',
-        'Bila ada kandidat dengan |skor radar| ≥ 35 yang tidak diveto karena bandar berlawanan kuat, WAJIB buka minimal satu posisi (stake 2–10% kas) di kandidat terkuat. "actions": [] hanya bila tidak ada kandidat seperti itu.',
+        mode === 'binary'
+          ? `Binary: buka HANYA instrumen di daftar SETUP AKTIF, dengan arah setup. Stake 2–${PLAYBOOK.maxStakePct}% kas. Setup yang tidak punya veto sah (bandar berlawanan ≥ 50) WAJIB diambil — bila kamu melewatkannya, sistem mengeksekusinya otomatis dengan stake minimum.`
+          : 'Bila ada kandidat dengan |skor radar| ≥ 35 yang tidak diveto karena bandar berlawanan kuat, WAJIB buka minimal satu posisi (stake 2–10% kas) di kandidat terkuat. Target harus minimal 2× jarak stop loss (rasio untung:rugi ≥ 2). Jangan long saat RSI > 75 atau short saat RSI < 25 — itu mengejar harga. "actions": [] hanya bila tidak ada kandidat seperti itu.',
         'Tulis "symbol" persis seperti di FAKTA tanpa awalan pasar, contoh "ETHUSDT" atau "BBCA.JK" (bukan "CRYPTO:ETHUSDT").',
         modeBrief(mode),
       ].join('\n'),
@@ -462,9 +476,6 @@ async function completeWithFallback(
 // Tahap 3: eksekusi
 // ---------------------------------------------------------------------------
 
-const nearestExpiry = (s: number | undefined) =>
-  BINARY_EXPIRIES.reduce((best, v) => (Math.abs(v - (s ?? 300)) < Math.abs(best - (s ?? 300)) ? v : best), 300 as number)
-
 async function execute(
   ownerKey: string,
   mode: SimMode,
@@ -472,6 +483,7 @@ async function execute(
   signals: SignalReport[],
   state: SimState,
   runId: number,
+  setups: PlaybookSetup[],
 ): Promise<ExecutedAction[]> {
   const results: ExecutedAction[] = []
   let cash = state.account.cash
@@ -502,36 +514,51 @@ async function execute(
       if (stake < MIN_STAKE_USD) throw new Error('Kas tidak cukup untuk stake minimum.')
 
       let input: OpenTradeInput
+      let note = action.reason ?? decision.summary
       if (mode === 'binary') {
+        // Pagar keras: binary hanya boleh mengikuti setup teruji, apa pun kata model.
+        const setup = setups.find((x) => x.symbol === sig.symbol)
+        if (!setup) throw new Error(`${sig.symbol} tidak punya setup teruji aktif — entry ditolak.`)
+        const direction = action.direction === 'down' || action.direction === 'short' ? 'down' : 'up'
+        if (direction !== setup.direction) throw new Error(`Arah ${direction} melawan setup teruji (${setup.direction}) — entry ditolak.`)
+        const binaryStake = Math.floor(cash * (Math.min(pct, PLAYBOOK.maxStakePct) / 100) * 100) / 100
+        if (binaryStake < MIN_STAKE_USD) throw new Error('Kas tidak cukup untuk stake minimum.')
         input = {
           kind: 'binary',
           symbol: sig.symbol as (typeof BINARY_SYMBOLS)[number],
-          direction: action.direction === 'down' || action.direction === 'short' ? 'down' : 'up',
-          stake,
-          expirySeconds: nearestExpiry(action.expiry_seconds),
+          direction,
+          stake: binaryStake,
+          expirySeconds: PLAYBOOK.expirySeconds,
         }
+        note = `[playbook] ${setup.reason}. ${note}`
       } else {
-        const sl = Number(action.stop_loss_pct)
-        const tp = Number(action.take_profit_pct)
+        const side = action.direction === 'short' || action.direction === 'down' ? 'short' : 'long'
+        // Jangan mengejar harga: entry searah setelah harga kelewat jauh adalah
+        // pola kalah yang paling sering (masuk di pucuk, keluar di dasar).
+        if (sig.rsi14 !== null && ((side === 'long' && sig.rsi14 > 75) || (side === 'short' && sig.rsi14 < 25))) {
+          throw new Error(`${side.toUpperCase()} ${sig.symbol} ditolak: RSI ${sig.rsi14} — mengejar harga.`)
+        }
+        const slRaw = Number(action.stop_loss_pct)
+        const tpRaw = Number(action.take_profit_pct)
+        const sl = Number.isFinite(slRaw) && slRaw >= 0.2 ? Math.min(slRaw, 90) : (sig.suggestedStopPct ?? null)
+        let tp = Number.isFinite(tpRaw) && tpRaw >= 0.2 ? Math.min(tpRaw, 1000) : (sig.suggestedTakePct ?? null)
+        // Untung:rugi minimal 2:1 — dengan begitu menang 40% saja sudah impas.
+        if (sl !== null && (tp === null || tp < sl * 2)) tp = Math.min(sl * 2, 1000)
         input = {
           kind: 'invest',
           mode,
           market: sig.market as 'CRYPTO' | 'IDX' | 'US' | 'GLOBAL',
           symbol: sig.symbol,
-          side: action.direction === 'short' || action.direction === 'down' ? 'short' : 'long',
+          side,
           stake,
-          stopLossPct: Number.isFinite(sl) && sl >= 0.2 ? Math.min(sl, 90) : (sig.suggestedStopPct ?? null),
-          takeProfitPct: Number.isFinite(tp) && tp >= 0.2 ? Math.min(tp, 1000) : (sig.suggestedTakePct ?? null),
+          stopLossPct: sl,
+          takeProfitPct: tp,
         }
       }
 
-      const pos = await openTrade(ownerKey, input, {
-        openedBy: 'ai',
-        deskRunId: runId,
-        note: action.reason ?? decision.summary,
-      })
-      cash -= stake
-      results.push({ action, ok: true, message: `Dibuka: ${sig.symbol} $${stake.toFixed(2)}.`, positionId: pos.id })
+      const pos = await openTrade(ownerKey, input, { openedBy: 'ai', deskRunId: runId, note })
+      cash -= input.stake
+      results.push({ action, ok: true, message: `Dibuka: ${sig.symbol} $${input.stake.toFixed(2)}.`, positionId: pos.id })
     } catch (err) {
       results.push({ action, ok: false, message: err instanceof Error ? err.message : String(err) })
     }
@@ -561,12 +588,52 @@ export async function runDesk(ownerKey: string, mode: SimMode): Promise<DeskResu
     return { runId, turns: [], signals: [], decision: null, executed: [] }
   }
 
+  // Binary: tanpa setup teruji, sidang hanya membakar kuota untuk lempar koin.
+  const held = new Set(state.open.map((p) => p.symbol))
+  // Maksimal dua setup per sidang, yang paling ekstrem. Koin kripto bergerak
+  // bersama; sepuluh setup serentak sebenarnya satu taruhan yang dilipatgandakan.
+  const setups =
+    mode === 'binary'
+      ? signals
+          .flatMap((sig) => binarySetup(sig) ?? [])
+          .filter((x) => !held.has(x.symbol))
+          .sort((a, b) => Math.abs(b.rsi - 50) - Math.abs(a.rsi - 50))
+          .slice(0, 2)
+      : []
+  if (mode === 'binary') {
+    const record = playbookRecord(state.closed)
+    const skip = record.paused
+      ? `Rem otomatis: playbook menang ${record.winRate?.toFixed(0)}% dari ${record.trades} trade terakhir (di bawah ${PLAYBOOK.brakeWinRate}%). Binary otomatis dihentikan — reset dompet untuk memulai ulang.`
+      : setups.length === 0
+        ? `Tidak ada setup teruji aktif (RSI 1m semua koin di antara ${PLAYBOOK.rsiLow}–${PLAYBOOK.rsiHigh} atau volume melonjak). Desk menunggu — entry tanpa setup hanya lempar koin.`
+        : null
+    if (skip) {
+      const runId = await recordDeskRun({
+        accountId: account.id,
+        status: 'done',
+        turns: [],
+        signals,
+        decision: { summary: skip, confidence: 0, actions: [] },
+      })
+      return { runId, turns: [], signals, decision: { summary: skip, confidence: 0, actions: [] }, executed: [] }
+    }
+  }
+
+  const record = mode === 'binary' ? playbookRecord(state.closed) : null
   const facts = [
     'FAKTA (satu-satunya sumber angka):',
     `Waktu server: ${new Date().toISOString()}`,
     '',
     '## DOMPET',
     portfolioBlock(state),
+    ...(mode === 'binary'
+      ? [
+          '',
+          '## SETUP AKTIF (playbook teruji)',
+          ...setups.map((x) => `${x.symbol}: ${x.direction} — ${x.reason}; volume relatif ${x.relVolume ?? '-'}x`),
+          `Rekam jejak nyata playbook di dompet ini: ${record?.trades ? `${record.wins}/${record.trades} menang (${record.winRate?.toFixed(0)}%)` : 'belum ada'}.`,
+        ]
+      : []),
     '',
     '## RADAR',
     ...signals.map(signalToPrompt),
@@ -623,7 +690,35 @@ export async function runDesk(ownerKey: string, mode: SimMode): Promise<DeskResu
     decision: decision ?? { summary: 'Putusan Kepala Desk tidak bisa diurai; tidak ada trade.', confidence: 0, actions: [] },
   })
 
-  const executed = decision ? await execute(ownerKey, mode, decision, signals, state, runId) : []
+  const executed = decision ? await execute(ownerKey, mode, decision, signals, state, runId, setups) : []
+
+  // Binary: setup teruji tanpa veto sah tetap diambil. Model cenderung menolak
+  // setup pantulan karena momentum tampak berlawanan — padahal justru itu
+  // syaratnya — dan penolakan semacam itu membuang satu-satunya keunggulan
+  // yang terukur.
+  if (mode === 'binary') {
+    const taken = new Set(executed.filter((e) => e.ok).map((e) => String(e.action.symbol ?? '').toUpperCase().replace(/^CRYPTO:/, '')))
+    const auto: DeskDecision = { summary: decision?.summary ?? '', confidence: 0, actions: [] }
+    for (const setup of setups) {
+      if (taken.has(setup.symbol)) continue
+      const sig = signals.find((x) => x.symbol === setup.symbol)
+      const opposing = sig ? (setup.direction === 'up' ? -sig.bandar.score : sig.bandar.score) : 0
+      if (opposing >= 50) continue
+      auto.actions.push({
+        type: 'open',
+        symbol: setup.symbol,
+        market: 'CRYPTO',
+        direction: setup.direction,
+        stake_pct: 2,
+        expiry_seconds: PLAYBOOK.expirySeconds,
+        reason: 'Setup teruji tanpa veto sah — dieksekusi otomatis dengan stake minimum.',
+      })
+    }
+    if (auto.actions.length > 0) {
+      const after = await getSimState(ownerKey, mode)
+      executed.push(...(await execute(ownerKey, mode, auto, signals, after, runId, setups)))
+    }
+  }
   if (executed.length > 0) await updateDeskRunExecuted(runId, executed)
 
   return { runId, turns, signals, decision, executed }
