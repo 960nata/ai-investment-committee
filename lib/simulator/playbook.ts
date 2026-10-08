@@ -9,12 +9,15 @@
  * Yang lolos uji justru kebalikannya: harga yang "kelewat jual/beli" dalam
  * hitungan menit cenderung memantul.
  *
- *   RSI14 (1m) < 25 → NAIK, RSI14 (1m) > 75 → TURUN,
+ *   RSI14 (1m) < 30 → NAIK, RSI14 (1m) > 70 → TURUN,
  *   volume relatif < 2× (bukan lonjakan berita/likuidasi), kedaluwarsa 10 menit.
  *
- *   Hasil: 58,5% menang (866 kejadian); paruh pertama 56,7%, paruh kedua
- *   60,3% — stabil, bukan kebetulan satu periode. Masuk terlambat 1 menit
- *   (waktu sidang desk) masih 58,2%.
+ *   Uji 1 (30 Sep–8 Okt, ambang 25/75): 58,5% menang, tetapi hanya ±6 sinyal
+ *   per jam di sepuluh koin — pasar tenang bisa sejam tanpa satu pun trade.
+ *   Uji 2 (1–8 Okt, masuk telat 1 menit seperti sidang desk): ambang 30/70
+ *   menang 56,1% (2.928 kejadian; paruh pertama 56,5%, paruh kedua 55,8%)
+ *   dengan sinyal ±3× lebih sering, dan laba harian totalnya tertinggi.
+ *   Ambang 33/67 sudah terlalu longgar (paruh kedua 53,9% — di bawah impas).
  *
  * Itu keunggulan kecil: ±6% laba per trade secara rata-rata, dengan kekalahan
  * beruntun yang tetap wajar terjadi. Karena itu stake dibatasi kecil (setengah
@@ -27,15 +30,15 @@ import type { SignalReport } from './signals'
 export const PLAYBOOK = {
   id: 'rsi-ekstrem-10m',
   name: 'Pantulan RSI ekstrem',
-  rsiLow: 25,
-  rsiHigh: 75,
+  rsiLow: 30,
+  rsiHigh: 70,
   maxRelVolume: 2,
   expirySeconds: 600,
-  backtestWinRate: 58.5,
-  backtestSamples: 866,
+  backtestWinRate: 56.1,
+  backtestSamples: 2928,
   breakevenWinRate: 54.1,
-  /** Persen kas maksimum per trade binary (setengah Kelly untuk p=0,585, b=0,85). */
-  maxStakePct: 4,
+  /** Persen kas maksimum per trade binary (±setengah Kelly untuk p=0,561, b=0,85 ≈ 2,2%). */
+  maxStakePct: 3,
   /** Jumlah trade nyata minimum sebelum rem otomatis boleh menilai. */
   brakeMinTrades: 20,
   /** Di bawah ini (dari 30 trade terakhir) playbook berhenti sendiri. */

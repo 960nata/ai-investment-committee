@@ -10,7 +10,8 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { ACCESS_MESSAGE, resolveSimAccess } from '@/lib/simulator/access'
-import { SimModeSchema } from '@/lib/simulator/config'
+import { MODE_INFO, SimModeSchema } from '@/lib/simulator/config'
+import { claimDeskSlot, getOrCreateAccount } from '@/lib/db/simulator-queries'
 import { runDesk } from '@/lib/simulator/desk'
 import { getSimState } from '@/lib/simulator/engine'
 import { refundLlmBudget, reserveLlmBudget, type SpendChannel } from '@/lib/http/budget'
@@ -21,7 +22,11 @@ import { AllProvidersFailedError } from '@/lib/ai/registry'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-const Body = z.object({ mode: SimModeSchema })
+const Body = z.object({
+  mode: SimModeSchema,
+  /** Dipicu autopilot di peramban: tunduk pada kunci jeda yang sama dengan cron. */
+  auto: z.boolean().optional(),
+})
 
 export async function POST(req: Request) {
   const access = await resolveSimAccess()
@@ -34,7 +39,20 @@ export async function POST(req: Request) {
 
   const parsed = await readBody(req, Body)
   if (!parsed.ok) return parsed.response
-  const { mode } = parsed.data
+  const { mode, auto } = parsed.data
+
+  // Autopilot dari peramban dan dari cron berbagi satu kunci per dompet, jadi
+  // keduanya tidak pernah bersidang ganda di dompet yang sama.
+  if (auto) {
+    const account = await getOrCreateAccount(access.ownerKey, mode)
+    const gap = mode === 'binary' ? 60 : (MODE_INFO[mode].autopilotSeconds ?? 3600)
+    if (!account.autopilot || !(await claimDeskSlot(account.id, gap))) {
+      return NextResponse.json(
+        { data: { result: { decision: null, executed: [], skipped: true }, state: await getSimState(access.ownerKey, mode) } },
+        { headers: NO_STORE },
+      )
+    }
+  }
 
   // Admin memakai jatah terjadwal: ia pemilik kunci, dan pengujiannya tidak
   // boleh terkunci oleh ramainya lalu lintas publik hari itu.

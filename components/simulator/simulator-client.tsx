@@ -269,16 +269,22 @@ export function SimulatorClient({ instruments }: { instruments: SimInstrumentOpt
     [accept],
   )
 
-  const runDesk = useCallback(async () => {
+  const runDesk = useCallback(async (auto = false) => {
     setBusy('desk')
     setError(null)
-    setDeskNote(null)
+    if (!auto) setDeskNote(null)
     try {
-      const data = await api<{ result: { decision: DeskDecision | null; executed: ExecutedAction[] }; state: SimState }>(
-        '/api/v1/simulator/desk',
-        { method: 'POST', body: JSON.stringify({ mode: modeRef.current }) },
-      )
+      const data = await api<{
+        result: { decision: DeskDecision | null; executed: ExecutedAction[]; skipped?: boolean }
+        state: SimState
+      }>('/api/v1/simulator/desk', { method: 'POST', body: JSON.stringify({ mode: modeRef.current, auto }) })
       accept(data.state)
+      // Autopilot yang belum waktunya (kunci jeda) diam saja, tanpa notifikasi.
+      if (data.result.skipped) return true
+      // Autopilot binary tanpa setup: tidak perlu mengganggu dengan notifikasi.
+      const waitingAuto =
+        auto && modeRef.current === 'binary' && data.result.executed.length === 0
+      if (waitingAuto) return true
       const opened = data.result.executed.filter((e) => e.ok)
       const note = data.result.decision
         ? opened.length > 0
@@ -292,7 +298,7 @@ export function SimulatorClient({ instruments }: { instruments: SimInstrumentOpt
         opened.length > 0
           ? `🤖 Desk AI membuka ${opened.length} posisi`
           : waiting
-            ? '🤖 Belum ada sinyal teruji — AI menunggu RSI ekstrem (<25 / >75)'
+            ? `🤖 Belum ada sinyal teruji — AI menunggu RSI 1m <${PLAYBOOK.rsiLow} / >${PLAYBOOK.rsiHigh}`
             : '🤖 Desk AI: tidak ada trade',
       )
       return true
@@ -312,6 +318,29 @@ export function SimulatorClient({ instruments }: { instruments: SimInstrumentOpt
   // halaman ditutup. Sakelarnya disimpan di dompet.
   const autopilot = state?.account.autopilot ?? false
   const toggleAutopilot = (enabled: boolean) => void post('autopilot', { action: 'autopilot', mode, enabled })
+
+  // Cadangan selama halaman terbuka: picu desk saat sinyal muncul (binary) atau
+  // tiap menit (investasi; server yang memutuskan sudah waktunya atau belum).
+  // Kunci jeda di server mencegah sidang ganda dengan cron.
+  const lastAutoAt = useRef(0)
+  useEffect(() => {
+    if (!autopilot || mode !== 'binary' || busy !== null || freshSetups.length === 0) return
+    if (Date.now() - lastAutoAt.current < 60_000) return
+    lastAutoAt.current = Date.now()
+    const t = setTimeout(() => void runDesk(true), 0)
+    return () => clearTimeout(t)
+  }, [autopilot, mode, busy, freshSetups, runDesk])
+  useEffect(() => {
+    if (!autopilot || mode === 'binary') return
+    const first = setTimeout(() => void runDesk(true), 0)
+    const id = setInterval(() => {
+      if (document.visibilityState === 'visible') void runDesk(true)
+    }, 60_000)
+    return () => {
+      clearTimeout(first)
+      clearInterval(id)
+    }
+  }, [autopilot, mode, runDesk])
 
   const autopilotLabel =
     mode === 'binary'
@@ -504,8 +533,8 @@ export function SimulatorClient({ instruments }: { instruments: SimInstrumentOpt
             {autopilot && (
               <div className={s.notice}>
                 {mode === 'binary'
-                  ? `Autopilot aktif di server — tetap jalan walau halaman ini ditutup. Pasar dipindai tiap beberapa menit tanpa AI; desk hanya bersidang (1 jatah AI) saat sinyal teruji muncul${freshSetups.length ? ` — sekarang: ${freshSetups.map((x) => displaySymbol(x.symbol)).join(', ')}` : ' — sekarang belum ada'}.`
-                  : 'Autopilot aktif di server — tetap jalan walau halaman ini ditutup. Tiap sidang memakai satu jatah AI harian.'}
+                  ? `Autopilot aktif. Selama halaman ini terbuka pasar dipindai tiap 30 detik; saat ditutup, server (cron) yang melanjutkan. Desk hanya bersidang (1 jatah AI) saat sinyal teruji muncul${freshSetups.length ? ` — sekarang: ${freshSetups.map((x) => displaySymbol(x.symbol)).join(', ')}` : ' — sekarang belum ada'}.`
+                  : 'Autopilot aktif. Selama halaman ini terbuka desk dipicu dari sini; saat ditutup, server (cron) yang melanjutkan. Tiap sidang memakai satu jatah AI harian.'}
               </div>
             )}
             {lastRun ? <DeskRunView run={lastRun} /> : <div className={s.empty}>Belum ada sidang desk di mode ini. Tekan 🤖 Desk AI.</div>}
