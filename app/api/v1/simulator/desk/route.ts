@@ -54,6 +54,18 @@ export async function POST(req: Request) {
     }
   }
 
+  // Binary dieksekusi langsung dari playbook tanpa model, jadi tidak memakai
+  // (dan tidak boleh terhalang) jatah AI.
+  if (mode === 'binary') {
+    try {
+      const result = await runDesk(access.ownerKey, mode)
+      const state = await getSimState(access.ownerKey, mode)
+      return NextResponse.json({ data: { result, state } }, { headers: NO_STORE })
+    } catch (err) {
+      return failure('simulator desk', err)
+    }
+  }
+
   // Admin memakai jatah terjadwal: ia pemilik kunci, dan pengujiannya tidak
   // boleh terkunci oleh ramainya lalu lintas publik hari itu.
   const channel: SpendChannel = access.isAdmin ? 'scheduled' : 'public'

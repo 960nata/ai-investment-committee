@@ -78,6 +78,14 @@ export async function runAutopilotTick(deadline: number): Promise<TickEntry[]> {
         continue
       }
 
+      if (mode === 'binary') {
+        // Playbook tanpa model: tidak menyentuh jatah AI.
+        const result = await runDesk(account.ownerKey, mode)
+        const opened = result.executed.filter((e) => e.ok).length
+        entry('desk', `${opened} posisi dibuka — ${result.decision?.summary ?? ''}`.slice(0, 300))
+        continue
+      }
+
       const channel: SpendChannel = access.isAdmin ? 'scheduled' : 'public'
       const budgetOptions = { userId: access.userId ?? undefined, perUserLimit: access.askPerDay ?? undefined }
       const budget = await reserveLlmBudget(channel, budgetOptions)

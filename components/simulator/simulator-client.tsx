@@ -533,7 +533,7 @@ export function SimulatorClient({ instruments }: { instruments: SimInstrumentOpt
             {autopilot && (
               <div className={s.notice}>
                 {mode === 'binary'
-                  ? `Autopilot aktif. Selama halaman ini terbuka pasar dipindai tiap 30 detik; saat ditutup, server (cron) yang melanjutkan. Desk hanya bersidang (1 jatah AI) saat sinyal teruji muncul${freshSetups.length ? ` — sekarang: ${freshSetups.map((x) => displaySymbol(x.symbol)).join(', ')}` : ' — sekarang belum ada'}.`
+                  ? `Autopilot aktif. Selama halaman ini terbuka pasar dipindai tiap 30 detik; saat ditutup, server (cron) yang melanjutkan. Saat sinyal teruji muncul, posisi langsung dibuka sesuai playbook (tanpa jatah AI)${freshSetups.length ? ` — sekarang: ${freshSetups.map((x) => displaySymbol(x.symbol)).join(', ')}` : ' — sekarang belum ada'}.`
                   : 'Autopilot aktif. Selama halaman ini terbuka desk dipicu dari sini; saat ditutup, server (cron) yang melanjutkan. Tiap sidang memakai satu jatah AI harian.'}
               </div>
             )}

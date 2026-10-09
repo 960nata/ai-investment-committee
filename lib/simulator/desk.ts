@@ -566,6 +566,38 @@ async function execute(
   return results
 }
 
+/**
+ * Putusan binary dari playbook: setiap setup diambil kecuali bandar berlawanan
+ * arah setup ≥ 50 — satu-satunya veto sah. Skor radar momentum sengaja
+ * diabaikan: ia selalu tampak berlawanan dengan setup pantulan.
+ */
+function playbookDecision(setups: PlaybookSetup[], signals: SignalReport[]): DeskDecision {
+  const actions: DeskDecision['actions'] = []
+  const vetoed: string[] = []
+  for (const setup of setups) {
+    const sig = signals.find((x) => x.symbol === setup.symbol)
+    const opposing = sig ? (setup.direction === 'up' ? -sig.bandar.score : sig.bandar.score) : 0
+    if (opposing >= 50) {
+      vetoed.push(`${setup.symbol} (bandar berlawanan ${opposing})`)
+      continue
+    }
+    actions.push({
+      type: 'open',
+      symbol: setup.symbol,
+      market: 'CRYPTO',
+      direction: setup.direction,
+      stake_pct: 2,
+      expiry_seconds: PLAYBOOK.expirySeconds,
+      reason: 'Setup teruji tanpa veto sah — dieksekusi otomatis.',
+    })
+  }
+  const parts = [
+    actions.length > 0 ? `Setup teruji diambil: ${actions.map((a) => `${a.symbol} ${a.direction}`).join(', ')}.` : 'Tidak ada setup yang diambil.',
+    vetoed.length > 0 ? `Veto: ${vetoed.join(', ')}.` : '',
+  ]
+  return { summary: parts.filter(Boolean).join(' '), confidence: actions.length > 0 ? Math.round(PLAYBOOK.backtestWinRate) : 0, actions }
+}
+
 // ---------------------------------------------------------------------------
 // Pintu masuk
 // ---------------------------------------------------------------------------
@@ -617,23 +649,24 @@ export async function runDesk(ownerKey: string, mode: SimMode): Promise<DeskResu
       })
       return { runId, turns: [], signals, decision: { summary: skip, confidence: 0, actions: [] }, executed: [] }
     }
+
+    // Binary tidak bersidang AI. Putusannya sudah pasti dari playbook (setup
+    // tanpa veto sah selalu diambil), sementara sidang empat giliran memakan
+    // sampai 48 detik dari setup yang hanya hidup semenit — dan bila penyedia
+    // AI sibuk atau fungsi kehabisan waktu, setup itu hilang tanpa trade.
+    const decision = playbookDecision(setups, signals)
+    const runId = await recordDeskRun({ accountId: account.id, status: 'done', turns: [], signals, decision })
+    const executed = decision.actions.length > 0 ? await execute(ownerKey, mode, decision, signals, state, runId, setups) : []
+    if (executed.length > 0) await updateDeskRunExecuted(runId, executed)
+    return { runId, turns: [], signals, decision, executed }
   }
 
-  const record = mode === 'binary' ? playbookRecord(state.closed) : null
   const facts = [
     'FAKTA (satu-satunya sumber angka):',
     `Waktu server: ${new Date().toISOString()}`,
     '',
     '## DOMPET',
     portfolioBlock(state),
-    ...(mode === 'binary'
-      ? [
-          '',
-          '## SETUP AKTIF (playbook teruji)',
-          ...setups.map((x) => `${x.symbol}: ${x.direction} — ${x.reason}; volume relatif ${x.relVolume ?? '-'}x`),
-          `Rekam jejak nyata playbook di dompet ini: ${record?.trades ? `${record.wins}/${record.trades} menang (${record.winRate?.toFixed(0)}%)` : 'belum ada'}.`,
-        ]
-      : []),
     '',
     '## RADAR',
     ...signals.map(signalToPrompt),
@@ -691,34 +724,6 @@ export async function runDesk(ownerKey: string, mode: SimMode): Promise<DeskResu
   })
 
   const executed = decision ? await execute(ownerKey, mode, decision, signals, state, runId, setups) : []
-
-  // Binary: setup teruji tanpa veto sah tetap diambil. Model cenderung menolak
-  // setup pantulan karena momentum tampak berlawanan — padahal justru itu
-  // syaratnya — dan penolakan semacam itu membuang satu-satunya keunggulan
-  // yang terukur.
-  if (mode === 'binary') {
-    const taken = new Set(executed.filter((e) => e.ok).map((e) => String(e.action.symbol ?? '').toUpperCase().replace(/^CRYPTO:/, '')))
-    const auto: DeskDecision = { summary: decision?.summary ?? '', confidence: 0, actions: [] }
-    for (const setup of setups) {
-      if (taken.has(setup.symbol)) continue
-      const sig = signals.find((x) => x.symbol === setup.symbol)
-      const opposing = sig ? (setup.direction === 'up' ? -sig.bandar.score : sig.bandar.score) : 0
-      if (opposing >= 50) continue
-      auto.actions.push({
-        type: 'open',
-        symbol: setup.symbol,
-        market: 'CRYPTO',
-        direction: setup.direction,
-        stake_pct: 2,
-        expiry_seconds: PLAYBOOK.expirySeconds,
-        reason: 'Setup teruji tanpa veto sah — dieksekusi otomatis dengan stake minimum.',
-      })
-    }
-    if (auto.actions.length > 0) {
-      const after = await getSimState(ownerKey, mode)
-      executed.push(...(await execute(ownerKey, mode, auto, signals, after, runId, setups)))
-    }
-  }
   if (executed.length > 0) await updateDeskRunExecuted(runId, executed)
 
   return { runId, turns, signals, decision, executed }
