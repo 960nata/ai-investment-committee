@@ -50,7 +50,16 @@ export interface VoteTally {
 export interface VoteResult {
   attendance: Attendance[]
   tallies: VoteTally[]
+  /** Penyedia sehat yang tidak diundang supaya voting tidak menguras kuota. */
+  notInvited?: string[]
 }
+
+/**
+ * Anggota voting paling banyak segini. Lima suara dari lima keluarga model
+ * sudah cukup untuk melihat arah; mengundang sepuluh menggandakan biaya tanpa
+ * mengubah hasil.
+ */
+export const MAX_VOTERS = 5
 
 const CHOICES: readonly VoteChoice[] = ['setuju', 'tolak', 'abstain']
 
@@ -120,8 +129,17 @@ const SYSTEM = [
  */
 export async function holdVote(proposals: NewProposal[], context: string): Promise<VoteResult> {
   const status = await llmStatus().catch(() => [])
-  const members = LLM_ADAPTERS.filter((a) => status.some((s) => s.id === a.id))
-  const ids = members.map((m) => m.id)
+  const configured = LLM_ADAPTERS.filter((a) => status.some((s) => s.id === a.id))
+  const ids = configured.map((m) => m.id)
+  const ready = (id: string) => status.find((s) => s.id === id)?.available ?? 0
+  // Yang kuncinya habis tetap tercatat absen (bukan disembunyikan); dari yang
+  // siap, diundang yang kolamnya paling longgar.
+  const invited = configured
+    .filter((a) => ready(a.id) > 0)
+    .sort((a, b) => ready(b.id) - ready(a.id))
+    .slice(0, MAX_VOTERS)
+  const members = [...invited, ...configured.filter((a) => ready(a.id) === 0)]
+  const notInvited = configured.filter((a) => ready(a.id) > 0 && !invited.includes(a)).map((a) => a.id)
   const list = proposals
     .map(
       (p, i) =>
@@ -163,7 +181,7 @@ export async function holdVote(proposals: NewProposal[], context: string): Promi
     }),
   )
 
-  return { attendance, tallies: tally(proposals.length, ballots) }
+  return { attendance, tallies: tally(proposals.length, ballots), notInvited }
 }
 
 /** Ringkasan voting untuk dibaca ketua rapat. */

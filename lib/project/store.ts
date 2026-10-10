@@ -195,6 +195,28 @@ export async function scheduledReportExists(period: ReportPeriod, periodStart: D
   return !!row?.exists
 }
 
+/** Rapat dadakan yang sudah digelar hari ini (WIB). */
+export async function countManualReportsToday(): Promise<number> {
+  await ensureProjectTables()
+  const [r] = await db.execute<{ n: number }>(sql`
+    SELECT COUNT(*)::int AS n FROM project_report
+    WHERE trigger = 'manual'
+      AND (created_at AT TIME ZONE 'Asia/Jakarta')::date = (NOW() AT TIME ZONE 'Asia/Jakarta')::date
+  `)
+  return Number(r?.n ?? 0)
+}
+
+/** Laporan terjadwal terakhir periode ini tidak berisi masalah apa pun. */
+export async function previousScheduledWasQuiet(period: ReportPeriod): Promise<boolean> {
+  await ensureProjectTables()
+  const [r] = await db.execute<{ quiet: boolean }>(sql`
+    SELECT jsonb_array_length(issues) = 0 AS quiet FROM project_report
+    WHERE period = ${period} AND trigger = 'jadwal'
+    ORDER BY period_start DESC LIMIT 1
+  `)
+  return !!r?.quiet
+}
+
 export async function listReports(period: ReportPeriod | null, limit = 30): Promise<ProjectReportRow[]> {
   await ensureProjectTables()
   const rows = await db.execute<ReportDbRow>(sql`

@@ -71,7 +71,118 @@ function connect(): Database {
     connection: { statement_timeout: STATEMENT_TIMEOUT_MS },
   })
 
+  guardClient(client)
   return drizzle(client, { schema })
+}
+
+/**
+ * Batas waktu di sisi KLIEN, di atas `statement_timeout` di sisi server.
+ *
+ * `statement_timeout` hanya menghentikan kueri yang sedang dikerjakan Postgres.
+ * Macet yang tercatat di proyek ini bukan itu: pooler transaksi Supabase
+ * sesekali diam di tengah protokol, Postgres tidak sedang mengerjakan apa pun
+ * (`pg_stat_activity` kosong), dan janji kuerinya tidak pernah selesai — job
+ * menggantung sampai function dibunuh, halaman admin berputar tanpa ujung.
+ *
+ * Bila sebuah kueri belum selesai setelah CLIENT_TIMEOUT_MS, klien itu
+ * dianggap rusak: ia ditutup (`end` menggagalkan semua kueri yang tergantung di
+ * sana, jadi tidak ada yang menunggu selamanya) dan kueri berikutnya membuka
+ * klien baru. Kueri BACA dicoba sekali lagi di klien baru; kueri tulis tidak,
+ * karena INSERT yang ternyata sudah sampai akan tertulis dua kali.
+ */
+const CLIENT_TIMEOUT_MS = 16_000
+
+export class QueryTimeoutError extends Error {
+  constructor(ms: number) {
+    super(`Kueri tidak dijawab basis data dalam ${ms / 1000} detik; koneksi diganti.`)
+    this.name = 'QueryTimeoutError'
+  }
+}
+
+/** Hanya kueri yang pasti tidak mengubah data yang aman diulang. */
+export function isReadOnlyQuery(text: string): boolean {
+  const q = text.trim().replace(/^\(+/, '').toLowerCase()
+  if (!(q.startsWith('select') || q.startsWith('with'))) return false
+  return !/\b(insert|update|delete|merge|alter|create|drop|truncate)\b/.test(q)
+}
+
+type Client = ReturnType<typeof postgres>
+const poisoned = new WeakSet<Client>()
+
+function guardClient(client: Client): void {
+  const rawUnsafe = client.unsafe.bind(client)
+
+  client.unsafe = ((query: string, params?: unknown[], options?: unknown) => {
+    const pending = rawUnsafe(query, params as never, options as never)
+    let asValues = false
+    const rawValues = pending.values.bind(pending)
+    pending.values = (() => {
+      asValues = true
+      rawValues()
+      return pending
+    }) as unknown as typeof pending.values
+
+    // Timer dipasang saat kueri dibuat dan dilepas saat jawabannya diterima.
+    // `then` dibungkus, bukan dipanggil di sini: memanggilnya lebih awal akan
+    // menjalankan kueri sebelum Drizzle sempat meminta mode `.values()`.
+    let timedOut = false
+    const timer = setTimeout(() => {
+      timedOut = true
+      discard(client)
+    }, CLIENT_TIMEOUT_MS)
+    timer.unref?.()
+
+    const rawThen = pending.then.bind(pending)
+    pending.then = ((onFulfilled?: (v: unknown) => unknown, onRejected?: (e: unknown) => unknown) =>
+      rawThen(
+        (value: unknown) => {
+          clearTimeout(timer)
+          return onFulfilled ? onFulfilled(value) : value
+        },
+        async (error: unknown) => {
+          clearTimeout(timer)
+          if (timedOut) {
+            if (isReadOnlyQuery(query)) {
+              console.warn('[DB] kueri baca macet, dicoba ulang di koneksi baru')
+              try {
+                const fresh = freshClient().unsafe(query, params as never, options as never)
+                const value = await (asValues ? fresh.values() : fresh)
+                return onFulfilled ? onFulfilled(value) : value
+              } catch (retryError) {
+                if (onRejected) return onRejected(retryError)
+                throw retryError
+              }
+            }
+            error = new QueryTimeoutError(CLIENT_TIMEOUT_MS)
+          }
+          if (onRejected) return onRejected(error)
+          throw error
+        },
+      )) as typeof pending.then
+
+    return pending
+  }) as typeof client.unsafe
+}
+
+/** Lepaskan klien yang macet: kueri berikutnya membuka klien baru. */
+function discard(client: Client): void {
+  if (poisoned.has(client)) return
+  poisoned.add(client)
+  console.warn('[DB] pooler tidak menjawab; klien ditutup dan diganti')
+  if (isProduction ? globalThis.__pgDb?.$client === client : moduleDb?.$client === client) {
+    if (isProduction) globalThis.__pgDb = undefined
+    else moduleDb = undefined
+  }
+  // `end` menolak semua kueri yang masih tergantung di klien ini.
+  client.end({ timeout: 1 }).catch(() => undefined)
+}
+
+function currentInstance(): Database {
+  return isProduction ? (globalThis.__pgDb ??= connect()) : (moduleDb ??= connect())
+}
+
+function freshClient(): Client {
+  return currentInstance().$client as Client
 }
 
 /**
@@ -102,7 +213,7 @@ let moduleDb: Database | undefined
 
 export const db = new Proxy({} as Database, {
   get(_target, property) {
-    const instance = isProduction ? (globalThis.__pgDb ??= connect()) : (moduleDb ??= connect())
+    const instance = currentInstance()
     const value = Reflect.get(instance, property)
     // Metode diikat ke instance aslinya; kalau `this` menunjuk ke proxy,
     // Drizzle kehilangan state internalnya.

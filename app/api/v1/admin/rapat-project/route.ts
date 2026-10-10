@@ -42,6 +42,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `Pagu harian sudah habis (${budget.used}/${budget.ceiling}).` }, { status: 429, headers: NO_STORE })
     }
     const result = await runProjectMeeting(body.period as ReportPeriod, 'manual')
+    if (result.limited) {
+      await refundLlmBudget('scheduled')
+      return NextResponse.json({ error: `Ditolak: ${result.skipped}. Coba lagi besok.` }, { status: 429, headers: NO_STORE })
+    }
     if (result.status === 'tanpa-rapat') await refundLlmBudget('scheduled')
     return NextResponse.json(result, { headers: NO_STORE })
   } catch (err) {

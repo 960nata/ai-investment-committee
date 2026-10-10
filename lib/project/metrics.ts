@@ -64,7 +64,8 @@ export interface ProjectMetrics {
     gagalPerJob: { job: string; gagal: number; galat: string | null }[]
   }>
   data: Section<{
-    asetBasi: { pasar: string; basi: number; total: number; batasHari: number }[]
+    /** `basi`: pernah terisi tapi tertinggal. `belumTerisi`: belum punya candle sama sekali (baru ditambahkan bila `baru`). */
+    asetBasi: { pasar: string; basi: number; total: number; batasHari: number; belumTerisi: number; belumTerisiLama: number }[]
     sumberBermasalah: { sumber: string; status: string; gagalBeruntun: number; galat: string | null }[]
     karantinaBaru: number
   }>
@@ -210,9 +211,12 @@ export async function collectProjectMetrics(from: Date, to: Date): Promise<Proje
     }),
 
     section(async () => {
-      const stale = await db.execute<{ market: string; total: number; basi: number }>(sql`
+      const stale = await db.execute<{ market: string; total: number; basi: number; kosong: number; kosong_lama: number }>(sql`
         SELECT i.market::text AS market, COUNT(*)::int AS total,
-               COUNT(*) FILTER (WHERE last.d IS NULL OR last.d < (NOW() AT TIME ZONE 'UTC')::date - (
+               COUNT(*) FILTER (WHERE last.d IS NULL)::int AS kosong,
+               -- Instrumen baru wajar belum punya candle sampai ingest berikutnya.
+               COUNT(*) FILTER (WHERE last.d IS NULL AND i.created_at < NOW() - INTERVAL '3 days')::int AS kosong_lama,
+               COUNT(*) FILTER (WHERE last.d IS NOT NULL AND last.d < (NOW() AT TIME ZONE 'UTC')::date - (
                  CASE i.market::text WHEN 'crypto' THEN ${STALE_LIMIT_DAYS.CRYPTO}::int ELSE ${STALE_LIMIT_DAYS.IDX}::int END
                ))::int AS basi
         FROM instrument i
@@ -234,6 +238,8 @@ export async function collectProjectMetrics(from: Date, to: Date): Promise<Proje
           basi: n(s.basi),
           total: n(s.total),
           batasHari: s.market === 'crypto' ? STALE_LIMIT_DAYS.CRYPTO : STALE_LIMIT_DAYS.IDX,
+          belumTerisi: n(s.kosong),
+          belumTerisiLama: n(s.kosong_lama),
         })),
         sumberBermasalah: sources.map((s) => ({ sumber: s.sumber, status: s.status, gagalBeruntun: n(s.gagal), galat: s.galat })),
         karantinaBaru: n(q?.n),
@@ -317,11 +323,17 @@ export function detectIssues(m: ProjectMetrics): ProjectIssue[] {
   if (!isMissing(m.data)) {
     for (const a of m.data.asetBasi) {
       if (a.total === 0) continue
-      const share = a.basi / a.total
+      if (a.belumTerisiLama > 0) {
+        push(`data-kosong:${a.pasar}`, 'perhatian', `${a.belumTerisiLama} aset ${a.pasar} belum pernah terisi`, `Sudah lebih dari 3 hari di katalog tanpa satu candle pun — simbolnya mungkin salah atau tidak dikenal sumber data.`)
+      }
+      // Yang belum pernah terisi tidak dihitung basi: aset baru menunggu ingest berikutnya.
+      const filled = a.total - a.belumTerisi
+      if (filled === 0) continue
+      const share = a.basi / filled
       if (share >= 0.5) {
-        push(`data-basi:${a.pasar}`, 'mendesak', `Harga ${a.pasar} basi`, `${a.basi} dari ${a.total} aset belum diperbarui lebih dari ${a.batasHari} hari; komite akan abstain untuk aset itu.`)
+        push(`data-basi:${a.pasar}`, 'mendesak', `Harga ${a.pasar} basi`, `${a.basi} dari ${filled} aset belum diperbarui lebih dari ${a.batasHari} hari; komite akan abstain untuk aset itu.`)
       } else if (share >= 0.2) {
-        push(`data-basi:${a.pasar}`, 'perhatian', `Sebagian harga ${a.pasar} basi`, `${a.basi} dari ${a.total} aset melewati ${a.batasHari} hari.`)
+        push(`data-basi:${a.pasar}`, 'perhatian', `Sebagian harga ${a.pasar} basi`, `${a.basi} dari ${filled} aset melewati ${a.batasHari} hari.`)
       }
     }
     for (const s of m.data.sumberBermasalah) {

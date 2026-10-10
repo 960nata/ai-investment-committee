@@ -30,6 +30,8 @@ import { applyResearch, backlogForPrompt, listProposals, parseResearch, type App
 import { holdVote, voteSummaryForPrompt, type VoteResult } from './voting'
 import {
   MANUAL_PERIOD_DAYS,
+  countManualReportsToday,
+  previousScheduledWasQuiet,
   saveReport,
   scheduledReportExists,
   type MeetingMinute,
@@ -181,7 +183,7 @@ function dataBlock(
   period: ReportPeriod,
   metrics: ProjectMetrics,
   issues: ProjectIssue[],
-  deep: DeepDive,
+  deep: DeepDive | null,
   backlog: Proposal[],
 ): string {
   return [
@@ -191,9 +193,11 @@ function dataBlock(
     issues.length
       ? `TEMUAN OTOMATIS (dari ambang tetap, bukan model):\n${issues.map((i) => `- [${i.severity}] ${i.title}: ${i.detail}`).join('\n')}`
       : 'TEMUAN OTOMATIS: tidak ada.',
-    `DATA GALIAN (penyebab, perilaku pengunjung, pemakaian fitur, integrasi terpasang):\n${JSON.stringify(deep)}`,
-    backlogForPrompt(backlog),
-  ].join('\n\n')
+    deep ? `DATA GALIAN (penyebab, perilaku pengunjung, pemakaian fitur, integrasi terpasang):\n${JSON.stringify(deep)}` : '',
+    deep ? backlogForPrompt(backlog) : '',
+  ]
+    .filter(Boolean)
+    .join('\n\n')
 }
 
 async function speak(
@@ -248,6 +252,16 @@ export interface MeetingResult {
   skipped?: string
   status?: 'selesai' | 'tanpa-rapat'
   proposals?: ApplyResult
+  /** Rapat harian dilewati karena tidak ada masalah dua hari berturut-turut. */
+  quiet?: boolean
+  /** Ditolak karena batas rapat dadakan harian tercapai. */
+  limited?: boolean
+}
+
+/** Batas rapat dadakan per hari (WIB). Rapat terjadwal tidak dihitung. */
+export function manualDailyLimit(): number {
+  const raw = Number(process.env.PROJECT_MEETING_MANUAL_LIMIT)
+  return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 6
 }
 
 export async function runProjectMeeting(
@@ -259,14 +273,45 @@ export async function runProjectMeeting(
   if (trigger === 'jadwal' && (await scheduledReportExists(period, window.from))) {
     return { reportId: null, skipped: `laporan ${period} untuk periode ini sudah ada` }
   }
+  if (trigger === 'manual') {
+    const used = await countManualReportsToday()
+    if (used >= manualDailyLimit()) {
+      return { reportId: null, skipped: `batas ${manualDailyLimit()} rapat dadakan per hari sudah tercapai`, limited: true }
+    }
+  }
+
+  // Rapat harian terjadwal versi ringan: pelapor dan ketua saja, tanpa data
+  // galian, peneliti, pengkritik, atau voting. Penggalian dan usulan cukup
+  // mingguan ke atas — harian yang dibutuhkan hanyalah "ada apa kemarin".
+  const light = trigger === 'jadwal' && period === 'harian'
 
   // Berurutan, bukan Promise.all: tiap pengumpul sudah menjalankan kuerinya
   // paralel, dan gabungannya melebihi kolam koneksi — antrean di pooler
   // transaksi Supabase bisa macet tanpa ujung (lihat lib/db/client.ts).
   const metrics = await collectProjectMetrics(window.from, window.to)
-  const deep = await collectDeepDive(window.from, window.to)
-  const backlog = await listProposals(null, 60).catch(() => [] as Proposal[])
+  const deep = light ? null : await collectDeepDive(window.from, window.to)
+  const backlog = light ? [] : await listProposals(null, 60).catch(() => [] as Proposal[])
   const issues = detectIssues(metrics)
+
+  // Hari tenang berturut-turut tidak perlu rapat: laporannya tetap tersimpan
+  // berisi angka, tapi tidak ada satu pun panggilan model.
+  if (light && issues.length === 0 && (await previousScheduledWasQuiet(period))) {
+    const reportId = await saveReport({
+      period,
+      trigger,
+      periodStart: window.from.toISOString(),
+      periodEnd: window.to.toISOString(),
+      status: 'tanpa-rapat',
+      metrics: metrics as unknown as Record<string, unknown>,
+      issues,
+      minutes: [],
+      actionItems: [],
+      note: 'Tidak ada masalah hari ini maupun kemarin; rapat dilewati untuk menghemat kuota AI.',
+      votes: null,
+    })
+    return { reportId, status: 'tanpa-rapat', quiet: true }
+  }
+
   const data = dataBlock(period, metrics, issues, deep, backlog)
 
   const minutes: MeetingMinute[] = []
@@ -278,7 +323,7 @@ export async function runProjectMeeting(
 
   let votes: VoteResult | null = null
 
-  for (const role of [PELAPOR, PENELITI, PENGKRITIK, KETUA_RAPAT]) {
+  for (const role of light ? [PELAPOR, KETUA_RAPAT] : [PELAPOR, PENELITI, PENGKRITIK, KETUA_RAPAT]) {
     // Voting digelar tepat sebelum ketua bicara, supaya ketua menimbang suara
     // seluruh anggota — bukan hanya tiga rekan semejanya.
     let extra: MeetingMinute[] = []

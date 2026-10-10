@@ -71,8 +71,15 @@ class AdapterRegistry {
     const errors: { adapterId: string; error: string }[] = [];
 
     for (const state of candidates) {
-      // Skip adapters in cooldown
-      if (state.cooldownUntil && state.cooldownUntil > now) {
+      // Lewati adaptor yang sedang didinginkan — kecuali tidak ada yang lain.
+      // Untuk pasar yang hanya punya satu sumber (Yahoo untuk IDX/US/GLOBAL),
+      // pendinginan tidak melindungi apa pun: ia hanya memastikan setiap simbol
+      // sisa batch gagal tanpa dicoba, dan satu gangguan sesaat menjadi ratusan
+      // aset basi.
+      const othersAvailable = candidates.some(
+        (other) => other !== state && !(other.cooldownUntil && other.cooldownUntil > now),
+      );
+      if (state.cooldownUntil && state.cooldownUntil > now && othersAvailable) {
         continue;
       }
 

@@ -9,6 +9,7 @@
 
 import { sql } from 'drizzle-orm'
 import { db } from './client'
+import { cache } from '@/lib/cache/redis'
 import { clickLog, visitLog, type NewClickLog, type NewVisitLog } from './schema'
 
 /**
@@ -668,4 +669,45 @@ export async function getVisitAnalytics(
     heatPath,
     clickDots: dots.map((d) => ({ x: n(d.x), y: n(d.y), weight: n(d.weight) })),
   }
+}
+
+/** Pengunjung aktif saat ini — selalu dihitung segar, tidak pernah dari cache. */
+export async function getVisitLive(): Promise<VisitAnalytics['live']> {
+  await ensureVisitTable()
+  const [counts] = await db.execute<{ last5: number; last30: number }>(sql`
+    SELECT
+      COUNT(DISTINCT visitor_hash) FILTER (WHERE created_at >= NOW() - INTERVAL '5 minutes')::int AS last5,
+      COUNT(DISTINCT visitor_hash)::int AS last30
+    FROM visit_log
+    WHERE created_at >= NOW() - INTERVAL '30 minutes' AND ${PUBLIC_ONLY}
+  `)
+  const pages = await db.execute<{ label: string; views: number; visitors: number }>(sql`
+    SELECT path AS label, COUNT(*)::int AS views, COUNT(DISTINCT visitor_hash)::int AS visitors
+    FROM visit_log
+    WHERE created_at >= NOW() - INTERVAL '30 minutes' AND ${PUBLIC_ONLY}
+    GROUP BY path ORDER BY views DESC LIMIT 6
+  `)
+  return {
+    last5: n(counts?.last5),
+    last30: n(counts?.last30),
+    pagesNow: pages.map((r) => ({ label: r.label, views: n(r.views), visitors: n(r.visitors) })),
+  }
+}
+
+/**
+ * Laporan trafik lewat cache Redis.
+ *
+ * Laporan setahun memindai seluruh catatan kunjungan dan pooler sesekali
+ * lambat; membuka halaman yang sama berkali-kali tidak perlu menghitungnya
+ * ulang. Masa simpan mengikuti panjang rentang — angka sehari bergerak cepat,
+ * angka setahun tidak. Pengunjung aktif dihitung segar di setiap pembukaan.
+ * Tanpa Redis, perilakunya sama dengan `getVisitAnalytics`.
+ */
+export async function getVisitAnalyticsCached(window: VisitWindow = '7d', heatPathWanted?: string): Promise<VisitAnalytics> {
+  const days = VISIT_WINDOWS[window]
+  const ttl = days <= 7 ? 60 : days <= 90 ? 300 : 900
+  const key = `analytics:visits:v1:${window}:${encodeURIComponent(heatPathWanted ?? '')}`
+  const report = await cache.getOrSet(key, () => getVisitAnalytics(window, heatPathWanted), ttl)
+  const live = await getVisitLive().catch(() => report.live)
+  return { ...report, live }
 }

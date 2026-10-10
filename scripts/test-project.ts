@@ -13,6 +13,7 @@ import { countSources, extractSources } from '../lib/db/work-archive-queries'
 import { trendUnit } from '../lib/db/visit-queries'
 import { parseRange } from '../lib/analytics/ga4'
 import { wibDate } from '../lib/project/store'
+import { isReadOnlyQuery } from '../lib/db/client'
 
 // --- Rentang periode (WIB) -------------------------------------------------
 // Kamis 15 Oktober 2026 pukul 00.10 WIB = Rabu 14 Oktober 17.10 UTC.
@@ -42,7 +43,13 @@ const base: ProjectMetrics = {
   warta: { terbit: 0, belumLengkapTerjemahan: 0, dibaca: 0 },
   job: { total: 5, sukses: 3, sebagian: 0, gagal: 2, gagalPerJob: [{ job: 'ingest-idx-daily', gagal: 2, galat: 'HTTP 429' }] },
   data: {
-    asetBasi: [{ pasar: 'IDX', basi: 60, total: 100, batasHari: 5 }, { pasar: 'US', basi: 1, total: 100, batasHari: 5 }],
+    asetBasi: [
+      { pasar: 'IDX', basi: 60, total: 100, batasHari: 5, belumTerisi: 0, belumTerisiLama: 0 },
+      { pasar: 'US', basi: 1, total: 100, batasHari: 5, belumTerisi: 0, belumTerisiLama: 0 },
+      // Kasus 10 Oktober: ratusan aset baru belum di-ingest — bukan basi, bukan alarm.
+      { pasar: 'GLOBAL', basi: 1, total: 313, batasHari: 5, belumTerisi: 131, belumTerisiLama: 0 },
+      { pasar: 'CRYPTO', basi: 0, total: 10, batasHari: 2, belumTerisi: 3, belumTerisiLama: 3 },
+    ],
     sumberBermasalah: [{ sumber: 'yahoo', status: 'dead', gagalBeruntun: 9, galat: 'HTTP 403' }],
     karantinaBaru: 0,
   },
@@ -56,6 +63,9 @@ assert.equal(keys.get('kunci:semua-istirahat'), 'mendesak')
 assert.equal(keys.get('job-gagal:ingest-idx-daily'), 'mendesak')
 assert.equal(keys.get('data-basi:IDX'), 'mendesak')
 assert.equal(keys.has('data-basi:US'), false)
+assert.equal(keys.has('data-basi:GLOBAL'), false)
+assert.equal(keys.has('data-kosong:GLOBAL'), false)
+assert.equal(keys.get('data-kosong:CRYPTO'), 'perhatian')
 assert.equal(keys.get('sumber:yahoo'), 'mendesak')
 assert.equal(keys.get('komite:gagal-tinggi'), 'mendesak')
 assert.equal(keys.get('warta:kosong'), 'perhatian')
@@ -172,5 +182,14 @@ assert.deepEqual(
   tallies.map((t) => [t.no, t.setuju, t.tolak, t.abstain]),
   [[1, 2, 1, 0], [2, 0, 0, 0]],
 )
+
+// --- Kueri yang aman diulang setelah pooler macet -------------------------
+assert.equal(isReadOnlyQuery('select * from "instrument" where id = $1'), true)
+assert.equal(isReadOnlyQuery('  WITH w AS (SELECT 1) SELECT * FROM w'), true)
+assert.equal(isReadOnlyQuery('(select 1) union (select 2)'), true)
+assert.equal(isReadOnlyQuery('insert into job_run (job_name) values ($1)'), false)
+assert.equal(isReadOnlyQuery('WITH x AS (DELETE FROM a RETURNING *) SELECT * FROM x'), false)
+assert.equal(isReadOnlyQuery('update agent_session set status = $1'), false)
+assert.equal(isReadOnlyQuery('CREATE TABLE IF NOT EXISTS t (id int)'), false)
 
 console.log('Project meeting, monitor thresholds, macro calendar, archive, and analytics range regressions passed.')

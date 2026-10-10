@@ -56,7 +56,7 @@ import {
   type Ga4Slice,
 } from '@/lib/analytics/ga4'
 import {
-  getVisitAnalytics,
+  getVisitAnalyticsCached,
   getVisitSummary,
   parseVisitWindow,
   VISIT_WINDOWS,
@@ -124,7 +124,7 @@ export default async function AdminAnalyticsPage({ searchParams }: AnalyticsPage
   const [summaryResult, trafficResult] = await Promise.allSettled([
     getVisitSummary(visitWindow),
     // Rentang setahun ke atas memindai jauh lebih banyak baris; batasnya ikut longgar.
-    withTimeout(getVisitAnalytics(visitWindow, heat), VISIT_WINDOWS[visitWindow] > 90 ? 45_000 : 20_000),
+    withTimeout(getVisitAnalyticsCached(visitWindow, heat), VISIT_WINDOWS[visitWindow] > 90 ? 45_000 : 20_000),
   ])
   if (summaryResult.status === 'fulfilled') visits = summaryResult.value
   else visitsError = errorText(summaryResult.reason)

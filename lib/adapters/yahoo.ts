@@ -20,6 +20,19 @@ import type { PriceAdapter, Market, Candle, HealthStatus } from './types'
 import { fetchWithTimeout } from '@/lib/http/fetch'
 
 const BASE_URL = 'https://query1.finance.yahoo.com/v8/finance/chart'
+/**
+ * Host kedua dengan API yang sama. Yahoo sesekali lambat atau membalas 429 dari
+ * IP pusat data di satu host sementara host lain menjawab normal — satu
+ * percobaan ulang di sana menyelamatkan simbol yang kalau tidak ikut dihitung
+ * sebagai kegagalan beruntun dan menjatuhkan seluruh batch.
+ */
+const FALLBACK_URL = 'https://query2.finance.yahoo.com/v8/finance/chart'
+
+/** Galat yang layak dicoba ulang di host lain: lambat, sibuk, atau server galat. */
+function isTransient(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err)
+  return /timeout|aborted|HTTP (429|5\d\d)|fetch failed|ECONNRESET|socket/i.test(msg)
+}
 
 /**
  * Yahoo menolak sebagian klien tanpa User-Agent yang wajar. Nilai ini bukan
@@ -72,16 +85,23 @@ export class YahooAdapter implements PriceAdapter {
       events: 'div,split',
     })
 
-    const response = await fetchWithTimeout(
-      `${BASE_URL}/${encodeURIComponent(symbol)}?${query}`,
-      { label: 'Yahoo Finance', headers: { 'user-agent': USER_AGENT } },
-    )
-
-    if (!response.ok) {
-      throw new Error(`Yahoo Finance HTTP ${response.status} untuk ${symbol}`)
+    const load = async (base: string): Promise<YahooChart> => {
+      const response = await fetchWithTimeout(`${base}/${encodeURIComponent(symbol)}?${query}`, {
+        label: 'Yahoo Finance',
+        headers: { 'user-agent': USER_AGENT },
+      })
+      if (!response.ok) throw new Error(`Yahoo Finance HTTP ${response.status} untuk ${symbol}`)
+      return response.json()
     }
 
-    const body: YahooChart = await response.json()
+    let body: YahooChart
+    try {
+      body = await load(BASE_URL)
+    } catch (err) {
+      if (!isTransient(err)) throw err
+      await new Promise((resolve) => setTimeout(resolve, 800))
+      body = await load(FALLBACK_URL)
+    }
 
     if (body.chart.error) {
       throw new Error(`Yahoo Finance menolak ${symbol}: ${body.chart.error.description}`)

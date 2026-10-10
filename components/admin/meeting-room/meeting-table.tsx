@@ -265,6 +265,7 @@ function AttendanceStrip({ votes }: { votes: NonNullable<ProjectReportRow['votes
     <div className={styles.attendance}>
       <div className={styles.attendanceHead}>
         Daftar hadir voting · <strong>{present}</strong> hadir, <strong>{votes.attendance.length - present}</strong> absen
+        {votes.notInvited?.length ? ` · tidak diundang (hemat kuota): ${votes.notInvited.join(', ')}` : ''}
       </div>
       <div className={styles.attendanceRow}>
         {votes.attendance.map((a) => (
