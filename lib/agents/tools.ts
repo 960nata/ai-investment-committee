@@ -153,6 +153,25 @@ const POLICY_RATE: Record<string, { id: string; label: string }> = {
   CNY: { id: 'FRED:IRSTCI01CNM156N', label: 'antarbank Tiongkok' },
 }
 
+/** Imbal hasil obligasi pemerintah 10 tahun per mata uang; EUR memakai Bund Jerman. */
+const LONG_YIELD: Record<string, { id: string; label: string }> = {
+  USD: { id: 'FRED:DGS10', label: 'Treasury AS' },
+  EUR: { id: 'FRED:IRLTLT01DEM156N', label: 'Bund Jerman' },
+  JPY: { id: 'FRED:IRLTLT01JPM156N', label: 'JGB Jepang' },
+  GBP: { id: 'FRED:IRLTLT01GBM156N', label: 'Gilt Inggris' },
+  AUD: { id: 'FRED:IRLTLT01AUM156N', label: 'Australia' },
+  KRW: { id: 'FRED:IRLTLT01KRM156N', label: 'Korea Selatan' },
+  CAD: { id: 'FRED:IRLTLT01CAM156N', label: 'Kanada' },
+}
+
+/** ETF obligasi negara non-AS → imbal hasil 10 tahun negaranya. */
+const COUNTRY_YIELD: Record<string, [string, string]> = {
+  'IGLT.L': ['FRED:IRLTLT01GBM156N', 'Gilt Inggris 10 tahun'],
+  'SEGA.L': ['FRED:IRLTLT01DEM156N', 'Bund Jerman 10 tahun (patokan Euro)'],
+  'EXX6.DE': ['FRED:IRLTLT01DEM156N', 'Bund Jerman 10 tahun'],
+  '148070.KS': ['FRED:IRLTLT01KRM156N', 'Obligasi Korea 10 tahun'],
+}
+
 const YIELD_CURVE: [string, string][] = [
   ['FRED:DFF', 'Fed Funds efektif'],
   ['FRED:DGS3MO', 'Treasury 3 bulan'],
@@ -192,19 +211,24 @@ async function macroContextFor(
   if (assetClass === 'mata_uang') {
     const base = symbol.slice(0, 3)
     const quote = symbol.slice(3, 6)
-    const lines = await Promise.all(
-      [base, quote].map((c) =>
+    const lines = await Promise.all([
+      ...[base, quote].map((c) =>
         POLICY_RATE[c] ? macroLine(POLICY_RATE[c].id, `Suku bunga ${c} (${POLICY_RATE[c].label})`, asOf) : Promise.resolve(`Suku bunga ${c}: belum ada sumber`),
       ),
-    )
+      ...[base, quote]
+        .filter((c) => LONG_YIELD[c])
+        .map((c) => macroLine(LONG_YIELD[c].id, `Imbal hasil 10 tahun ${c} (${LONG_YIELD[c].label})`, asOf)),
+    ])
     return {
       title: `SELISIH SUKU BUNGA (${base} vs ${quote}; kurs naik = ${base} menguat terhadap ${quote})`,
       lines,
     }
   }
+  const local = COUNTRY_YIELD[symbol]
+  const series: [string, string][] = local ? [local, ...YIELD_CURVE] : YIELD_CURVE
   return {
-    title: 'KURVA IMBAL HASIL AS (harga obligasi bergerak berlawanan dengan imbal hasil)',
-    lines: await Promise.all(YIELD_CURVE.map(([id, label]) => macroLine(id, label, asOf))),
+    title: `${local ? 'IMBAL HASIL NEGARA & KURVA AS' : 'KURVA IMBAL HASIL AS'} (harga obligasi bergerak berlawanan dengan imbal hasil)`,
+    lines: await Promise.all(series.map(([id, label]) => macroLine(id, label, asOf))),
   }
 }
 

@@ -705,6 +705,27 @@ const OBLIGASI: CatalogueEntry[] = ([
   region,
 }))
 
+/**
+ * Obligasi pemerintah per negara, dari bursa negaranya sendiri. 2821.HK
+ * (ABF Pan Asia) memuat obligasi pemerintah Indonesia bersama tujuh negara
+ * Asia lain — paling dekat ke SBN yang tersedia gratis, riwayatnya baru
+ * sejak 2024.
+ */
+const OBLIGASI_NEGARA: CatalogueEntry[] = ([
+  ['IGLT.L', 'Gilt pemerintah Inggris', 'GBP', 'Inggris'],
+  ['SEGA.L', 'Obligasi pemerintah Kawasan Euro', 'EUR', 'Kawasan Euro'],
+  ['EXX6.DE', 'Bund Jerman 10 tahun ke atas', 'EUR', 'Jerman'],
+  ['148070.KS', 'Obligasi pemerintah Korea 10 tahun', 'KRW', 'Korea Selatan'],
+  ['2821.HK', 'Obligasi pemerintah Asia (ABF Pan Asia, termasuk Indonesia)', 'USD', 'Asia'],
+] as [string, string, string, string][]).map(([symbol, name, currency, region]) => ({
+  symbol,
+  name,
+  market: 'GLOBAL' as Market,
+  assetClass: 'obligasi' as AssetClass,
+  currency,
+  region,
+}))
+
 export const CATALOGUE: CatalogueEntry[] = [
   ...CRYPTO,
   ...MEMECOIN,
@@ -716,6 +737,7 @@ export const CATALOGUE: CatalogueEntry[] = [
   ...INDEKS,
   ...MATA_UANG,
   ...OBLIGASI,
+  ...OBLIGASI_NEGARA,
 ]
 
 export function catalogueFor(market: Market): CatalogueEntry[] {

@@ -68,6 +68,10 @@ const TOPIC_MACRO: Partial<Record<AskTopic, [string, string][]>> = {
     ['FRED:T10YIE', 'Ekspektasi inflasi 10 tahun (%)'],
     ['FRED:BAMLH0A0HYM2', 'Selisih obligasi high-yield AS (poin)'],
     ['FRED:IRSTCI01IDM156N', 'Suku bunga antarbank Indonesia (%)'],
+    ['FRED:IRLTLT01DEM156N', 'Imbal hasil Bund Jerman 10 tahun (%)'],
+    ['FRED:IRLTLT01JPM156N', 'Imbal hasil JGB Jepang 10 tahun (%)'],
+    ['FRED:IRLTLT01GBM156N', 'Imbal hasil Gilt Inggris 10 tahun (%)'],
+    ['FRED:IRLTLT01KRM156N', 'Imbal hasil obligasi Korea 10 tahun (%)'],
   ],
 }
 

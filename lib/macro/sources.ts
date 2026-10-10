@@ -57,6 +57,20 @@ export const MACRO_SERIES: MacroSeriesSpec[] = [
     ['IRSTCI01GBM156N', 'Suku bunga antarbank Inggris, bulanan'],
     ['IRSTCI01AUM156N', 'Suku bunga antarbank Australia, bulanan'],
     ['IRSTCI01CNM156N', 'Suku bunga antarbank Tiongkok, bulanan'],
+    // Imbal hasil obligasi pemerintah 10 tahun per negara (OECD), bulanan.
+    // Indonesia tidak tersedia di sini; lihat catatan di atas.
+    ...([
+      ['DE', 'Jerman'],
+      ['JP', 'Jepang'],
+      ['GB', 'Inggris'],
+      ['AU', 'Australia'],
+      ['KR', 'Korea Selatan'],
+      ['FR', 'Prancis'],
+      ['IT', 'Italia'],
+      ['CA', 'Kanada'],
+      ['MX', 'Meksiko'],
+      ['ZA', 'Afrika Selatan'],
+    ] as const).map(([c, name]) => [`IRLTLT01${c}M156N`, `Imbal hasil obligasi pemerintah ${name} 10 tahun, bulanan`] as const),
   ] as const).map(([code, label]) => ({ id: `FRED:${code}`, source: 'fred' as const, code, label, since: '2015-01-01' })),
   ...(['IDN', 'USA'] as const).flatMap((c) => [
     { id: `WB:${c}:NY.GDP.MKTP.KD.ZG`, source: 'worldbank' as const, code: 'NY.GDP.MKTP.KD.ZG', country: c, label: `Pertumbuhan PDB riil ${c}, tahunan` },
