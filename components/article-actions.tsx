@@ -262,75 +262,67 @@ export function ArticleActions({
         <span className="article-actions-note mono">AI INVESTDESK</span>
       </div>
 
+      {/* Hanya ikon: nama tiap aksi ada di tooltip dan aria-label. */}
       <div className="article-actions-rows">
-        {/* Grup Unduh Dokumen */}
-        <div className="article-actions-group">
-          <span className="article-actions-label mono">DOKUMEN:</span>
+        <div className="article-actions-group" role="group" aria-label="Dokumen">
           <div className="segmented">
             <button
               type="button"
               className="seg"
               onClick={handleDownloadMarkdown}
-              title="Unduh laporan lengkap dalam format Markdown (.md) untuk Obsidian / catatan lokal"
+              title={downloadedMd ? 'Tersimpan (.md)' : 'Unduh .MD'}
+              aria-label={downloadedMd ? 'Laporan tersimpan (.md)' : 'Unduh laporan .MD'}
             >
-              {downloadedMd ? <IconCheck size={13} style={{ color: 'var(--measured)' }} /> : <IconDownload size={13} />}
-              <span>{downloadedMd ? 'Tersimpan (.md)' : 'Unduh .MD'}</span>
+              {downloadedMd ? <IconCheck size={16} /> : <IconDownload size={16} />}
             </button>
 
             <button
               type="button"
               className="seg"
               onClick={handlePrintOrPdf}
-              title="Cetak artikel atau simpan sebagai dokumen PDF resmi"
+              title="Cetak / PDF"
+              aria-label="Cetak atau simpan sebagai PDF"
             >
-              <IconPrinter size={13} />
-              <span>Cetak / PDF</span>
+              <IconPrinter size={16} />
             </button>
           </div>
         </div>
 
-        {/* Grup Salin & Prompt AI */}
-        <div className="article-actions-group">
-          <span className="article-actions-label mono">INTEGRASI:</span>
+        <div className="article-actions-group" role="group" aria-label="Integrasi">
           <div className="segmented">
             <button
               type="button"
               className="seg"
               onClick={handleCopyPrompt}
-              title="Salin ringkasan intelijen berformat prompt LLM siap pakai"
-              style={{ color: copiedPrompt ? 'var(--brand)' : undefined }}
+              title={copiedPrompt ? 'Konteks tersalin' : 'Salin konteks AI'}
+              aria-label={copiedPrompt ? 'Konteks AI tersalin' : 'Salin konteks AI untuk LLM'}
             >
-              {copiedPrompt ? <IconCheck size={13} style={{ color: 'var(--brand)' }} /> : <IconBolt size={13} />}
-              <span>{copiedPrompt ? 'Konteks Tersalin' : 'Konteks AI'}</span>
+              {copiedPrompt ? <IconCheck size={16} /> : <IconBolt size={16} />}
             </button>
 
             <button
               type="button"
               className="seg"
               onClick={handleCopyLink}
-              title="Salin tautan resmi artikel publik"
-              style={{ color: copiedLink ? 'var(--measured)' : undefined }}
+              title={copiedLink ? 'Tautan tersalin' : 'Salin tautan'}
+              aria-label={copiedLink ? 'Tautan tersalin' : 'Salin tautan artikel'}
             >
-              {copiedLink ? <IconCheck size={13} style={{ color: 'var(--measured)' }} /> : <IconCopy size={13} />}
-              <span>{copiedLink ? 'Tautan Tersalin' : 'Salin Tautan'}</span>
+              {copiedLink ? <IconCheck size={16} /> : <IconCopy size={16} />}
             </button>
           </div>
         </div>
 
-        {/* Grup Bagikan Media Sosial */}
-        <div className="article-actions-group">
-          <span className="article-actions-label mono">BAGIKAN:</span>
+        <div className="article-actions-group" role="group" aria-label="Bagikan">
           <div className="segmented">
             {hasNativeShare && (
               <button
                 type="button"
                 className="seg"
                 onClick={handleNativeShare}
-                title="Buka menu bagikan perangkat"
-                style={{ fontWeight: 600, color: 'var(--ink)' }}
+                title="Bagikan"
+                aria-label="Buka menu bagikan perangkat"
               >
-                <IconShare size={13} />
-                <span>Bagikan</span>
+                <IconShare size={16} />
               </button>
             )}
 
@@ -339,10 +331,10 @@ export function ArticleActions({
               target="_blank"
               rel="noreferrer"
               className="seg"
-              title="Bagikan ke WhatsApp"
+              title="WhatsApp"
+              aria-label="Bagikan ke WhatsApp"
             >
-              <IconChat size={13} />
-              <span>WhatsApp</span>
+              <BrandIcon name="whatsapp" />
             </a>
 
             <a
@@ -350,9 +342,10 @@ export function ArticleActions({
               target="_blank"
               rel="noreferrer"
               className="seg"
-              title="Bagikan ke X (Twitter)"
+              title="X"
+              aria-label="Bagikan ke X"
             >
-              <span>X</span>
+              <BrandIcon name="x" />
             </a>
 
             <a
@@ -360,9 +353,10 @@ export function ArticleActions({
               target="_blank"
               rel="noreferrer"
               className="seg"
-              title="Bagikan ke Telegram"
+              title="Telegram"
+              aria-label="Bagikan ke Telegram"
             >
-              <span>Telegram</span>
+              <BrandIcon name="telegram" />
             </a>
 
             <a
@@ -370,13 +364,44 @@ export function ArticleActions({
               target="_blank"
               rel="noreferrer"
               className="seg"
-              title="Bagikan ke LinkedIn"
+              title="LinkedIn"
+              aria-label="Bagikan ke LinkedIn"
             >
-              <span>LinkedIn</span>
+              <BrandIcon name="linkedin" />
             </a>
           </div>
         </div>
       </div>
     </div>
+  )
+}
+
+/** Logo media sosial satu warna; mengikuti warna teks tombolnya. */
+function BrandIcon({ name, size = 16 }: { name: 'whatsapp' | 'x' | 'telegram' | 'linkedin'; size?: number }) {
+  const paths = {
+    whatsapp: (
+      <>
+        <path
+          d="M12 2.5a9.5 9.5 0 0 0-8.2 14.3L2.5 21.5l4.8-1.3A9.5 9.5 0 1 0 12 2.5Z"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.7"
+          strokeLinejoin="round"
+        />
+        <path d="M8.9 7.2c-.3 0-.7.1-1 .5-.4.4-1 1-1 2.4s1 2.8 1.2 3c.1.2 2 3.2 5 4.4 2.5 1 3 .8 3.5.7.6-.1 1.8-.7 2-1.4.3-.7.3-1.3.2-1.4l-.6-.4-2-1c-.3-.1-.5-.1-.7.1l-.9 1.1c-.2.2-.3.2-.6.1-.3-.1-1.2-.5-2.3-1.4-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.4.1-.6l.5-.5.3-.5v-.5l-.9-2.2c-.2-.5-.5-.5-.7-.5h-.5Z" />
+      </>
+    ),
+    x: <path d="M17.75 3h3.07l-6.7 7.66L22 21h-6.17l-4.84-6.32L5.46 21H2.39l7.17-8.2L2 3h6.33l4.37 5.78L17.75 3Zm-1.08 16.18h1.7L7.4 4.73H5.58l11.09 14.45Z" />,
+    telegram: (
+      <path d="M21.2 3.3 2.9 10.4c-1.2.5-1.2 1.2-.2 1.5l4.7 1.5 1.8 5.5c.2.6.1.9.8.9.5 0 .7-.2 1-.5l2.3-2.2 4.7 3.5c.9.5 1.5.2 1.7-.8l3.1-14.6c.3-1.3-.5-1.8-1.6-1.4ZM8.6 13.1l9.7-6.1c.5-.3.9-.1.5.2l-8.2 7.4-.3 3.4-1.7-4.9Z" />
+    ),
+    linkedin: (
+      <path d="M4.98 3.5a2.48 2.48 0 1 1 0 4.96 2.48 2.48 0 0 1 0-4.96ZM2.86 9.75h4.24V21H2.86V9.75Zm6.9 0h4.06v1.54h.06c.57-1.07 1.95-2.2 4-2.2 4.29 0 5.08 2.82 5.08 6.49V21h-4.23v-4.83c0-1.15-.02-2.63-1.6-2.63-1.61 0-1.86 1.25-1.86 2.55V21H9.76V9.75Z" />
+    ),
+  }
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
+      {paths[name]}
+    </svg>
   )
 }

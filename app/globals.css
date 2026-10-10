@@ -3991,6 +3991,20 @@ body.rail-lock {
   letter-spacing: 0.06em;
 }
 
+/* Kotak lengkap hanya berisi ikon, hitam-putih mengikuti warna teks. */
+.article-actions-box .seg {
+  justify-content: center;
+  width: 40px;
+  height: 36px;
+  padding: 0;
+  color: var(--ink-mute);
+}
+
+.article-actions-box .seg:hover,
+.article-actions-box .seg:focus-visible {
+  color: var(--ink);
+}
+
 @media (max-width: 760px) {
   .article-actions-compact {
     margin: var(--space-2) 0 var(--space-3) 0;
@@ -4025,30 +4039,12 @@ body.rail-lock {
   }
 
   .article-actions-rows {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
+    gap: 8px 10px;
   }
 
-  .article-actions-group {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 6px;
-    width: 100%;
-  }
-
-  .article-actions-group .segmented {
-    width: 100%;
-    display: flex;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .article-actions-group .seg {
-    flex: 1 1 auto;
-    justify-content: center;
-    padding: 8px 10px;
-    font-size: 11px;
+  .article-actions-box .seg {
+    width: 42px;
+    height: 40px;
   }
 }
 
