@@ -7,6 +7,7 @@
 import Link from 'next/link'
 import type { ProjectReportRow, ReportPeriod } from '@/lib/project/store'
 import { reportLead, reportTitle, WIB } from '@/components/admin/project-format'
+import { FolderShelf } from './folder-shelf'
 import styles from './meeting-room.module.css'
 
 const DRAWERS: ReportPeriod[] = ['harian', 'mingguan', 'bulanan', 'tahunan']
@@ -67,23 +68,16 @@ export function ArchiveCabinet({
         {folders.length === 0 ? (
           <p className={styles.boardEmpty}>Laci ini masih kosong.</p>
         ) : (
-          <div className={styles.folderGrid}>
-            {folders.map((r) => {
-              const urgent = r.issues.filter((i) => i.severity === 'mendesak').length
-              return (
-                <Link key={r.id} href={`/admin/rapat-project/${r.id}`} className={styles.folder}>
-                  <span className={styles.folderTab}>#{r.id}</span>
-                  <span className={styles.folderTitle}>{reportTitle(r)}</span>
-                  <span className={styles.folderLead}>{reportLead(r)}</span>
-                  <span className={styles.folderMeta}>
-                    {new Date(r.createdAt).toLocaleString('id-ID', WIB)} · {r.trigger === 'jadwal' ? 'terjadwal' : 'dadakan'}
-                    {urgent ? ` · ${urgent} mendesak` : ''}
-                    {r.status === 'tanpa-rapat' ? ' · tanpa rapat' : ''}
-                  </span>
-                </Link>
-              )
-            })}
-          </div>
+          <FolderShelf
+            folders={folders.map((r) => ({
+              id: r.id,
+              title: reportTitle(r),
+              lead: reportLead(r),
+              meta: `${new Date(r.createdAt).toLocaleString('id-ID', WIB)} · ${r.trigger === 'jadwal' ? 'terjadwal' : 'dadakan'}`,
+              urgent: r.issues.filter((i) => i.severity === 'mendesak').length,
+              noMeeting: r.status === 'tanpa-rapat',
+            }))}
+          />
         )}
       </div>
     </section>

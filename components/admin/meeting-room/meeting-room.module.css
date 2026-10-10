@@ -202,6 +202,7 @@
 .folderGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
 .folder {
   position: relative;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   gap: 5px;
@@ -213,7 +214,28 @@
   color: var(--ink);
   text-decoration: none;
 }
-.folder:hover { border-color: var(--signal); }
+.folder:hover { border-color: var(--signal); transform: translateY(-3px); }
+.folder { font: inherit; text-align: left; cursor: pointer; width: 100%; transition: transform 160ms ease, border-color 160ms ease; }
+.folder:focus-visible { outline: 2px solid var(--signal); outline-offset: 3px; }
+/* Ujung kertas surat yang menyembul dari dalam map */
+.folder::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  right: 14px;
+  width: 46%;
+  height: 10px;
+  border: 1.5px solid var(--line);
+  border-bottom: none;
+  border-radius: 2px 2px 0 0;
+  background: var(--surface-2);
+  z-index: -1;
+}
+.folderHint { margin-top: 2px; color: var(--signal); font-family: var(--mono); font-size: 10px; opacity: 0; transition: opacity 160ms ease; }
+.folder:hover .folderHint, .folder:focus-visible .folderHint { opacity: 1; }
+@media (hover: none) {
+  .folderHint { opacity: 1; }
+}
 .folderTab {
   position: absolute;
   top: -11px;

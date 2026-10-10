@@ -6,6 +6,7 @@ import { proposalsForReport, type Proposal } from '@/lib/project/proposals'
 import { isMissing, type ProjectMetrics } from '@/lib/project/metrics'
 import styles from '@/components/admin/project.module.css'
 import { reportTitle, rupiah, WIB } from '@/components/admin/project-format'
+import { ReportLetter } from '@/components/admin/meeting-room/report-letter'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Laporan Rapat Project — Admin AI Investdesk' }
@@ -33,6 +34,9 @@ export default async function ProjectReportDetail({ params }: { params: Promise<
         <h1 className="admin-page-headline">{reportTitle(report)}</h1>
       </div>
 
+      <ReportLetter report={report} />
+
+      <h2 className={styles.sectionTitle}>Berkas data rapat</h2>
       <KeyNumbers m={m} />
 
       {report.issues.length > 0 && (

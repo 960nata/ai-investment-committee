@@ -10,12 +10,26 @@ import { NextResponse } from 'next/server'
 import { verifyAdminSession, isRequestAdminAuthenticated } from '@/lib/auth/admin-auth'
 import { runProjectMeeting } from '@/lib/project/meeting'
 import { runUrgentMonitor } from '@/lib/project/monitor'
-import { REPORT_PERIODS, type ReportPeriod } from '@/lib/project/store'
+import { getReport, REPORT_PERIODS, type ReportPeriod } from '@/lib/project/store'
 import { reserveLlmBudget, refundLlmBudget } from '@/lib/http/budget'
 import { badRequest, failure, NO_STORE, unauthorized } from '@/lib/http/errors'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
+
+/** GET ?id=N — isi satu laporan, untuk surat yang dibuka dari map di lemari arsip. */
+export async function GET(request: Request) {
+  if (!((await verifyAdminSession()) || isRequestAdminAuthenticated(request))) return unauthorized()
+  const id = Number(new URL(request.url).searchParams.get('id'))
+  if (!Number.isInteger(id) || id <= 0) return badRequest('ID laporan tidak sah')
+  try {
+    const report = await getReport(id)
+    if (!report) return NextResponse.json({ error: 'Laporan tidak ditemukan' }, { status: 404, headers: NO_STORE })
+    return NextResponse.json(report, { headers: NO_STORE })
+  } catch (err) {
+    return failure('api/v1/admin/rapat-project GET', err)
+  }
+}
 
 export async function POST(request: Request) {
   if (!((await verifyAdminSession()) || isRequestAdminAuthenticated(request))) return unauthorized()
