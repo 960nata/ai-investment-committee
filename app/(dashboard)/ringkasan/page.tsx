@@ -12,24 +12,14 @@
 
 import { InstrumentExplorer } from '@/components/instrument-explorer'
 import type { Candle } from '@/components/candlestick-chart'
+import { IconDatabase } from '@/components/icons'
+import { DatabaseNotice, type State } from '@/components/ui'
 import {
-  IconCandles,
-  IconClock,
-  IconDatabase,
-  IconPlug,
-  IconQueue,
-  IconRows,
-} from '@/components/icons'
-import { DatabaseNotice, Lamp, Track, type State } from '@/components/ui'
-import {
-  describeAge,
   getCandles,
   getDashboardStats,
   listAdapterHealth,
   listInstrumentQuotes,
   listLatestScores,
-  STALE_AFTER_MINUTES,
-  type DashboardStats,
 } from '@/lib/db/queries'
 import { TAB_LAYOUT } from '@/lib/db/schema'
 import { MODEL_VERSION } from '@/lib/scoring/weights'
@@ -108,68 +98,12 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
             <div className="deck-hero-meta mono">
               <span className="deck-hero-date">{todayLabel()}</span>
 
-              {data && (
-                <>
-                  <span className="deck-hero-chip">
-                    <Lamp state={freshnessState(data.stats.freshness)} />
-                    {freshnessLabel(data.stats.freshness)}
-                  </span>
-                  <span className="deck-hero-chip">
-                    <IconQueue size={12} />
-                    antrean {data.queueConfigured ? 'terjadwal' : 'manual'}
-                  </span>
-                  <span className="deck-hero-chip">
-                    <IconDatabase size={12} />
-                    cache {data.cacheAvailable ? 'aktif' : 'nonaktif'}
-                  </span>
-                </>
-              )}
             </div>
           </div>
 
-          {/* Empat bacaan mesin. Bukan hiasan: ini yang menjawab "boleh percaya
-              angka di bawah atau tidak" sebelum satu grafik pun dibuka. */}
-          {data && (
-            <div className="deck-hero-readouts">
-              <Readout
-                icon={<IconRows size={14} />}
-                label="Instrumen aktif"
-                value={formatCount(data.stats.instrumentCount)}
-                note={`${data.tabs.length} kelas aset punya isi`}
-              />
-              <Readout
-                icon={<IconCandles size={14} />}
-                label="Candle harian"
-                value={formatCount(data.stats.candleCount)}
-                note={
-                  data.stats.latestCandleDate
-                    ? `terakhir ${data.stats.latestCandleDate}`
-                    : 'belum ada lilin tersimpan'
-                }
-              />
-              <Readout
-                icon={<IconPlug size={14} />}
-                label="Adapter data"
-                value={`${data.healthy}/${data.adapterCount}`}
-                note={data.adapterSummary}
-                track={{
-                  value: data.adapterCount > 0 ? data.healthy / data.adapterCount : null,
-                  state: data.adapterState,
-                }}
-              />
-              <Readout
-                icon={<IconClock size={14} />}
-                label="Pembaruan"
-                value={describeAge(data.stats.ageMinutes)}
-                quiet={data.stats.freshness !== 'fresh'}
-                note={
-                  data.stats.quarantinedCount > 0
-                    ? `${formatCount(data.stats.quarantinedCount)} baris dikarantina`
-                    : 'tidak ada baris dikarantina'
-                }
-              />
-            </div>
-          )}
+          {/* Bacaan mesin (instrumen, candle, adapter, pembaruan) dan chip
+              status sengaja tidak ditampilkan ke siapa pun, termasuk admin;
+              kesehatan pipeline ada di /pipeline. */}
         </div>
       </header>
 
@@ -210,38 +144,6 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
 }
 
 // ---------------------------------------------------------------------------
-
-function Readout({
-  icon,
-  label,
-  value,
-  note,
-  quiet,
-  track,
-}: {
-  icon: React.ReactNode
-  label: string
-  value: string
-  note: string
-  quiet?: boolean
-  track?: { value: number | null; state: State }
-}) {
-  return (
-    <div className="readout">
-      <div className="readout-head">
-        {icon}
-        <span className="readout-label">{label}</span>
-      </div>
-      <div className={quiet ? 'readout-value quiet' : 'readout-value'}>{value}</div>
-      {track && (
-        <div style={{ marginTop: 'var(--space-3)' }}>
-          <Track value={track.value} state={track.state} ticks={16} label={label} />
-        </div>
-      )}
-      <p className="readout-note">{note}</p>
-    </div>
-  )
-}
 
 async function load({
   symbol,
@@ -389,24 +291,6 @@ function adapterSummary(statuses: AdapterStatus[]): string {
     : `${bad} dari ${statuses.length} adapter bermasalah`
 }
 
-function freshnessState(freshness: DashboardStats['freshness']): State {
-  if (freshness === 'fresh') return 'ok'
-  if (freshness === 'stale') return 'halted'
-  return 'unknown'
-}
-
-/**
- * Data basi diberi nama terang-terangan.
- *
- * Pembaca yang tidak tahu datanya mati akan mengambil keputusan berdasarkan
- * angka mati, dan itu kegagalan produk, bukan sekadar kegagalan teknis.
- */
-function freshnessLabel(freshness: DashboardStats['freshness']): string {
-  if (freshness === 'fresh') return 'data segar'
-  if (freshness === 'stale') return `basi, lewat ${STALE_AFTER_MINUTES / 60} jam`
-  return 'belum ada data'
-}
-
 function isoDaysAgo(days: number): string {
   const d = new Date()
   d.setUTCDate(d.getUTCDate() - days)
@@ -465,7 +349,3 @@ function todayLabel(now: Date = new Date()): string {
   }).format(now)
 }
 
-/** Angka besar dengan pemisah ribuan lokal. */
-function formatCount(n: number): string {
-  return new Intl.NumberFormat('id-ID').format(n)
-}
