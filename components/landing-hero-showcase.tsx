@@ -553,7 +553,7 @@ export function LandingHeroShowcase({
                       <span className="feed-asset-sub">Bitcoin / USDT</span>
                     </div>
                     <span className="feed-verdict badge-hold">TAHAN</span>
-                    <span className="feed-conf">Keyakinan 84%</span>
+                    <span className="feed-conf">Keyakinan tinggi</span>
                   </div>
 
                   <div className="feed-row">
@@ -562,7 +562,7 @@ export function LandingHeroShowcase({
                       <span className="feed-asset-sub">Bank Central Asia</span>
                     </div>
                     <span className="feed-verdict badge-buy">POSITIF</span>
-                    <span className="feed-conf">Keyakinan 78%</span>
+                    <span className="feed-conf">Keyakinan sedang</span>
                   </div>
 
                   <div className="feed-row">
@@ -571,7 +571,7 @@ export function LandingHeroShowcase({
                       <span className="feed-asset-sub">Emas Spot Global</span>
                     </div>
                     <span className="feed-verdict badge-hold">TAHAN</span>
-                    <span className="feed-conf">Keyakinan 72%</span>
+                    <span className="feed-conf">Keyakinan sedang</span>
                   </div>
 
                   <div className="feed-row">
@@ -580,7 +580,7 @@ export function LandingHeroShowcase({
                       <span className="feed-asset-sub">Solana / USDT</span>
                     </div>
                     <span className="feed-verdict badge-avoid">RAPUH</span>
-                    <span className="feed-conf">Keyakinan 89%</span>
+                    <span className="feed-conf">Keyakinan tinggi</span>
                   </div>
                 </div>
               </div>
