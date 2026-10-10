@@ -15048,7 +15048,7 @@ body.rail-lock {
 }
 
 .lp-limits-caption {
-  max-width: 200px;
+  white-space: nowrap;
   margin: 0 0 6px;
   text-align: right;
   font-size: 14px;
