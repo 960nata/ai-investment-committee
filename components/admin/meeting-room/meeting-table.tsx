@@ -13,11 +13,12 @@
  * Kursinya ada supaya jelas siapa yang menulis "temuan otomatis".
  */
 
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import type { MeetingMinute, ProjectReportRow, ReportPeriod } from '@/lib/project/store'
+import type { ProjectReportRow, ReportPeriod } from '@/lib/project/store'
 import { IconPlay, IconRadar } from '@/components/icons'
 import styles from './meeting-room.module.css'
+import { MinuteNote, type NoteContent } from './minute-note'
 
 interface Seat {
   id: string
@@ -39,7 +40,7 @@ const SEATS: Seat[] = [
   { id: 'owner', title: 'Owner', x: 158, y: 230, rotate: -90, labelX: 158, labelY: 292, anchor: 'middle', paperX: 238, paperY: 218 },
   { id: 'pelapor', title: 'Pelapor', x: 360, y: 98, rotate: 0, labelX: 360, labelY: 22, anchor: 'middle', paperX: 343, paperY: 158 },
   { id: 'peneliti', title: 'Peneliti', x: 540, y: 98, rotate: 0, labelX: 540, labelY: 22, anchor: 'middle', paperX: 523, paperY: 158 },
-  { id: 'ketua-rapat', title: 'Ketua Rapat', x: 742, y: 230, rotate: 90, labelX: 742, labelY: 292, anchor: 'middle', paperX: 628, paperY: 218 },
+  { id: 'ketua-rapat', title: 'Ketua Rapat', x: 742, y: 230, rotate: 90, labelX: 742, labelY: 292, anchor: 'middle', paperX: 618, paperY: 218 },
   { id: 'pengkritik', title: 'Pengkritik', x: 360, y: 362, rotate: 180, labelX: 360, labelY: 416, anchor: 'middle', paperX: 343, paperY: 278 },
   { id: 'pemantau', title: 'Pemantau', x: 540, y: 362, rotate: 180, labelX: 540, labelY: 416, anchor: 'middle', paperX: 523, paperY: 278 },
 ]
@@ -75,7 +76,16 @@ export function MeetingTable({
   const [message, setMessage] = useState<{ text: string; bad?: boolean } | null>(null)
 
   const minutes = useMemo(() => new Map((report?.minutes ?? []).map((m) => [m.role, m])), [report])
-  const opened: MeetingMinute | undefined = selected ? minutes.get(selected) : undefined
+  const note: NoteContent | null = !selected
+    ? null
+    : selected === 'pemantau'
+      ? report
+        ? { kind: 'monitor', issues: report.issues }
+        : null
+      : minutes.get(selected)
+        ? { kind: 'minute', minute: minutes.get(selected)! }
+        : null
+  const closeNote = useCallback(() => setSelected(null), [])
   const meeting = busy !== null && busy !== 'pantau'
 
   async function run(payload: Record<string, string>, key: string) {
@@ -157,6 +167,9 @@ export function MeetingTable({
           const minute = minutes.get(seat.id)
           const speakIndex = SPEAK_ORDER.indexOf(seat.id)
           const isAgent = speakIndex !== -1
+          // Pemantau juga punya kertas: temuan otomatisnya pada rapat ini.
+          const hasPaper = isAgent || seat.id === 'pemantau'
+          const readable = !!minute || (seat.id === 'pemantau' && !!report)
           const filled = seat.id === 'owner' || seat.id === 'pemantau' || !!minute
           const replaced = !!minute && minute.failovers.length > 0
           const active = selected === seat.id
@@ -165,7 +178,7 @@ export function MeetingTable({
             filled ? styles.seatFilled : styles.seatEmpty,
             active ? styles.seatActive : '',
             meeting && isAgent ? styles.seatSpeaking : '',
-            minute ? styles.seatClickable : '',
+            readable ? styles.seatClickable : '',
           ].join(' ')
           const sub =
             seat.id === 'owner'
@@ -181,12 +194,12 @@ export function MeetingTable({
               key={seat.id}
               className={className}
               style={meeting && isAgent ? { animationDelay: `${speakIndex * 2.5}s` } : undefined}
-              onClick={() => minute && setSelected(active ? null : seat.id)}
-              role={minute ? 'button' : undefined}
-              tabIndex={minute ? 0 : undefined}
-              aria-label={minute ? `Notulen ${seat.title}` : undefined}
+              onClick={() => readable && setSelected(active ? null : seat.id)}
+              role={readable ? 'button' : undefined}
+              tabIndex={readable ? 0 : undefined}
+              aria-label={readable ? `Buka catatan ${seat.title}` : undefined}
               onKeyDown={(e) => {
-                if (minute && (e.key === 'Enter' || e.key === ' ')) {
+                if (readable && (e.key === 'Enter' || e.key === ' ')) {
                   e.preventDefault()
                   setSelected(active ? null : seat.id)
                 }
@@ -201,8 +214,8 @@ export function MeetingTable({
               </g>
 
               {/* Kertas notulen di depan kursi */}
-              {isAgent && (
-                <g transform={`translate(${seat.paperX} ${seat.paperY})`} className={minute ? styles.paper : styles.paperEmpty}>
+              {hasPaper && (
+                <g transform={`translate(${seat.paperX} ${seat.paperY})`} className={readable ? styles.paper : styles.paperEmpty}>
                   <rect width="34" height="24" rx="2" />
                   <line x1="6" y1="7" x2="28" y2="7" />
                   <line x1="6" y1="12" x2="28" y2="12" />
@@ -228,28 +241,10 @@ export function MeetingTable({
 
       {report?.votes && <AttendanceStrip votes={report.votes} />}
 
-      {opened ? (
-        <article className={styles.minute}>
-          <header className={styles.minuteHead}>
-            <span className={styles.minuteRole}>{opened.title.toUpperCase()}</span>
-            <span className={styles.mono}>
-              {opened.providerId}/{opened.model}
-            </span>
-            <span>{(opened.latencyMs / 1000).toFixed(1)} dtk</span>
-            <button type="button" className={styles.close} onClick={() => setSelected(null)} aria-label="Tutup notulen">
-              ×
-            </button>
-          </header>
-          {opened.failovers.length > 0 && (
-            <div className={styles.chain}>
-              DIGANTIKAN:{' '}
-              {[...opened.failovers.map((f) => `${f.providerId}${f.keyIndex >= 0 ? `#${f.keyIndex}` : ''} ${f.kind}`), opened.providerId].join(' → ')}
-            </div>
-          )}
-          <pre className={styles.minuteBody}>{prettyMinute(opened)}</pre>
-        </article>
+      {note ? (
+        <MinuteNote note={note} onClose={closeNote} />
       ) : (
-        report && !meeting && <p className={styles.hint}>Klik kursi yang menyala untuk membaca notulen rapat terakhir.</p>
+        report && !meeting && <p className={styles.hint}>Klik kertas di meja — atau kursinya — untuk membaca catatan rapat terakhir.</p>
       )}
     </section>
   )
@@ -287,16 +282,4 @@ function AttendanceStrip({ votes }: { votes: NonNullable<ProjectReportRow['votes
       </div>
     </div>
   )
-}
-
-/** Notulen JSON (peneliti, ketua) dirapikan supaya terbaca. */
-function prettyMinute(m: MeetingMinute): string {
-  if (m.role !== 'peneliti' && m.role !== 'ketua-rapat') return m.content
-  try {
-    const first = m.content.indexOf('{')
-    const last = m.content.lastIndexOf('}')
-    return JSON.stringify(JSON.parse(m.content.slice(first, last + 1)), null, 2)
-  } catch {
-    return m.content
-  }
 }

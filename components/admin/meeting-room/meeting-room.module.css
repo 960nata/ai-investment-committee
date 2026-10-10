@@ -52,6 +52,9 @@
 .seatEmpty { opacity: 0.4; }
 .seatFilled .chairBack, .seatFilled .chairSeat, .seatFilled .chairArm { stroke: var(--measured); }
 .seatClickable { cursor: pointer; }
+/* Garis tanpa isian hanya bisa diklik di garisnya; seluruh bidang kursi dan
+   kertas dibuat menerima klik supaya tidak meleset di bagian tengahnya. */
+.seatClickable rect { pointer-events: all; }
 .seatClickable:hover .chairSeat, .seatClickable:focus-visible .chairSeat { stroke: var(--signal); }
 .seatClickable:focus { outline: none; }
 .seatActive .chairBack, .seatActive .chairSeat, .seatActive .chairArm { stroke: var(--signal); stroke-width: 3; }
@@ -73,6 +76,10 @@
 .seatReplaced { fill: var(--degraded); font-family: var(--mono); font-size: 10px; font-weight: 700; }
 
 .paper rect, .paper line { fill: none; stroke: var(--signal); stroke-width: 1.2; }
+.paper rect { fill: var(--signal-dim); transition: fill 160ms ease; }
+.paper { transition: transform 160ms ease; }
+.seatClickable:hover .paper rect, .seatClickable:focus-visible .paper rect { fill: rgba(224, 161, 60, 0.32); }
+.seatClickable:hover .paper line, .seatClickable:focus-visible .paper line { stroke-width: 1.6; }
 .paperEmpty rect, .paperEmpty line { fill: none; stroke: var(--line); stroke-width: 1; stroke-dasharray: 3 3; }
 
 .minute { border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-1); }

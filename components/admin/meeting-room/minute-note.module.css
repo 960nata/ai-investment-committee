@@ -1,0 +1,124 @@
+/* Kertas memo bergaris: catatan satu agen, terangkat dari meja sidang. */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 48px 16px 24px;
+  background: rgba(6, 8, 7, 0.5);
+  backdrop-filter: blur(2px);
+  overflow-y: auto;
+  animation: fade 180ms ease both;
+}
+
+@keyframes fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.note {
+  --tilt: -1deg;
+  --memo: #fbf3c8;
+  --memo-ink: #2c2a22;
+  --memo-mute: #6f6a52;
+  --memo-rule: rgba(66, 112, 170, 0.22);
+  --memo-margin: rgba(196, 66, 54, 0.45);
+  position: relative;
+  width: min(560px, 100%);
+  padding: 30px 30px 26px 54px;
+  background:
+    linear-gradient(90deg, transparent 40px, var(--memo-margin) 40px 41.5px, transparent 41.5px),
+    repeating-linear-gradient(180deg, transparent 0 25px, var(--memo-rule) 25px 26px),
+    var(--memo);
+  background-position: 0 0, 0 14px, 0 0;
+  color: var(--memo-ink);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 14px;
+  line-height: 26px;
+  border-radius: 2px;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.06), 0 26px 50px rgba(0, 0, 0, 0.45);
+  transform: rotate(var(--tilt));
+  animation: lift 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes lift {
+  from { opacity: 0; transform: translateY(70px) scale(0.35) rotate(-8deg); }
+  to { opacity: 1; transform: rotate(var(--tilt)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay, .note { animation: none; }
+}
+
+@media (max-width: 640px) {
+  /* Di layar sempit kertasnya lurus, dan teks diberi jarak dari garis margin. */
+  .note {
+    --tilt: 0deg;
+    padding: 26px 16px 20px 48px;
+    font-size: 13.5px;
+    background:
+      linear-gradient(90deg, transparent 34px, var(--memo-margin) 34px 35.5px, transparent 35.5px),
+      repeating-linear-gradient(180deg, transparent 0 25px, var(--memo-rule) 25px 26px),
+      var(--memo);
+    background-position: 0 0, 0 14px, 0 0;
+  }
+}
+
+.tape {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  width: 110px;
+  height: 26px;
+  transform: translateX(-50%) rotate(-3deg);
+  background: rgba(230, 226, 205, 0.7);
+  border-left: 1px dashed rgba(0, 0, 0, 0.08);
+  border-right: 1px dashed rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+.close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 30px;
+  height: 30px;
+  border: 1.5px solid var(--memo-ink);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--memo-ink);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.close:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+
+.head { margin-bottom: 4px; padding-right: 30px; }
+.title {
+  font-family: 'Segoe Print', 'Bradley Hand', 'Comic Sans MS', cursive;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 32px;
+}
+.meta { color: var(--memo-mute); font-family: var(--mono); font-size: 11px; line-height: 20px; overflow-wrap: anywhere; }
+.replaced { color: #a0561a; font-family: var(--mono); font-size: 11px; line-height: 20px; overflow-wrap: anywhere; }
+
+.body { overflow-wrap: anywhere; }
+.body p { margin: 0; }
+.body ul, .body ol { margin: 0; padding-left: 20px; }
+.block + .block { margin-top: 4px; }
+.label {
+  margin-top: 8px !important;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #3d5f8f;
+}
+.small { color: var(--memo-mute); font-size: 12.5px; }
+.red { color: #a3352b !important; font-weight: 700; }
+.amber { color: #9a6416; font-weight: 700; }
