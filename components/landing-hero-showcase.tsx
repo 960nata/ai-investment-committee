@@ -537,10 +537,11 @@ export function LandingHeroShowcase({
                 </div>
               </div>
 
-              {/* Right Column: Live Deliberations Preview */}
+              {/* Kolom kanan: contoh ilustrasi, bukan putusan nyata. Label putusan
+                  memakai bahasa bukti (positif/rapuh), bukan anjuran beli/jual. */}
               <div className="dashboard-feed-card">
                 <div className="feed-card-head">
-                  <span className="feed-head-title">Putusan Sidang Terkini</span>
+                  <span className="feed-head-title">Contoh Putusan Sidang</span>
                   <Link href={terminalHref} className="feed-head-link">
                     Terminal &rarr;
                   </Link>
@@ -560,7 +561,7 @@ export function LandingHeroShowcase({
                       <span className="feed-symbol">BBCA.JK</span>
                       <span className="feed-asset-sub">Bank Central Asia</span>
                     </div>
-                    <span className="feed-verdict badge-buy">BELI</span>
+                    <span className="feed-verdict badge-buy">POSITIF</span>
                     <span className="feed-conf">Keyakinan 78%</span>
                   </div>
 
@@ -578,7 +579,7 @@ export function LandingHeroShowcase({
                       <span className="feed-symbol">SOLUSDT</span>
                       <span className="feed-asset-sub">Solana / USDT</span>
                     </div>
-                    <span className="feed-verdict badge-avoid">HINDARI</span>
+                    <span className="feed-verdict badge-avoid">RAPUH</span>
                     <span className="feed-conf">Keyakinan 89%</span>
                   </div>
                 </div>
