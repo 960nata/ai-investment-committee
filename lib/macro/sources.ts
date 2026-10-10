@@ -69,6 +69,9 @@ async function fetchFred(spec: MacroSeriesSpec): Promise<MacroPoint[]> {
   const res = await fetchWithTimeout(`https://fred.stlouisfed.org/graph/fredgraph.csv?id=${spec.code}${spec.since ? `&cosd=${spec.since}` : ''}`, {
     label: 'FRED',
     timeoutMs: 30_000,
+    // Penyaring bot FRED menggantung permintaan berpenanda Node maupun
+    // peramban sampai habis waktu, tetapi melayani klien baris perintah.
+    headers: { 'User-Agent': 'curl/8.7.1', Accept: '*/*' },
   })
   if (!res.ok) throw new Error(`FRED ${spec.code} menjawab HTTP ${res.status}`)
   const text = await res.text()
