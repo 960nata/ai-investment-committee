@@ -278,7 +278,7 @@ const modeBrief = (mode: SimMode) =>
   mode === 'binary'
     ? [
         'MODE: binary option kripto, bayaran 85% bila benar, stake hangus bila salah — butuh ≥ 54,1% menang hanya untuk impas.',
-        `PLAYBOOK TERUJI (satu-satunya pemicu entry): ${PLAYBOOK.name} — RSI14 1m < ${PLAYBOOK.rsiLow} → "up", > ${PLAYBOOK.rsiHigh} → "down", volume relatif < ${PLAYBOOK.maxRelVolume}×, kedaluwarsa ${PLAYBOOK.expirySeconds} detik. Uji 7 hari: ${PLAYBOOK.backtestWinRate}% menang (${PLAYBOOK.backtestSamples} kejadian).`,
+        `PLAYBOOK (satu-satunya pemicu entry; belum terbukti di luar sampel): ${PLAYBOOK.name} — RSI14 1m < ${PLAYBOOK.rsiLow} → "up", > ${PLAYBOOK.rsiHigh} → "down", volume relatif < ${PLAYBOOK.maxRelVolume}×, kedaluwarsa ${PLAYBOOK.expirySeconds} detik. Uji 7 hari: ${PLAYBOOK.backtestWinRate}% menang (${PLAYBOOK.backtestSamples} kejadian).`,
         'Skor radar momentum sudah diuji HANYA ±50% (lempar koin) untuk binary dan SELALU tampak berlawanan dengan setup pantulan (RSI tinggi = momentum naik) — itu wajar dan BUKAN alasan veto. Satu-satunya veto sah: skor bandar berlawanan arah setup ≥ 50.',
       ].join(' ')
     : `MODE: ${MODE_INFO[mode].label}. Posisi "long" atau "short", ditutup otomatis setelah ${MODE_INFO[mode].horizonDays} hari. ${MODE_INFO[mode].description}`
@@ -518,9 +518,9 @@ async function execute(
       if (mode === 'binary') {
         // Pagar keras: binary hanya boleh mengikuti setup teruji, apa pun kata model.
         const setup = setups.find((x) => x.symbol === sig.symbol)
-        if (!setup) throw new Error(`${sig.symbol} tidak punya setup teruji aktif — entry ditolak.`)
+        if (!setup) throw new Error(`${sig.symbol} tidak punya setup playbook aktif — entry ditolak.`)
         const direction = action.direction === 'down' || action.direction === 'short' ? 'down' : 'up'
-        if (direction !== setup.direction) throw new Error(`Arah ${direction} melawan setup teruji (${setup.direction}) — entry ditolak.`)
+        if (direction !== setup.direction) throw new Error(`Arah ${direction} melawan setup playbook (${setup.direction}) — entry ditolak.`)
         const binaryStake = Math.floor(cash * (Math.min(pct, PLAYBOOK.maxStakePct) / 100) * 100) / 100
         if (binaryStake < MIN_STAKE_USD) throw new Error('Kas tidak cukup untuk stake minimum.')
         input = {
@@ -588,11 +588,11 @@ function playbookDecision(setups: PlaybookSetup[], signals: SignalReport[]): Des
       direction: setup.direction,
       stake_pct: 2,
       expiry_seconds: PLAYBOOK.expirySeconds,
-      reason: 'Setup teruji tanpa veto sah — dieksekusi otomatis.',
+      reason: 'Setup playbook tanpa veto sah — dieksekusi otomatis.',
     })
   }
   const parts = [
-    actions.length > 0 ? `Setup teruji diambil: ${actions.map((a) => `${a.symbol} ${a.direction}`).join(', ')}.` : 'Tidak ada setup yang diambil.',
+    actions.length > 0 ? `Setup playbook diambil: ${actions.map((a) => `${a.symbol} ${a.direction}`).join(', ')}.` : 'Tidak ada setup yang diambil.',
     vetoed.length > 0 ? `Veto: ${vetoed.join(', ')}.` : '',
   ]
   return { summary: parts.filter(Boolean).join(' '), confidence: actions.length > 0 ? Math.round(PLAYBOOK.backtestWinRate) : 0, actions }
@@ -637,7 +637,7 @@ export async function runDesk(ownerKey: string, mode: SimMode): Promise<DeskResu
     const skip = record.paused
       ? `Rem otomatis: playbook menang ${record.winRate?.toFixed(0)}% dari ${record.trades} trade terakhir (di bawah ${PLAYBOOK.brakeWinRate}%). Binary otomatis dihentikan — reset dompet untuk memulai ulang.`
       : setups.length === 0
-        ? `Tidak ada setup teruji aktif (RSI 1m semua koin di antara ${PLAYBOOK.rsiLow}–${PLAYBOOK.rsiHigh} atau volume melonjak). Desk menunggu — entry tanpa setup hanya lempar koin.`
+        ? `Tidak ada setup playbook aktif (RSI 1m semua koin di antara ${PLAYBOOK.rsiLow}–${PLAYBOOK.rsiHigh} atau volume melonjak). Desk menunggu — entry tanpa setup hanya lempar koin.`
         : null
     if (skip) {
       const runId = await recordDeskRun({

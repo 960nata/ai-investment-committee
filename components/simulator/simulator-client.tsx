@@ -292,13 +292,13 @@ export function SimulatorClient({ instruments }: { instruments: SimInstrumentOpt
           : `Desk AI memutuskan tidak trade. ${data.result.decision.summary}`
         : 'Desk tidak bersidang — tidak ada instrumen dengan data cukup atau pasar tutup.'
       setDeskNote(note)
-      const waiting = modeRef.current === 'binary' && data.result.decision?.summary.startsWith('Tidak ada setup teruji')
+      const waiting = modeRef.current === 'binary' && data.result.decision?.summary.startsWith('Tidak ada setup playbook')
       toast(
         'info',
         opened.length > 0
           ? `🤖 Desk AI membuka ${opened.length} posisi`
           : waiting
-            ? `🤖 Belum ada sinyal teruji — AI menunggu RSI 1m <${PLAYBOOK.rsiLow} / >${PLAYBOOK.rsiHigh}`
+            ? `🤖 Belum ada sinyal playbook — AI menunggu RSI 1m <${PLAYBOOK.rsiLow} / >${PLAYBOOK.rsiHigh}`
             : '🤖 Desk AI: tidak ada trade',
       )
       return true
@@ -344,7 +344,7 @@ export function SimulatorClient({ instruments }: { instruments: SimInstrumentOpt
 
   const autopilotLabel =
     mode === 'binary'
-      ? 'Masuk otomatis saat sinyal teruji muncul'
+      ? 'Masuk otomatis saat sinyal playbook muncul'
       : `Sidang otomatis tiap ${autopilotEvery && autopilotEvery >= 3600 ? `${autopilotEvery / 3600} jam` : `${Math.round((autopilotEvery ?? 0) / 60)} menit`}`
 
   const reset = () => {
@@ -533,7 +533,7 @@ export function SimulatorClient({ instruments }: { instruments: SimInstrumentOpt
             {autopilot && (
               <div className={s.notice}>
                 {mode === 'binary'
-                  ? `Autopilot aktif. Selama halaman ini terbuka pasar dipindai tiap 30 detik; saat ditutup, server (cron) yang melanjutkan. Saat sinyal teruji muncul, posisi langsung dibuka sesuai playbook (tanpa jatah AI)${freshSetups.length ? ` — sekarang: ${freshSetups.map((x) => displaySymbol(x.symbol)).join(', ')}` : ' — sekarang belum ada'}.`
+                  ? `Autopilot aktif. Selama halaman ini terbuka pasar dipindai tiap 30 detik; saat ditutup, server (cron) yang melanjutkan. Saat sinyal playbook muncul, posisi langsung dibuka sesuai playbook (tanpa jatah AI)${freshSetups.length ? ` — sekarang: ${freshSetups.map((x) => displaySymbol(x.symbol)).join(', ')}` : ' — sekarang belum ada'}.`
                   : 'Autopilot aktif. Selama halaman ini terbuka desk dipicu dari sini; saat ditutup, server (cron) yang melanjutkan. Tiap sidang memakai satu jatah AI harian.'}
               </div>
             )}
@@ -720,9 +720,9 @@ function BinaryTicket({
     <div className={s.ticket}>
       <div className={s.setupBox}>
         <div className={s.fieldLabel}>
-          <span>Sinyal teruji</span>
+          <span>Sinyal playbook</span>
           <span>
-            uji {PLAYBOOK.backtestWinRate}% · impas {PLAYBOOK.breakevenWinRate}%
+            uji 7 hari {PLAYBOOK.backtestWinRate}% · impas {PLAYBOOK.breakevenWinRate}%
           </span>
         </div>
         {setups.length === 0 ? (

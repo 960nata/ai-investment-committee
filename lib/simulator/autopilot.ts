@@ -63,7 +63,7 @@ export async function runAutopilotTick(deadline: number): Promise<TickEntry[]> {
         if (fresh.length === 0 || outOfTime) {
           // Tetap selesaikan binary yang sudah kedaluwarsa supaya saldo segar.
           await getSimState(account.ownerKey, mode)
-          entry(outOfTime ? 'skipped' : 'settled', outOfTime ? 'waktu putaran habis' : 'tidak ada setup teruji')
+          entry(outOfTime ? 'skipped' : 'settled', outOfTime ? 'waktu putaran habis' : 'tidak ada setup playbook')
           continue
         }
       } else if (outOfTime) {
