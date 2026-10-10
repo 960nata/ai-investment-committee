@@ -153,14 +153,49 @@ export function FlagThailand(p: { size?: number }) {
   )
 }
 
+/** Kemiringan diagonal bendera 3:2 — sumbu taegeuk dan letak trigram mengikutinya. */
+const KR_TILT = (Math.atan2(14, 21) * 180) / Math.PI
+
+/**
+ * Satu trigram, digambar di sepanjang sumbu x lalu diputar ke diagonalnya.
+ * `solid[i]` false berarti batang terputus. Batangnya sedikit lebih tebal dari
+ * spesifikasi resmi supaya tidak lenyap di ukuran ikon.
+ */
+function Trigram({ solid, side, angle }: { solid: boolean[]; side: 1 | -1; angle: number }) {
+  const bar = 0.62
+  const gap = 0.34
+  const inner = 5.2
+  return (
+    <g transform={`rotate(${angle} 10.5 7) translate(10.5 7)`} fill="#000">
+      {solid.map((s, i) => {
+        const x = side > 0 ? inner + i * (bar + gap) : -(inner + i * (bar + gap)) - bar
+        return s ? (
+          <rect key={i} x={x} y={-1.75} width={bar} height={3.5} />
+        ) : (
+          <g key={i}>
+            <rect x={x} y={-1.75} width={bar} height={1.5} />
+            <rect x={x} y={0.25} width={bar} height={1.5} />
+          </g>
+        )
+      })}
+    </g>
+  )
+}
+
 export function FlagSouthKorea(p: { size?: number }) {
   return (
     <Flag label="Korea Selatan" {...p}>
       <rect width="21" height="14" fill={W} />
-      <path d="M10.5 3.5a3.5 3.5 0 0 1 0 7 3.5 3.5 0 0 0 0-7z" fill="#003478" />
-      <path d="M10.5 3.5a3.5 3.5 0 0 0 0 7 3.5 3.5 0 0 1 0-7z" fill="#cd2e3a" />
-      <circle cx="10.5" cy="5.25" r="1.75" fill="#cd2e3a" />
-      <circle cx="10.5" cy="8.75" r="1.75" fill="#003478" />
+      {/* Taegeuk: merah di atas, biru di bawah, sumbunya miring mengikuti diagonal. */}
+      <g transform={`rotate(${KR_TILT} 10.5 7)`}>
+        <circle cx="10.5" cy="7" r="3.5" fill="#0047a0" />
+        <path d="M7 7a3.5 3.5 0 0 1 7 0a1.75 1.75 0 0 1-3.5 0a1.75 1.75 0 0 0-3.5 0z" fill="#cd2e3a" />
+      </g>
+      {/* Geon ☰ kiri atas, gon ☷ kanan bawah, gam ☵ kanan atas, ri ☲ kiri bawah. */}
+      <Trigram solid={[true, true, true]} side={-1} angle={KR_TILT} />
+      <Trigram solid={[false, false, false]} side={1} angle={KR_TILT} />
+      <Trigram solid={[false, true, false]} side={1} angle={-KR_TILT} />
+      <Trigram solid={[true, false, true]} side={-1} angle={-KR_TILT} />
     </Flag>
   )
 }
