@@ -45,6 +45,12 @@ export const assetClassEnum = pgEnum('asset_class', [
   'emas',
   'komoditi',
   'indeks',
+  // Pasangan valas dari Yahoo (`USDIDR=X`). Tidak punya volume transaksi
+  // terpusat, jadi likuiditasnya tidak dinilai dari volume.
+  'mata_uang',
+  // ETF obligasi (TLT, IEF, EMB, ...). Imbal hasil Treasury harian dicatat
+  // terpisah sebagai deret makro FRED, bukan sebagai instrumen.
+  'obligasi',
 ])
 export const healthStatusEnum = pgEnum('health_status', ['healthy', 'degraded', 'dead'])
 export const jobStatusEnum = pgEnum('job_status', ['running', 'success', 'failed', 'partial'])
@@ -253,6 +259,8 @@ export const TAB_LAYOUT: TabGroup[] = [
   { id: 'emas', label: 'Emas', children: [{ id: 'emas', label: 'Emas' }] },
   { id: 'komoditi', label: 'Komoditi', children: [{ id: 'komoditi', label: 'Komoditi' }] },
   { id: 'indeks', label: 'Indeks', children: [{ id: 'indeks', label: 'Indeks' }] },
+  { id: 'mata_uang', label: 'Mata Uang', children: [{ id: 'mata_uang', label: 'Mata Uang' }] },
+  { id: 'obligasi', label: 'Obligasi', children: [{ id: 'obligasi', label: 'Obligasi' }] },
 ]
 
 export type Instrument = typeof instrument.$inferSelect

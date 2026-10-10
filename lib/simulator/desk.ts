@@ -183,7 +183,7 @@ async function intradaySignal(row: MarketRow): Promise<SignalReport | null> {
   )
 }
 
-const TRADABLE = new Set(['crypto', 'memecoin', 'saham', 'emas', 'komoditi'])
+const TRADABLE = new Set(['crypto', 'memecoin', 'saham', 'emas', 'komoditi', 'mata_uang', 'obligasi'])
 
 /** Kandidat terkuat per mode, plus instrumen yang sedang dipegang. */
 async function gatherSignals(mode: SimMode, state: SimState, gatherDeadline: number): Promise<SignalReport[]> {

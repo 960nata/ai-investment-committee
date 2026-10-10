@@ -245,7 +245,7 @@ async function recentContext(
   const recent = candles.slice(-20)
 
   const multiplier =
-    assetClass === 'indeks' ? null : assetClass === 'komoditi' ? CONTRACT_MULTIPLIER[symbol] ?? null : 1
+    assetClass === 'indeks' || assetClass === 'mata_uang' ? null : assetClass === 'komoditi' ? CONTRACT_MULTIPLIER[symbol] ?? null : 1
 
   let turnover =
     recent.length === 0 || multiplier === null
@@ -272,7 +272,7 @@ async function recentContext(
   // Indeks memang tidak punya volume, dan volume berjangka jatuh ke nol di
   // sekitar pergantian kontrak; keduanya tidak bisa disebut disuspensi.
   let suspendedDays = 0
-  if (assetClass !== 'indeks' && assetClass !== 'komoditi') {
+  if (assetClass !== 'indeks' && assetClass !== 'komoditi' && assetClass !== 'mata_uang') {
     for (let i = candles.length - 1; i > 0; i--) {
       const c = candles[i]
       if (Number(c.volume) !== 0 || Number(c.close) !== Number(candles[i - 1].close)) break

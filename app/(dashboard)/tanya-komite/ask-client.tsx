@@ -39,7 +39,7 @@ interface Message {
   sources?: Source[]
 }
 
-type Topic = 'saham' | 'kripto' | 'indeks' | 'komoditas' | 'emas' | 'keuangan'
+type Topic = 'saham' | 'kripto' | 'indeks' | 'komoditas' | 'emas' | 'mata_uang' | 'obligasi' | 'keuangan'
 
 interface ThreadSummary {
   id: number
@@ -152,6 +152,30 @@ const TOPICS: {
       'Emas fisik, digital, atau reksa dana emas — mana yang cocok?',
       'Berapa porsi emas yang wajar untuk lindung nilai?',
       'Kenapa emas biasanya naik saat suku bunga turun?',
+    ],
+  },
+  {
+    id: 'mata_uang',
+    label: 'Mata Uang',
+    classes: ['mata_uang'],
+    placeholder: 'Tanya soal kurs, mis. kenapa rupiah melemah terhadap dolar?',
+    suggestions: [
+      'Bagaimana kurs rupiah terhadap dolar sekarang dan apa penggeraknya?',
+      'Mata uang apa yang bergerak paling besar hari ini?',
+      'Bagaimana selisih suku bunga BI dan The Fed memengaruhi rupiah?',
+      'Kalau rupiah melemah, saham sektor apa yang diuntungkan?',
+    ],
+  },
+  {
+    id: 'obligasi',
+    label: 'Obligasi',
+    classes: ['obligasi'],
+    placeholder: 'Tanya soal obligasi, mis. kalau suku bunga turun, obligasi apa yang naik?',
+    suggestions: [
+      'Bagaimana kurva imbal hasil Treasury AS sekarang?',
+      'Obligasi tenor pendek atau panjang yang cocok saat suku bunga mau turun?',
+      'Apa beda risiko obligasi pemerintah dan korporasi high-yield?',
+      'Berapa porsi obligasi yang wajar di portofolio saya?',
     ],
   },
   {

@@ -121,6 +121,12 @@ export interface MarketFacts {
     items: Record<string, number>
     missingItems: string[]
   } | null
+  /**
+   * Deret makro yang menggerakkan kelas aset ini: suku bunga kedua mata uang
+   * untuk valas, kurva imbal hasil Treasury untuk obligasi. Angkanya dari
+   * basis data (FRED), bukan dari ingatan model.
+   */
+  macroContext?: { title: string; lines: string[] } | null
   /** Skor sistem per horizon, dengan label keyakinan yang dihitung mesin skor. */
   systemScores?: { horizon: string; asOf: string; score: number; confidence: string }[]
   warnings: string[]
@@ -534,6 +540,10 @@ export function factsToPrompt(facts: MarketFacts, detail: 'full' | 'summary' = '
         lines.push(`Pos wajib yang tidak tersedia: ${report.missingItems.join(', ')}`)
       }
     }
+  }
+
+  if (facts.macroContext && facts.macroContext.lines.length > 0) {
+    lines.push(``, `${facts.macroContext.title}:`, ...facts.macroContext.lines)
   }
 
   if (facts.systemScores && facts.systemScores.length > 0) {

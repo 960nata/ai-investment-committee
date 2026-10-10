@@ -8,7 +8,7 @@
 import { loadMarketView } from '@/lib/member/market-view'
 import type { SimInstrumentOption } from './simulator-client'
 
-const TRADABLE = new Set(['crypto', 'memecoin', 'saham', 'emas', 'komoditi'])
+const TRADABLE = new Set(['crypto', 'memecoin', 'saham', 'emas', 'komoditi', 'mata_uang', 'obligasi'])
 
 export async function loadSimInstrumentOptions(): Promise<SimInstrumentOption[]> {
   const view = await loadMarketView()

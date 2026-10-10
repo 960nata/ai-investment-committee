@@ -268,6 +268,8 @@ export function LandingNav({
       { category: 'EMAS', rows: pick(byClass('emas'), ['XAUUSD', 'PAXGUSDT', 'GC=F'], 2) },
       { category: 'KOMODITI', rows: pick(byClass('komoditi'), ['BZ=F', 'CL=F', 'NG=F'], 3) },
       { category: 'INDEKS', rows: pick(byClass('indeks'), ['^GSPC', '^IXIC', '^JKSE'], 3) },
+      { category: 'KURS', rows: pick(byClass('mata_uang'), ['USDIDR=X', 'EURUSD=X', 'USDJPY=X'], 3) },
+      { category: 'OBLIGASI', rows: pick(byClass('obligasi'), ['TLT', 'IEF', 'EMB'], 2) },
     ]
 
     // Selang-seling antar kelas: ambil satu dari tiap keranjang, ulangi.
@@ -321,6 +323,8 @@ export function LandingNav({
       emas: count('emas'),
       komoditi: count('komoditi'),
       indeks: count('indeks'),
+      mata_uang: count('mata_uang'),
+      obligasi: count('obligasi'),
     }
   }, [instruments])
 
@@ -479,6 +483,22 @@ export function LandingNav({
                             <span className="mono bold">Komoditas Energi</span>
                           </div>
                           <span className="tag mono" style={{ fontSize: '9px' }}>{assetCounts.komoditi} kontrak</span>
+                        </Link>
+
+                        <Link href="/ringkasan?tab=mata_uang" prefetch={false} className="mega-asset-row" onClick={() => setActiveMenu(null)}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span className="chip-dot" style={{ background: 'var(--measured)' }} />
+                            <span className="mono bold">Kurs &amp; Mata Uang</span>
+                          </div>
+                          <span className="tag mono" style={{ fontSize: '9px' }}>{assetCounts.mata_uang} pasangan</span>
+                        </Link>
+
+                        <Link href="/ringkasan?tab=obligasi" prefetch={false} className="mega-asset-row" onClick={() => setActiveMenu(null)}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span className="chip-dot" style={{ background: 'var(--ink-mute)' }} />
+                            <span className="mono bold">Obligasi &amp; Imbal Hasil</span>
+                          </div>
+                          <span className="tag mono" style={{ fontSize: '9px' }}>{assetCounts.obligasi} ETF</span>
                         </Link>
                       </div>
                     </div>

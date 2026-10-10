@@ -395,5 +395,7 @@ function countByClass(instruments: InstrumentQuote[]): CoverageCounts {
     emas: count('emas'),
     komoditi: count('komoditi'),
     indeks: count('indeks'),
+    mata_uang: count('mata_uang'),
+    obligasi: count('obligasi'),
   }
 }

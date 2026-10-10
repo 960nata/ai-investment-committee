@@ -27,6 +27,12 @@ export interface MacroSeriesSpec {
   source: 'fred' | 'worldbank'
   /** Kode di sumbernya. */
   code: string
+  /**
+   * Batas awal unduhan FRED. Deret harian sejak 1960-an berisi belasan ribu
+   * baris dan diambil ulang tiap hari; riwayat sejak 2015 sudah menutup
+   * seluruh rentang candle yang tersimpan.
+   */
+  since?: string
   country?: 'IDN' | 'USA'
   label: string
 }
@@ -35,6 +41,23 @@ export const MACRO_SERIES: MacroSeriesSpec[] = [
   { id: 'FRED:GS10', source: 'fred', code: 'GS10', label: 'Imbal hasil Treasury AS 10 tahun (Rf AS), bulanan' },
   { id: 'FRED:IRSTCI01IDM156N', source: 'fred', code: 'IRSTCI01IDM156N', label: 'Suku bunga antarbank Indonesia, bulanan' },
   { id: 'FRED:CPIAUCSL', source: 'fred', code: 'CPIAUCSL', label: 'Indeks harga konsumen AS, bulanan' },
+  // Imbal hasil dan selisih harian untuk kelas obligasi, serta suku bunga
+  // antarbank negara lain untuk selisih bunga kelas mata uang.
+  ...([
+    ['DGS3MO', 'Imbal hasil Treasury AS 3 bulan, harian'],
+    ['DGS2', 'Imbal hasil Treasury AS 2 tahun, harian'],
+    ['DGS10', 'Imbal hasil Treasury AS 10 tahun, harian'],
+    ['DGS30', 'Imbal hasil Treasury AS 30 tahun, harian'],
+    ['T10Y2Y', 'Selisih Treasury 10 tahun − 2 tahun, harian'],
+    ['T10YIE', 'Ekspektasi inflasi 10 tahun (breakeven), harian'],
+    ['BAMLH0A0HYM2', 'Selisih imbal hasil obligasi high-yield AS (OAS), harian'],
+    ['DFF', 'Suku bunga Fed Funds efektif, harian'],
+    ['IRSTCI01EZM156N', 'Suku bunga antarbank Kawasan Euro, bulanan'],
+    ['IRSTCI01JPM156N', 'Suku bunga antarbank Jepang, bulanan'],
+    ['IRSTCI01GBM156N', 'Suku bunga antarbank Inggris, bulanan'],
+    ['IRSTCI01AUM156N', 'Suku bunga antarbank Australia, bulanan'],
+    ['IRSTCI01CNM156N', 'Suku bunga antarbank Tiongkok, bulanan'],
+  ] as const).map(([code, label]) => ({ id: `FRED:${code}`, source: 'fred' as const, code, label, since: '2015-01-01' })),
   ...(['IDN', 'USA'] as const).flatMap((c) => [
     { id: `WB:${c}:NY.GDP.MKTP.KD.ZG`, source: 'worldbank' as const, code: 'NY.GDP.MKTP.KD.ZG', country: c, label: `Pertumbuhan PDB riil ${c}, tahunan` },
     { id: `WB:${c}:FP.CPI.TOTL.ZG`, source: 'worldbank' as const, code: 'FP.CPI.TOTL.ZG', country: c, label: `Inflasi ${c}, tahunan` },
@@ -43,7 +66,7 @@ export const MACRO_SERIES: MacroSeriesSpec[] = [
 ]
 
 async function fetchFred(spec: MacroSeriesSpec): Promise<MacroPoint[]> {
-  const res = await fetchWithTimeout(`https://fred.stlouisfed.org/graph/fredgraph.csv?id=${spec.code}`, {
+  const res = await fetchWithTimeout(`https://fred.stlouisfed.org/graph/fredgraph.csv?id=${spec.code}${spec.since ? `&cosd=${spec.since}` : ''}`, {
     label: 'FRED',
     timeoutMs: 30_000,
   })

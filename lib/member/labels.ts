@@ -10,6 +10,8 @@ export const ASSET_CLASS_LABEL: Record<string, string> = {
   emas: 'Emas',
   komoditi: 'Komoditi',
   indeks: 'Indeks',
+  mata_uang: 'Mata uang',
+  obligasi: 'Obligasi',
 }
 
 /**
@@ -23,4 +25,6 @@ export const ASSET_TABS: { id: string; label: string; classes: string[] | null }
   { id: 'komoditas', label: 'Komoditas', classes: ['komoditi'] },
   { id: 'emas', label: 'Emas', classes: ['emas'] },
   { id: 'indeks', label: 'Indeks', classes: ['indeks'] },
+  { id: 'mata_uang', label: 'Mata uang', classes: ['mata_uang'] },
+  { id: 'obligasi', label: 'Obligasi', classes: ['obligasi'] },
 ]

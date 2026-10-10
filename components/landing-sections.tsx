@@ -534,6 +534,8 @@ const ASSET_CLASSES = [
   { key: 'indeks', tab: 'indeks', label: 'Indeks', desc: 'Indeks acuan pasar global dan regional.' },
   { key: 'komoditi', tab: 'komoditi', label: 'Komoditas', desc: 'Minyak mentah, gas alam, dan komoditas energi global.' },
   { key: 'emas', tab: 'emas', label: 'Emas', desc: 'Emas spot dan kontrak berjangka logam mulia.' },
+  { key: 'mata_uang', tab: 'mata_uang', label: 'Mata Uang', desc: 'Kurs rupiah dan pasangan valas utama dunia.' },
+  { key: 'obligasi', tab: 'obligasi', label: 'Obligasi', desc: 'ETF obligasi pemerintah dan korporasi, plus kurva imbal hasil.' },
 ] as const
 
 export type CoverageCounts = Record<(typeof ASSET_CLASSES)[number]['key'], number> & { total: number }
@@ -545,7 +547,7 @@ export function CoverageSection({ counts }: { counts: CoverageCounts }) {
       <div className="lp-inner">
         <SectionHead
           label="Cakupan"
-          title={`${counts.total.toLocaleString('id-ID')} instrumen, lima kelas aset`}
+          title={`${counts.total.toLocaleString('id-ID')} instrumen, ${ASSET_CLASSES.length} kelas aset`}
           sub="Hanya instrumen yang benar-benar punya riwayat harga tersimpan yang dihitung di sini."
         />
 
@@ -578,7 +580,7 @@ export function CoverageSection({ counts }: { counts: CoverageCounts }) {
           ))}
         </ul>
         <p className="lp-note">
-          Indeks, komoditas, dan emas tidak punya laporan keuangan, jadi penilaian jangka
+          Indeks, komoditas, emas, mata uang, dan obligasi tidak punya laporan keuangan, jadi penilaian jangka
           panjangnya memakai kerangka berbeda — bukan kekurangan yang akan diperbaiki, melainkan
           sifat asetnya.
         </p>

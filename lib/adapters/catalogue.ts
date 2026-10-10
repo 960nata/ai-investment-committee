@@ -625,6 +625,86 @@ const INDEKS: CatalogueEntry[] = [
   region,
 }))
 
+// ---------------------------------------------------------------------------
+// Mata uang
+// ---------------------------------------------------------------------------
+
+/**
+ * Pasangan valas dari Yahoo (`USDIDR=X`). Mata uang di belakang garis miring
+ * adalah mata uang harganya, jadi itu yang dicatat sebagai `currency`.
+ *
+ * Rupiah lebih dulu: pembaca di Indonesia menanyakan "dolar sekarang
+ * berapa", baru kemudian pasangan utama dunia. CNYIDR=X tidak dimasukkan —
+ * Yahoo hanya punya satu candle untuknya.
+ */
+const MATA_UANG: CatalogueEntry[] = ([
+  ['USDIDR=X', 'Dolar AS / Rupiah', 'IDR', 'Indonesia'],
+  ['EURIDR=X', 'Euro / Rupiah', 'IDR', 'Indonesia'],
+  ['SGDIDR=X', 'Dolar Singapura / Rupiah', 'IDR', 'Indonesia'],
+  ['JPYIDR=X', 'Yen / Rupiah', 'IDR', 'Indonesia'],
+  ['AUDIDR=X', 'Dolar Australia / Rupiah', 'IDR', 'Indonesia'],
+  ['GBPIDR=X', 'Pound / Rupiah', 'IDR', 'Indonesia'],
+  ['MYRIDR=X', 'Ringgit / Rupiah', 'IDR', 'Indonesia'],
+  ['EURUSD=X', 'Euro / Dolar AS', 'USD', 'Global'],
+  ['USDJPY=X', 'Dolar AS / Yen', 'JPY', 'Global'],
+  ['GBPUSD=X', 'Pound / Dolar AS', 'USD', 'Global'],
+  ['AUDUSD=X', 'Dolar Australia / Dolar AS', 'USD', 'Global'],
+  ['NZDUSD=X', 'Dolar Selandia Baru / Dolar AS', 'USD', 'Global'],
+  ['USDCHF=X', 'Dolar AS / Franc Swiss', 'CHF', 'Global'],
+  ['USDCAD=X', 'Dolar AS / Dolar Kanada', 'CAD', 'Global'],
+  ['USDCNY=X', 'Dolar AS / Yuan', 'CNY', 'Global'],
+  ['USDSGD=X', 'Dolar AS / Dolar Singapura', 'SGD', 'Global'],
+  ['USDMYR=X', 'Dolar AS / Ringgit', 'MYR', 'Global'],
+  ['USDTHB=X', 'Dolar AS / Baht', 'THB', 'Global'],
+  ['USDKRW=X', 'Dolar AS / Won', 'KRW', 'Global'],
+  ['USDINR=X', 'Dolar AS / Rupee', 'INR', 'Global'],
+] as [string, string, string, string][]).map(([symbol, name, currency, region]) => ({
+  symbol,
+  name,
+  market: 'GLOBAL' as Market,
+  assetClass: 'mata_uang' as AssetClass,
+  currency,
+  region,
+}))
+
+// ---------------------------------------------------------------------------
+// Obligasi
+// ---------------------------------------------------------------------------
+
+/**
+ * ETF obligasi, bukan obligasinya langsung: harga obligasi satuan tidak ada di
+ * sumber terbuka mana pun, sedangkan ETF punya harga dan volume harian.
+ * Imbal hasil Treasury dicatat terpisah sebagai deret makro FRED (DGS10 dan
+ * kawan-kawan) dan dibacakan ke komite sebagai konteks.
+ *
+ * SBN Indonesia belum punya sumber otomatis yang gratis. EMB dan VWOB
+ * (obligasi negara berkembang dalam dolar, Indonesia termasuk di dalamnya)
+ * adalah pendekatan terdekatnya, bukan penggantinya.
+ */
+const OBLIGASI: CatalogueEntry[] = ([
+  ['SHY', 'Treasury AS 1–3 tahun', 'Amerika Serikat'],
+  ['IEF', 'Treasury AS 7–10 tahun', 'Amerika Serikat'],
+  ['TLT', 'Treasury AS 20+ tahun', 'Amerika Serikat'],
+  ['GOVT', 'Treasury AS seluruh tenor', 'Amerika Serikat'],
+  ['TIP', 'Treasury AS terlindung inflasi (TIPS)', 'Amerika Serikat'],
+  ['AGG', 'Obligasi AS agregat', 'Amerika Serikat'],
+  ['BND', 'Obligasi AS total pasar', 'Amerika Serikat'],
+  ['LQD', 'Obligasi korporasi AS layak investasi', 'Amerika Serikat'],
+  ['HYG', 'Obligasi korporasi AS imbal hasil tinggi', 'Amerika Serikat'],
+  ['EMB', 'Obligasi negara berkembang (USD)', 'Negara berkembang'],
+  ['VWOB', 'Obligasi pemerintah negara berkembang (USD)', 'Negara berkembang'],
+  ['EMLC', 'Obligasi negara berkembang (mata uang lokal)', 'Negara berkembang'],
+  ['BNDX', 'Obligasi internasional (lindung nilai)', 'Global'],
+  ['IGOV', 'Obligasi pemerintah internasional', 'Global'],
+] as [string, string, string][]).map(([symbol, name, region]) => ({
+  symbol,
+  name,
+  market: 'GLOBAL' as Market,
+  assetClass: 'obligasi' as AssetClass,
+  currency: 'USD',
+  region,
+}))
+
 export const CATALOGUE: CatalogueEntry[] = [
   ...CRYPTO,
   ...MEMECOIN,
@@ -634,6 +714,8 @@ export const CATALOGUE: CatalogueEntry[] = [
   ...SAHAM_US,
   ...SAHAM_INTERNASIONAL,
   ...INDEKS,
+  ...MATA_UANG,
+  ...OBLIGASI,
 ]
 
 export function catalogueFor(market: Market): CatalogueEntry[] {

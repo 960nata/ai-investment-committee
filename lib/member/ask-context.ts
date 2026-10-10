@@ -12,7 +12,7 @@ import { listInstrumentQuotes, type InstrumentQuote } from '@/lib/db/queries'
 import { latestMacro } from '@/lib/db/macro-queries'
 import { formatPriceIn } from '@/lib/format/market'
 
-export const ASK_TOPICS = ['saham', 'kripto', 'indeks', 'komoditas', 'emas', 'keuangan'] as const
+export const ASK_TOPICS = ['saham', 'kripto', 'indeks', 'komoditas', 'emas', 'mata_uang', 'obligasi', 'keuangan'] as const
 export type AskTopic = (typeof ASK_TOPICS)[number]
 
 export const TOPIC_INFO: Record<AskTopic, { label: string; classes: string[]; newsKeywords: string }> = {
@@ -21,6 +21,8 @@ export const TOPIC_INFO: Record<AskTopic, { label: string; classes: string[]; ne
   indeks: { label: 'Indeks', classes: ['indeks'], newsKeywords: 'IHSG indeks Wall Nasdaq index' },
   komoditas: { label: 'Komoditas', classes: ['komoditi'], newsKeywords: 'minyak batubara komoditas oil coal' },
   emas: { label: 'Emas', classes: ['emas'], newsKeywords: 'emas gold logam' },
+  mata_uang: { label: 'Mata Uang', classes: ['mata_uang'], newsKeywords: 'rupiah dolar kurs valas forex currency' },
+  obligasi: { label: 'Obligasi', classes: ['obligasi'], newsKeywords: 'obligasi SBN treasury yield bond suku bunga' },
   keuangan: { label: 'Nasihat Keuangan', classes: [], newsKeywords: 'inflasi suku bunga rupiah ekonomi' },
 }
 
@@ -46,13 +48,37 @@ function classSnapshot(quotes: InstrumentQuote[], classes: string[], label: stri
   ].join('\n')
 }
 
-async function macroSnapshot(): Promise<string> {
-  const series: [string, string][] = [
+/** Deret makro yang dibacakan per topik di luar nasihat keuangan. */
+const TOPIC_MACRO: Partial<Record<AskTopic, [string, string][]>> = {
+  mata_uang: [
+    ['FRED:IRSTCI01IDM156N', 'Suku bunga antarbank Indonesia (%)'],
+    ['FRED:DFF', 'Fed Funds efektif (%)'],
+    ['FRED:IRSTCI01EZM156N', 'Suku bunga antarbank Kawasan Euro (%)'],
+    ['FRED:IRSTCI01JPM156N', 'Suku bunga antarbank Jepang (%)'],
+    ['WB:IDN:FP.CPI.TOTL.ZG', 'Inflasi Indonesia tahunan (%)'],
+    ['WB:USA:FP.CPI.TOTL.ZG', 'Inflasi AS tahunan (%)'],
+  ],
+  obligasi: [
+    ['FRED:DFF', 'Fed Funds efektif (%)'],
+    ['FRED:DGS3MO', 'Imbal hasil Treasury 3 bulan (%)'],
+    ['FRED:DGS2', 'Imbal hasil Treasury 2 tahun (%)'],
+    ['FRED:DGS10', 'Imbal hasil Treasury 10 tahun (%)'],
+    ['FRED:DGS30', 'Imbal hasil Treasury 30 tahun (%)'],
+    ['FRED:T10Y2Y', 'Selisih Treasury 10th − 2th (poin)'],
+    ['FRED:T10YIE', 'Ekspektasi inflasi 10 tahun (%)'],
+    ['FRED:BAMLH0A0HYM2', 'Selisih obligasi high-yield AS (poin)'],
+    ['FRED:IRSTCI01IDM156N', 'Suku bunga antarbank Indonesia (%)'],
+  ],
+}
+
+async function macroSnapshot(
+  series: [string, string][] = [
     ['FRED:IRSTCI01IDM156N', 'Suku bunga antarbank Indonesia (%)'],
     ['WB:IDN:FP.CPI.TOTL.ZG', 'Inflasi Indonesia tahunan (%)'],
     ['WB:IDN:NY.GDP.MKTP.KD.ZG', 'Pertumbuhan PDB riil Indonesia (%)'],
     ['FRED:GS10', 'Imbal hasil obligasi AS 10 tahun (%)'],
-  ]
+  ],
+): Promise<string> {
   const rows = await Promise.all(
     series.map(async ([id, label]) => {
       const v = await latestMacro(id).catch(() => null)
@@ -81,5 +107,7 @@ export async function buildTopicContext(topic: AskTopic): Promise<string> {
     ].join('\n')
   }
 
-  return classSnapshot(quotes, info.classes, info.label)
+  const macro = TOPIC_MACRO[topic]
+  const snapshot = classSnapshot(quotes, info.classes, info.label)
+  return macro ? [snapshot, '', await macroSnapshot(macro)].join('\n') : snapshot
 }

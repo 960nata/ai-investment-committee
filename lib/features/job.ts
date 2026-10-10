@@ -104,6 +104,13 @@ function benchmarkFor(instrument: InstrumentView, market: MarketCode): Benchmark
     case 'komoditi':
     case 'emas':
       return { kind: 'komoditi' }
+    // Valas terhadap indeks dolar: USD/IDR yang naik 2% saat DXY naik 0,5%
+    // berarti rupiah melemah karena dirinya sendiri, bukan karena dolar.
+    case 'mata_uang':
+      return { kind: 'symbol', symbol: 'DX-Y.NYB', market: 'GLOBAL' }
+    // ETF obligasi terhadap pasar obligasi AS agregat.
+    case 'obligasi':
+      return instrument.symbol === 'AGG' ? null : { kind: 'symbol', symbol: 'AGG', market: 'GLOBAL' }
     default:
       return null
   }
@@ -383,7 +390,7 @@ async function externalFor(
     out.taker_buy_ratio_20 = rollingMean(taker, 20, 15)
   }
 
-  if (cls === 'saham' || cls === 'indeks') {
+  if (cls === 'saham' || cls === 'indeks' || cls === 'obligasi') {
     const vix = await sharedSeries('^VIX', async () => {
       const inst = await getInstrumentBySymbol('GLOBAL', '^VIX')
       if (!inst) return new Map()

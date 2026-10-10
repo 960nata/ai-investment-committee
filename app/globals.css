@@ -15157,10 +15157,12 @@ body.rail-lock {
 .s2 { background: #b4531a; }
 .s3 { background: #6b3a1e; }
 .s4 { background: #e8b04b; }
+.s5 { background: #d9d4cc; }
+.s6 { background: #8c7e6e; }
 
 .lp-coverage {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 12px;
   margin: 0;
   padding: 0;

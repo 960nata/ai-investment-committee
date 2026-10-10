@@ -15,8 +15,11 @@
 export function formatTickerPrice(value: number | null, assetClass: string): string {
   if (value === null || !Number.isFinite(value)) return '—'
   // Indeks adalah angka poin, bukan harga dalam mata uang: IHSG tidak ber-"$".
-  const prefix = assetClass === 'saham' ? 'Rp' : assetClass === 'indeks' ? '' : '$'
-  const digits = value >= 1000 ? 0 : value >= 1 ? 2 : 4
+  // Kurs valas juga tanpa simbol, dan butuh empat desimal: EUR/USD 1,12
+  // tidak membedakan hari ini dari kemarin.
+  const prefix = assetClass === 'saham' ? 'Rp' : assetClass === 'indeks' || assetClass === 'mata_uang' ? '' : '$'
+  const digits =
+    assetClass === 'mata_uang' && value < 100 ? 4 : value >= 1000 ? 0 : value >= 1 ? 2 : 4
   return (
     prefix +
     value.toLocaleString('id-ID', { minimumFractionDigits: digits, maximumFractionDigits: digits })

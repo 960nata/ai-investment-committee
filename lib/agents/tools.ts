@@ -15,6 +15,7 @@
  * bisa diuji tanpa koneksi apa pun.
  */
 
+import { latestMacro, macroRange } from '@/lib/db/macro-queries'
 import { getCandles, getFundamentalsAsOf, getInstrumentBySymbol, getLatestFeature, getLatestScoresForSymbol } from '@/lib/db/queries'
 import type { MarketCode } from '@/lib/db/schema'
 import { FEATURE_SET_VERSION } from '@/lib/features/compute'
@@ -126,6 +127,11 @@ export async function gatherFacts(
     }
   }
 
+  if (instrument.assetClass === 'mata_uang' || instrument.assetClass === 'obligasi') {
+    facts.macroContext = await macroContextFor(instrument.assetClass, symbol, facts.asOf).catch(() => null)
+    if (!facts.macroContext) facts.warnings.push('Data makro (suku bunga / imbal hasil) gagal dibaca untuk analisis ini.')
+  }
+
   facts.systemScores = (scores?.scores ?? []).map((s) => ({
     horizon: s.horizon,
     asOf: s.date,
@@ -134,6 +140,72 @@ export async function gatherFacts(
   }))
 
   return facts
+}
+
+/** Deret suku bunga jangka pendek per mata uang, untuk selisih bunga valas. */
+const POLICY_RATE: Record<string, { id: string; label: string }> = {
+  USD: { id: 'FRED:DFF', label: 'Fed Funds efektif' },
+  IDR: { id: 'FRED:IRSTCI01IDM156N', label: 'antarbank Indonesia' },
+  EUR: { id: 'FRED:IRSTCI01EZM156N', label: 'antarbank Kawasan Euro' },
+  JPY: { id: 'FRED:IRSTCI01JPM156N', label: 'antarbank Jepang' },
+  GBP: { id: 'FRED:IRSTCI01GBM156N', label: 'antarbank Inggris' },
+  AUD: { id: 'FRED:IRSTCI01AUM156N', label: 'antarbank Australia' },
+  CNY: { id: 'FRED:IRSTCI01CNM156N', label: 'antarbank Tiongkok' },
+}
+
+const YIELD_CURVE: [string, string][] = [
+  ['FRED:DFF', 'Fed Funds efektif'],
+  ['FRED:DGS3MO', 'Treasury 3 bulan'],
+  ['FRED:DGS2', 'Treasury 2 tahun'],
+  ['FRED:DGS10', 'Treasury 10 tahun'],
+  ['FRED:DGS30', 'Treasury 30 tahun'],
+  ['FRED:T10Y2Y', 'Selisih 10th − 2th'],
+  ['FRED:T10YIE', 'Ekspektasi inflasi 10 tahun'],
+  ['FRED:BAMLH0A0HYM2', 'Selisih high-yield (OAS)'],
+]
+
+/** Nilai terakhir per `asOf` dan perubahannya dalam ~3 bulan, dalam poin persen. */
+async function macroLine(id: string, label: string, asOf: string): Promise<string> {
+  const from = new Date(Date.parse(asOf) - 400 * 86_400_000).toISOString().slice(0, 10)
+  const rows = [...(await macroRange(id, from, asOf)).entries()]
+  if (rows.length === 0) {
+    const last = await latestMacro(id)
+    return last ? `${label}: ${last.value.toFixed(2)}% (per ${last.date}, sesudah tanggal analisis)` : `${label}: tidak tersedia`
+  }
+  const [date, value] = rows[rows.length - 1]
+  const cutoff = new Date(Date.parse(date) - 91 * 86_400_000).toISOString().slice(0, 10)
+  const past = [...rows].reverse().find(([d]) => d <= cutoff)
+  const chg = past ? `, ${value - past[1] >= 0 ? '+' : ''}${(value - past[1]).toFixed(2)} poin dalam 3 bulan` : ''
+  return `${label}: ${value.toFixed(2)}% (per ${date}${chg})`
+}
+
+/**
+ * Konteks makro untuk valas dan obligasi. Harga valas digerakkan selisih
+ * bunga, harga obligasi bergerak berlawanan dengan imbal hasil — tanpa angka
+ * itu komite hanya membaca grafik.
+ */
+async function macroContextFor(
+  assetClass: 'mata_uang' | 'obligasi',
+  symbol: string,
+  asOf: string,
+): Promise<{ title: string; lines: string[] }> {
+  if (assetClass === 'mata_uang') {
+    const base = symbol.slice(0, 3)
+    const quote = symbol.slice(3, 6)
+    const lines = await Promise.all(
+      [base, quote].map((c) =>
+        POLICY_RATE[c] ? macroLine(POLICY_RATE[c].id, `Suku bunga ${c} (${POLICY_RATE[c].label})`, asOf) : Promise.resolve(`Suku bunga ${c}: belum ada sumber`),
+      ),
+    )
+    return {
+      title: `SELISIH SUKU BUNGA (${base} vs ${quote}; kurs naik = ${base} menguat terhadap ${quote})`,
+      lines,
+    }
+  }
+  return {
+    title: 'KURVA IMBAL HASIL AS (harga obligasi bergerak berlawanan dengan imbal hasil)',
+    lines: await Promise.all(YIELD_CURVE.map(([id, label]) => macroLine(id, label, asOf))),
+  }
 }
 
 function isoDate(date: Date): string {

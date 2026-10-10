@@ -142,6 +142,9 @@ export const WITHOUT_FUNDAMENTALS: readonly string[] = [
   'emas',
   'crypto',
   'memecoin',
+  'mata_uang',
+  // ETF obligasi punya imbal hasil, bukan laba: valuasi saham tidak berlaku.
+  'obligasi',
 ]
 
 export function fundamentalsApply(assetClass: string): boolean {
