@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { CandlestickChart, IntradayChart, type Candle, type IntradayCandle } from './candlestick-chart'
 
 /*
@@ -48,6 +48,31 @@ const STALE_SECONDS = 30 * 60
 const QUOTE_POLL_MS = 15_000
 const CANDLE_POLL_MS = 60_000
 
+/**
+ * Saham BEI bergerak per fraksi harga (BBCA: Rp25). Dalam 15 menit harganya
+ * sering hanya bergeser 0–1 fraksi, jadi lilinnya tergambar sebagai garis
+ * datar. Digabung jadi 1 jam, tiap lilin punya badan dan ekor yang terbaca.
+ */
+const IDR_BUCKET_SECONDS = 60 * 60
+
+function mergeCandles(candles: IntradayCandle[], bucketSeconds: number): IntradayCandle[] {
+  const out: IntradayCandle[] = []
+  for (const c of candles) {
+    // WIB = UTC+7 jam penuh, jadi batas jam UTC juga batas jam WIB.
+    const time = c.time - (c.time % bucketSeconds)
+    const prev = out[out.length - 1]
+    if (prev && prev.time === time) {
+      prev.high = Math.max(prev.high, c.high)
+      prev.low = Math.min(prev.low, c.low)
+      prev.close = c.close
+      prev.volume += c.volume
+    } else {
+      out.push({ ...c, time })
+    }
+  }
+  return out
+}
+
 interface LiveQuote {
   price: number
   changePct: number
@@ -63,6 +88,10 @@ export function LandingMarketChart({ samples = [] }: { samples?: MarketSample[] 
   const [quote, setQuote] = useState<LiveQuote | null>(null)
   const [livePrice, setLivePrice] = useState<number | null>(null)
   const [now, setNow] = useState(() => Date.now())
+  const shown = useMemo(
+    () => (tab.kind === 'idr' ? mergeCandles(candles, IDR_BUCKET_SECONDS) : candles),
+    [candles, tab.kind],
+  )
 
   // Lilin 5 menit: dimuat saat tab dipilih, lalu disegarkan tiap menit.
   useEffect(() => {
@@ -233,7 +262,7 @@ export function LandingMarketChart({ samples = [] }: { samples?: MarketSample[] 
       <div className="lp-market-plot">
         {candles.length > 0 ? (
           // key: grafik dibuat ulang per tab supaya skala harganya ikut berganti.
-          <IntradayChart key={tab.symbol} data={candles} livePrice={livePrice} />
+          <IntradayChart key={tab.symbol} data={shown} livePrice={livePrice} />
         ) : daily ? (
           <CandlestickChart key={`daily-${tab.symbol}`} data={daily.candles} range="3M" />
         ) : (
@@ -246,7 +275,7 @@ export function LandingMarketChart({ samples = [] }: { samples?: MarketSample[] 
       <p className="lp-market-foot">
         {candles.length > 0 ? (
           <>
-            <span>1 lilin = {tab.kind === 'crypto' ? 5 : 15} menit</span>
+            <span>1 lilin = {tab.kind === 'crypto' ? '5 menit' : tab.kind === 'idr' ? '1 jam' : '15 menit'}</span>
             <span>
               {tab.kind === 'crypto' ? 'live dari Binance, tiap detik' : 'dari Yahoo Finance, diperbarui tiap 15 detik'}
               {closed ? ' · menampilkan sesi terakhir' : ''}
