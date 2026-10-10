@@ -8,6 +8,7 @@ import { reconcileSession } from '../lib/auth/verified-session'
 import { cache } from '../lib/cache/redis'
 import { cloudflareAdapter } from '../lib/ai/providers/cloudflare'
 import { factsToPrompt, type MarketFacts } from '../lib/agents/facts'
+import { applyGuard, formatCheckTurn, parseCheck, parseCheckTurn, ruleFindings, untracedNumbers } from '../lib/agents/guard'
 
 async function main() {
   const reportFacts = {
@@ -31,6 +32,34 @@ async function main() {
   assert.ok(reportPrompt.includes('Laba bersih: USD -100.000'))
   assert.ok(reportPrompt.includes('Arus kas operasi: tidak tersedia'))
   assert.ok(reportPrompt.includes('Pos wajib yang tidak tersedia: arus_kas_operasi'))
+
+  // Pemeriksa putusan: hanya menurunkan, tidak pernah menaikkan atau membalik arah.
+  const factsText = 'Imbal hasil 30 hari: 12,34%. Harga terakhir: IDR 1.234,5. Volatilitas 1 tahun: 28,1%.'
+  assert.deepEqual(untracedNumbers('naik 12,3% dari 1.234,5 dengan volatilitas 28,1%', factsText), [])
+  assert.deepEqual(untracedNumbers('naik 45,6% dalam 3 kategori sejak 2026', factsText), ['45,6%'])
+  const ketua = { verdict: 'beli' as const, confidence: 82, rationale: 'Bukti condong positif.', key_risk: '', invalidation: '' }
+  const longFacts = { ...reportFacts, historyYears: 3 }
+  const clean = ruleFindings(ketua, longFacts, factsText)
+  assert.equal(clean.shortHistory, false)
+  assert.deepEqual(ruleFindings({ ...ketua, rationale: 'Saatnya membeli.' }, longFacts, factsText).bannedWords, ['membeli'])
+  assert.deepEqual(applyGuard(ketua, clean, { supported: true, max_confidence: 90, issues: [] }), { verdict: 'beli', confidence: 82, note: '' })
+  assert.equal(applyGuard(ketua, clean, { supported: true, max_confidence: 65, issues: [] }).confidence, 65)
+  const disputed = applyGuard(ketua, clean, { supported: false, max_confidence: 70, issues: ['tren turun'] }, 'groq')
+  assert.equal(disputed.verdict, 'tahan')
+  assert.equal(disputed.confidence, 40)
+  assert.ok(disputed.note.includes('groq') && disputed.note.includes('tren turun'))
+  assert.equal(applyGuard({ ...ketua, verdict: 'jual' }, clean, { supported: false, max_confidence: 0, issues: [] }).verdict, 'tahan')
+  const unchecked = applyGuard(ketua, clean, null)
+  assert.equal(unchecked.verdict, 'beli')
+  assert.equal(unchecked.confidence, 60)
+  assert.equal(applyGuard(ketua, ruleFindings(ketua, { ...reportFacts, historyYears: 0.5 }, factsText), { supported: true, max_confidence: 90, issues: [] }).confidence, 39)
+  assert.deepEqual(applyGuard({ ...ketua, verdict: 'abstain', confidence: 0 }, clean, null), { verdict: 'abstain', confidence: 0, note: '' })
+  assert.equal(applyGuard({ ...ketua, confidence: 30 }, clean, null).note, '')
+  assert.deepEqual(parseCheck('```json\n{"supported":"false","max_confidence":"55.4","issues":["x"],}\n```'), { supported: false, max_confidence: 55, issues: ['x'] })
+  assert.equal(parseCheck('{"supported":true,"max_confidence":140}'), null)
+  assert.equal(parseCheck('tidak ada JSON'), null)
+  const stored = { supported: false, max_confidence: 35, issues: ['angka karangan', 'keberatan tidak dijawab'] }
+  assert.deepEqual(parseCheckTurn(formatCheckTurn(clean, stored)), stored)
 
   // No env loader and no real network: providers and storage are controlled fakes.
   const originals = [...LLM_ADAPTERS]
@@ -87,6 +116,10 @@ async function main() {
 
     setup([provider('ordinary'), provider('preferred')])
     assert.equal((await complete({ ...request, prefer: ['preferred'] })).providerId, 'preferred')
+    calls.length = 0
+    assert.equal((await complete({ ...request, prefer: ['preferred'], exclude: ['preferred'] })).providerId, 'ordinary')
+    assert.deepEqual(calls, ['ordinary'])
+    await assert.rejects(complete({ ...request, exclude: ['ordinary', 'preferred'] }), AllProvidersFailedError)
     const paid = provider('paid')
     process.env[paid.envPrefix] = 'fake-paid'
     PREMIUM_LLM_ADAPTERS.push(paid)

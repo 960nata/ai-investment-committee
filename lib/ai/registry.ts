@@ -115,7 +115,10 @@ export async function complete(request: LlmRequest): Promise<LlmResponse> {
   let attemptNumber = 0
   const attempts: AttemptLog[] = []
   const base = preferred(getEntries(), request.prefer)
-  const chain = request.tier === 'premium' ? [...getPremiumEntries(), ...base] : base
+  const excluded = new Set(request.exclude ?? [])
+  const chain = (request.tier === 'premium' ? [...getPremiumEntries(), ...base] : base).filter(
+    (entry) => !excluded.has(entry.adapter.id),
+  )
 
   for (const entry of chain) {
     const { adapter, pool } = entry

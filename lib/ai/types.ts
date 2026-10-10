@@ -42,6 +42,11 @@ export interface LlmRequest {
    * permintaan gagal — ia hanya menentukan siapa yang ditanya lebih dulu.
    */
   prefer?: string[]
+  /**
+   * Penyedia yang tidak boleh menjawab sama sekali. Dipakai pemeriksa putusan:
+   * model yang memeriksa dirinya sendiri cenderung setuju dengan dirinya.
+   */
+  exclude?: string[]
 }
 
 export interface LlmResponse {

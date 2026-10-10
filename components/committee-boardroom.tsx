@@ -95,6 +95,12 @@ const ROLES_INFO: Record<
     badgeTone: 'warn',
     icon: <IconScales size={16} />,
   },
+  pemeriksa: {
+    title: 'Pemeriksa Independen',
+    badge: 'PEMERIKSAAN PUTUSAN',
+    badgeTone: 'neutral',
+    icon: <IconCheck size={16} />,
+  },
 }
 
 const STEPS = [

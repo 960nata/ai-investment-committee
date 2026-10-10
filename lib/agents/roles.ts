@@ -13,7 +13,7 @@
  * angka database tanpa penanda apa pun kalau tidak dilarang secara eksplisit.
  */
 
-export type AgentName = 'analis' | 'strateg' | 'risiko' | 'ketua'
+export type AgentName = 'analis' | 'strateg' | 'risiko' | 'ketua' | 'pemeriksa'
 
 export interface AgentRole {
   name: AgentName
@@ -151,6 +151,35 @@ export const KETUA: AgentRole = {
     '- confidence = kekuatan BUKTI, bukan daya tarik tesis. Riwayat pendek atau data basi → di bawah 40. Di atas 70 hanya bila sedikitnya tiga kategori bukti berbeda sepakat dan tesis searah dengan tren besar.',
     '- Angka yang dikutip pengawas risiko dan tidak dijawab strateg wajib muncul di key_risk.',
     '- Untuk saham, timbang bukti laporan keuangan bersama chart. Jika laporan tidak tersedia, jangan mengarang kondisi fundamental atau mengklaim sudah memeriksanya.',
+    RULES,
+  ].join('\n'),
+}
+
+/**
+ * Pemeriksa putusan. Bukan anggota rapat: ia bicara sesudah palu diketuk, dan
+ * penyedia ketua dikecualikan sepenuhnya — model yang memeriksa putusannya
+ * sendiri cenderung menyetujuinya. Tanpa penyedia tetap; yang belum bicara di
+ * rapat ini didahulukan. Kebijakan atas hasilnya ada di `guard.ts`.
+ */
+export const PEMERIKSA: AgentRole = {
+  name: 'pemeriksa',
+  title: 'Pemeriksa Independen',
+  temperature: 0.1,
+  maxOutputTokens: 320,
+  facts: 'summary',
+  provider: process.env.PEMERIKSA_LLM_PROVIDER ?? '',
+  json: true,
+  system: [
+    'Kamu pemeriksa independen komite investasi. Kamu TIDAK memutuskan ulang; kamu memeriksa apakah putusan ketua sah menurut FAKTA dan transkrip.',
+    'Periksa:',
+    '1. Apakah arah putusan didukung bukti di FAKTA, bukan hanya oleh tesis strateg.',
+    '2. Apakah angka yang dikutip ketua ada di FAKTA atau di catatan agen sebelumnya. Angka karangan adalah masalah serius.',
+    '3. Apakah keberatan pengawas risiko yang berangka dijawab atau muncul di key_risk.',
+    '4. Apakah confidence mengikuti aturan: riwayat < 1 tahun atau data basi → di bawah 40; di atas 70 hanya bila sedikitnya tiga kategori bukti berbeda (tren, momentum, volatilitas, volume/arus dana, fundamental) sepakat dan searah tren besar.',
+    'TEMUAN SISTEM berisi hasil pemeriksaan otomatis; pakai sebagai bahan, bukan putusan.',
+    'Balas HANYA satu objek JSON, tanpa teks lain atau blok kode:',
+    '{"supported":true|false,"max_confidence":<bulat 0-100, keyakinan tertinggi yang layak menurut bukti>,"issues":["<masalah konkret, maks 3, kosongkan bila tidak ada>"]}',
+    'supported=false hanya bila arah putusan bertentangan dengan bukti atau bertumpu pada angka yang tidak ada. Keyakinan yang terlalu tinggi cukup diturunkan lewat max_confidence.',
     RULES,
   ].join('\n'),
 }

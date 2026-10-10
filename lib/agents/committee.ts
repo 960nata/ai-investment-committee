@@ -39,9 +39,18 @@ import {
   gatherFacts,
   type MarketFacts,
 } from './tools'
-import { COMMITTEE, type AgentRole } from './roles'
+import { COMMITTEE, PEMERIKSA, type AgentRole } from './roles'
 import { LLM_ADAPTERS } from '@/lib/ai/adapters'
 import { parseVerdict, type CommitteeVerdict } from './verdict'
+import {
+  applyGuard,
+  formatCheckTurn,
+  parseCheck,
+  parseCheckTurn,
+  ruleFindings,
+  type RuleFindings,
+  type VerdictCheck,
+} from './guard'
 
 export { parseVerdict, type CommitteeVerdict }
 
@@ -51,7 +60,8 @@ export { parseVerdict, type CommitteeVerdict }
  * perbaikan prompt langsung berlaku tanpa menunggu candle baru.
  */
 // 2026-09-29.1: blok fakta memuat fundamental, kepemilikan KSEI, dan skor sistem.
-export const COMMITTEE_VERSION = '2026-10-03.1'
+// 2026-10-10.1: putusan ketua diperiksa aturan pasti dan model dari keluarga lain.
+export const COMMITTEE_VERSION = '2026-10-10.1'
 
 
 export interface CommitteeResult {
@@ -227,13 +237,20 @@ export async function runCommittee(input: CommitteeInput): Promise<CommitteeResu
     )
   }
 
+  // --- Tahap 4: pemeriksaan ----------------------------------------------
+
+  const rules = ruleFindings(parsed, facts, factsBlocks.full)
+  const check = await checkVerdict(session.id, rules, factsBlocks.summary, turns, existing)
+  const guarded = applyGuard(parsed, rules, check?.result ?? null, check?.providerId)
+
   await closeAgentSession({
     sessionId: session.id,
     status: 'done',
-    verdict: parsed.verdict,
-    confidence: parsed.confidence,
+    verdict: guarded.verdict,
+    confidence: guarded.confidence,
     rationale: [
       parsed.rationale,
+      guarded.note,
       parsed.key_risk ? `Risiko utama: ${parsed.key_risk}` : '',
       parsed.invalidation ? `Pembatalan: ${parsed.invalidation}` : '',
     ]
@@ -247,11 +264,82 @@ export async function runCommittee(input: CommitteeInput): Promise<CommitteeResu
     symbol,
     market,
     status: 'done',
-    verdict: parsed.verdict,
-    confidence: parsed.confidence,
-    rationale: parsed.rationale,
+    verdict: guarded.verdict,
+    confidence: guarded.confidence,
+    rationale: [parsed.rationale, guarded.note].filter(Boolean).join(' '),
     turns,
     facts,
+  }
+}
+
+/**
+ * Giliran pemeriksa. Tidak pernah menggagalkan rapat: bila semua penyedia
+ * selain milik ketua sedang kena limit, atau balasannya rusak, hasilnya null
+ * dan `applyGuard` membatasi keyakinan alih-alih membuang empat giliran yang
+ * sudah dibayar.
+ */
+async function checkVerdict(
+  sessionId: number,
+  rules: RuleFindings,
+  factsBlock: string,
+  turns: CommitteeResult['turns'],
+  existing: Awaited<ReturnType<typeof getAgentTranscript>>,
+): Promise<{ result: VerdictCheck; providerId?: string } | null> {
+  const seq = COMMITTEE.length
+  const recorded = existing.find((m) => m.seq === seq)
+  if (recorded) {
+    const result = parseCheckTurn(recorded.content)
+    return result ? { result, providerId: recorded.providerId ?? undefined } : null
+  }
+
+  const ketuaProvider = turns.find((t) => t.agent === 'ketua')?.providerId
+  const findings = [
+    rules.shortHistory ? '- Riwayat kurang dari 1 tahun.' : '',
+    rules.untracedNumbers.length
+      ? `- Angka di putusan yang tidak ditemukan di FAKTA: ${rules.untracedNumbers.join(', ')}`
+      : '- Semua angka di putusan terlacak ke FAKTA.',
+    rules.bannedWords.length ? `- Kata transaksi terlarang di putusan: ${rules.bannedWords.join(', ')}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n')
+
+  try {
+    const response = await complete({
+      feature: 'committee-check',
+      messages: buildMessages(PEMERIKSA, factsBlock, [...turns, { agent: 'temuan sistem', content: findings }]),
+      temperature: PEMERIKSA.temperature,
+      maxOutputTokens: PEMERIKSA.maxOutputTokens,
+      json: true,
+      prefer: await speakingOrder(PEMERIKSA.provider, PEMERIKSA.name, turns),
+      exclude: ketuaProvider ? [ketuaProvider] : [],
+      timeoutMs: 25_000,
+    })
+
+    const result = parseCheck(response.text)
+    if (!result) {
+      console.warn(`[Komite] balasan pemeriksa dari ${response.providerId} tidak bisa diurai`)
+      return null
+    }
+
+    const content = formatCheckTurn(rules, result)
+    await recordAgentMessage({
+      sessionId,
+      seq,
+      agent: PEMERIKSA.name,
+      content,
+      providerId: response.providerId,
+      model: response.model,
+      keyIndex: response.keyIndex,
+      latencyMs: response.latencyMs,
+      inputTokens: response.inputTokens,
+      outputTokens: response.outputTokens,
+    })
+    turns.push({ agent: PEMERIKSA.name, content, providerId: response.providerId, latencyMs: response.latencyMs })
+
+    return { result, providerId: response.providerId }
+  } catch (err) {
+    console.warn(`[Komite] pemeriksa tidak terjangkau: ${err instanceof Error ? err.message : String(err)}`)
+    return null
   }
 }
 
