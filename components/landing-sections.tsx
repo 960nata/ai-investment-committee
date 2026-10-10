@@ -424,16 +424,19 @@ export function LimitsSection({
   const sufficient = Math.max(0, totalScores - insufficient)
   const items = [
     {
-      title: 'Belum ada angka peluang',
-      body: 'Skor bisa mengurutkan mana yang lebih kuat, tapi belum berhak bilang "peluang naik 62%". Angka itu butuh kalibrasi terhadap hasil historis.',
+      title: 'Skor peringkat, angka peluang menyusul',
+      body: 'Skor mengurutkan instrumen dari sinyal yang paling kuat. Angka seperti "peluang naik 62%" baru ditampilkan setelah dicocokkan dengan hasil historis, supaya angkanya bisa dipertanggungjawabkan.',
+      status: 'berikutnya',
     },
     {
-      title: 'Bobotnya belum dikalibrasi',
-      body: 'Bobot antar kelompok fitur dipilih dari rancangan awal, belum dari hasil historis. Ini juga tertulis di tiap halaman skor.',
+      title: 'Kalibrasi bobot dari backtest',
+      body: 'Bobot antar kelompok fitur saat ini mengikuti rancangan riset awal. Tahap berikutnya: menyetelnya dari backtest terhadap harga yang benar-benar terjadi. Statusnya juga tertulis di tiap halaman skor.',
+      status: 'berikutnya',
     },
     {
       title: 'Bukan untuk day trading',
       body: 'Grafiknya memang live, tapi skor dan putusan komite dihitung dari data harian. Kalau butuh sinyal detik-per-detik, platform ini bukan jawabannya.',
+      status: 'di luar cakupan',
     },
   ]
 
@@ -442,7 +445,7 @@ export function LimitsSection({
       <div className="lp-inner">
         <SectionHead
           label="Batas sistem"
-          title="Yang belum bisa dilakukan sistem ini"
+          title="Jujur soal batasnya"
           sub="Ditulis di beranda, bukan disembunyikan di halaman syarat."
         />
 
@@ -499,7 +502,7 @@ export function LimitsSection({
                   <div>
                     <h3>
                       {item.title}
-                      <span className="lp-limit-status">belum</span>
+                      <span className="lp-limit-status">{item.status}</span>
                     </h3>
                     <p>{item.body}</p>
                   </div>
