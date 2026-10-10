@@ -421,6 +421,7 @@ export function LimitsSection({
   totalScores: number
   chartSamples: MarketSample[]
 }) {
+  const sufficient = Math.max(0, totalScores - insufficient)
   const items = [
     {
       title: 'Belum ada angka peluang',
@@ -451,37 +452,37 @@ export function LimitsSection({
               <div className="lp-limits-figure lp-reveal">
                 <div className="lp-limits-top">
                   <p className="lp-limits-ratio">
-                    <span className="big">{insufficient.toLocaleString('id-ID')}</span>
+                    <span className="big">{sufficient.toLocaleString('id-ID')}</span>
                     <span className="of">/ {totalScores.toLocaleString('id-ID')}</span>
                   </p>
                   <p className="lp-limits-caption">
-                    skor terbaru berlabel <strong>&ldquo;tidak memadai&rdquo;</strong>
+                    skor terbaru punya <strong>data yang cukup</strong>
                   </p>
                 </div>
 
-                {/* Satu kotak per skor. Yang menyala adalah yang tidak memadai. */}
+                {/* Satu kotak per skor. Yang menyala punya data cukup; sisanya "tidak memadai". */}
                 <div
                   className="lp-waffle"
                   role="img"
-                  aria-label={`${insufficient} dari ${totalScores} skor tidak memadai`}
+                  aria-label={`${sufficient} dari ${totalScores} skor punya data cukup, ${insufficient} tidak memadai`}
                 >
                   {Array.from({ length: totalScores }, (_, i) => (
                     <span
                       key={i}
-                      className={i < insufficient ? 'on' : undefined}
-                      style={i < insufficient ? ({ '--i': i } as React.CSSProperties) : undefined}
+                      className={i < sufficient ? 'on' : undefined}
+                      style={i < sufficient ? ({ '--i': i } as React.CSSProperties) : undefined}
                     />
                   ))}
                 </div>
 
                 <p className="lp-waffle-legend">
-                  <span className="on">tidak memadai</span>
-                  <span>tinggi, sedang, atau rendah</span>
+                  <span className="on">cukup data</span>
+                  <span>tidak memadai ({insufficient.toLocaleString('id-ID')})</span>
                 </p>
                 <p className="lp-limits-why">
-                  Umumnya memecoin dan saham yang transaksinya tipis: volume hariannya terlalu
-                  kecil untuk menghasilkan sinyal yang bisa dipercaya. Ditampilkan apa adanya,
-                  bukan diisi angka asal.
+                  Sisanya umumnya memecoin dan saham yang transaksinya tipis: volume hariannya
+                  terlalu kecil untuk menghasilkan sinyal yang bisa dipercaya. Ditampilkan apa
+                  adanya, bukan diisi angka asal.
                 </p>
               </div>
             )}

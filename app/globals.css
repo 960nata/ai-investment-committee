@@ -14783,7 +14783,7 @@ body.rail-lock {
   margin-bottom: 20px;
 }
 
-/* Satu kotak per skor terbaru; yang menyala berlabel "tidak memadai". */
+/* Satu kotak per skor terbaru; yang menyala punya data cukup. */
 .lp-waffle {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(9px, 1fr));
@@ -14804,8 +14804,8 @@ body.rail-lock {
   opacity: 0.15;
   transform: scale(0.4);
   transition:
-    opacity 0.3s ease calc(var(--i) * 18ms + 250ms),
-    transform 0.3s ease calc(var(--i) * 18ms + 250ms);
+    opacity 0.3s ease calc(var(--i) * 0.8ms + 250ms),
+    transform 0.3s ease calc(var(--i) * 0.8ms + 250ms);
 }
 
 .reveal-ready .lp-limits-figure.is-in .lp-waffle span.on {
