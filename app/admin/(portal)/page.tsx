@@ -20,16 +20,21 @@ import {
 } from '@/components/icons'
 import { getMarketNewsList, getAdSettings, getAppUsers } from '@/lib/db/news-queries'
 import { isSupabaseStorageConfigured } from '@/lib/storage/supabase-storage'
+import { alertSummary, type AlertSummary } from '@/lib/project/store'
+import styles from '@/components/admin/project.module.css'
 
 export const dynamic = 'force-dynamic'
 
 export default async function AdminOverviewPage() {
   await requireAdmin()
-  const [news, ads, users] = await Promise.all([
+  const [news, ads, users, alerts] = await Promise.all([
     getMarketNewsList({ limit: 10 }),
     getAdSettings(),
     getAppUsers(),
+    // Spanduk peringatan bukan alasan untuk menggagalkan seluruh ringkasan.
+    alertSummary().catch((): AlertSummary | null => null),
   ])
+  const urgentAlerts = alerts?.alerts.filter((a) => a.severity === 'mendesak') ?? []
 
   const storageReady = isSupabaseStorageConfigured()
   const activeAdsCount = ads.filter((a) => a.isEnabled).length
@@ -100,6 +105,24 @@ export default async function AdminOverviewPage() {
           <div className="admin-hero-chips-foot">{todayLabel()}</div>
         </div>
       </div>
+
+      {urgentAlerts.length > 0 && (
+        <Link href="/admin/rapat-project" className={styles.urgentBanner}>
+          <IconAlert size={16} />
+          <span>
+            <strong>
+              {urgentAlerts.length} masalah mendesak terbuka
+            </strong>
+            {' — '}
+            {urgentAlerts
+              .slice(0, 3)
+              .map((a) => a.title)
+              .join(' · ')}
+            {urgentAlerts.length > 3 ? ` · +${urgentAlerts.length - 3} lainnya` : ''}
+          </span>
+          <span className={styles.urgentBannerCta}>Lihat →</span>
+        </Link>
+      )}
 
       {/* 2. STAT METRIC CARDS (4-GRID) */}
       <div className="admin-stats-grid" suppressHydrationWarning>

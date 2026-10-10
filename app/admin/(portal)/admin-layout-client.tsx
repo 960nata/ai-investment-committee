@@ -25,6 +25,7 @@ import {
   IconWallet,
 } from '@/components/icons'
 import { AdminLogoutButton } from './admin-logout-btn'
+import { AdminAlertBell, UrgentBadge, useAdminAlerts } from '@/components/admin/admin-alert-bell'
 
 interface AdminLayoutClientProps {
   children: React.ReactNode
@@ -33,6 +34,7 @@ interface AdminLayoutClientProps {
 export function AdminLayoutClient({ children }: AdminLayoutClientProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const pathname = usePathname()
+  const { summary: alerts, acknowledge } = useAdminAlerts(pathname)
 
   // Cari judul modul aktif untuk breadcrumb topbar
   let moduleTitle = 'Ringkasan Sistem'
@@ -60,6 +62,14 @@ export function AdminLayoutClient({ children }: AdminLayoutClientProps) {
     moduleTitle = 'Pengumuman Dashboard'
   } else if (pathname.startsWith('/admin/simulator')) {
     moduleTitle = 'Simulator Trading AI'
+  } else if (pathname.startsWith('/admin/ruang-komite')) {
+    moduleTitle = 'Ruang Komite'
+  } else if (pathname.startsWith('/admin/arsip-kerja')) {
+    moduleTitle = 'Arsip Kerja AI'
+  } else if (pathname.startsWith('/admin/rapat-project')) {
+    moduleTitle = 'Rapat Project'
+  } else if (pathname.startsWith('/admin/keuangan')) {
+    moduleTitle = 'Buku Kas'
   }
 
   return (
@@ -91,6 +101,8 @@ export function AdminLayoutClient({ children }: AdminLayoutClientProps) {
         </div>
 
         <div className="admin-topbar-right" suppressHydrationWarning>
+          <AdminAlertBell summary={alerts} acknowledge={acknowledge} />
+
           {/* Status Sesi */}
           <div className="admin-session-pill mono">
             <span className="badge-live-pulse" style={{ width: '6px', height: '6px' }} />
@@ -211,6 +223,7 @@ export function AdminLayoutClient({ children }: AdminLayoutClientProps) {
             >
               <IconActivity size={15} />
               <span>Rapat Project</span>
+              <UrgentBadge count={alerts?.urgent ?? 0} />
             </Link>
 
             <Link

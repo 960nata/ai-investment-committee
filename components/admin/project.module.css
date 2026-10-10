@@ -115,3 +115,20 @@
 .input { height: 32px; padding: 0 8px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-0); color: var(--ink); font-size: 12px; min-width: 0; }
 .wide { grid-column: span 2; }
 @media (max-width: 640px) { .wide { grid-column: auto; } }
+
+.urgentBanner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--halted);
+  border-radius: var(--radius-sm);
+  background: var(--halted-dim);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.5;
+  text-decoration: none;
+}
+.urgentBanner > svg { color: var(--halted); flex: none; }
+.urgentBanner strong { color: var(--halted); }
+.urgentBannerCta { margin-left: auto; color: var(--halted); font-family: var(--mono); font-size: 11px; white-space: nowrap; }

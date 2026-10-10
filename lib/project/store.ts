@@ -81,7 +81,8 @@ export function ensureProjectTables(): Promise<void> {
         detail TEXT NOT NULL,
         first_seen TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         last_seen TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        resolved_at TIMESTAMPTZ
+        resolved_at TIMESTAMPTZ,
+        acknowledged_at TIMESTAMPTZ
       );
       CREATE UNIQUE INDEX IF NOT EXISTS project_alert_open_uq ON project_alert (alert_key) WHERE resolved_at IS NULL;
 
@@ -98,11 +99,28 @@ export function ensureProjectTables(): Promise<void> {
       );
       CREATE UNIQUE INDEX IF NOT EXISTS project_ledger_ref_uq ON project_ledger (ref) WHERE ref IS NOT NULL;
       CREATE INDEX IF NOT EXISTS project_ledger_date_idx ON project_ledger (entry_date);
-    `).catch((err) => {
-    ready = null
-    throw err
-  })
+    `)
+    .then(ensureAlertAckColumn)
+    .catch((err) => {
+      ready = null
+      throw err
+    })
   return ready
+}
+
+/**
+ * `acknowledged_at` datang sesudah tabelnya sudah terpasang di produksi, jadi
+ * DDL pembuatan di atas tidak lagi dijalankan di sana. Kolomnya ditambahkan
+ * terpisah, didahului cek katalog yang murah.
+ */
+async function ensureAlertAckColumn(): Promise<void> {
+  const [state] = await db.execute<{ ready: boolean }>(sql`
+    SELECT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name = 'project_alert' AND column_name = 'acknowledged_at'
+    ) AS ready
+  `)
+  if (!state?.ready) await db.execute(sql`ALTER TABLE project_alert ADD COLUMN IF NOT EXISTS acknowledged_at TIMESTAMPTZ`)
 }
 
 // --- Laporan ---------------------------------------------------------------
@@ -194,6 +212,8 @@ export interface ProjectAlertRow {
   firstSeen: string
   lastSeen: string
   resolvedAt: string | null
+  /** Kapan admin menandainya sudah dilihat. Berlaku untuk semua admin sekaligus. */
+  acknowledgedAt: string | null
 }
 
 /**
@@ -211,7 +231,10 @@ export async function syncAlerts(issues: ProjectIssue[]): Promise<ProjectIssue[]
   for (const issue of issues) {
     if (openKeys.has(issue.key)) {
       await db.execute(sql`
-        UPDATE project_alert SET last_seen = NOW(), severity = ${issue.severity}, title = ${issue.title}, detail = ${issue.detail}
+        UPDATE project_alert SET last_seen = NOW(), title = ${issue.title}, detail = ${issue.detail},
+          -- Naik dari "perhatian" ke "mendesak" berarti kabar baru: lonceng menyala lagi.
+          acknowledged_at = CASE WHEN severity <> 'mendesak' AND ${issue.severity} = 'mendesak' THEN NULL ELSE acknowledged_at END,
+          severity = ${issue.severity}
         WHERE alert_key = ${issue.key} AND resolved_at IS NULL
       `)
     } else {
@@ -245,6 +268,7 @@ export async function listAlerts(includeResolved = false, limit = 50): Promise<P
     first_seen: Date | string
     last_seen: Date | string
     resolved_at: Date | string | null
+    acknowledged_at: Date | string | null
   }>(sql`
     SELECT * FROM project_alert
     ${includeResolved ? sql`` : sql`WHERE resolved_at IS NULL`}
@@ -260,7 +284,41 @@ export async function listAlerts(includeResolved = false, limit = 50): Promise<P
     firstSeen: new Date(r.first_seen).toISOString(),
     lastSeen: new Date(r.last_seen).toISOString(),
     resolvedAt: r.resolved_at ? new Date(r.resolved_at).toISOString() : null,
+    acknowledgedAt: r.acknowledged_at ? new Date(r.acknowledged_at).toISOString() : null,
   }))
+}
+
+export interface AlertSummary {
+  /** Masalah mendesak yang masih terbuka. */
+  urgent: number
+  open: number
+  /** Terbuka dan belum ditandai dilihat — angka di lonceng. */
+  unseen: number
+  alerts: ProjectAlertRow[]
+}
+
+/** Ringkasan untuk lonceng, lencana sidebar, dan spanduk Ringkasan Admin. */
+export async function alertSummary(): Promise<AlertSummary> {
+  const alerts = await listAlerts(false, 30)
+  return {
+    urgent: alerts.filter((a) => a.severity === 'mendesak').length,
+    open: alerts.length,
+    unseen: alerts.filter((a) => !a.acknowledgedAt).length,
+    alerts,
+  }
+}
+
+/** Tandai peringatan terbuka sudah dilihat; tanpa `ids`, semuanya. */
+export async function acknowledgeAlerts(ids?: number[]): Promise<number> {
+  await ensureProjectTables()
+  if (ids && ids.length === 0) return 0
+  const rows = await db.execute<{ id: number }>(sql`
+    UPDATE project_alert SET acknowledged_at = NOW()
+    WHERE resolved_at IS NULL AND acknowledged_at IS NULL
+      ${ids ? sql`AND id IN (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})` : sql``}
+    RETURNING id
+  `)
+  return rows.length
 }
 
 // --- Buku kas ----------------------------------------------------------------
