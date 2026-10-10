@@ -109,8 +109,10 @@
 .footer { padding: 9px 12px; border-top: 1px solid var(--line); color: var(--signal); font-family: var(--mono); font-size: 11px; text-decoration: none; text-align: center; }
 .footer:hover { background: var(--signal-dim); }
 
+.navBadges { margin-left: auto; display: inline-flex; gap: 4px; }
+.navBadgePending { background: var(--signal) !important; color: #0f1110 !important; }
+
 .navBadge {
-  margin-left: auto;
   min-width: 18px;
   height: 18px;
   padding: 0 5px;

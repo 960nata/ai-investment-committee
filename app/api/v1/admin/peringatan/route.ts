@@ -8,6 +8,7 @@
 import { NextResponse } from 'next/server'
 import { verifyAdminSession, isRequestAdminAuthenticated } from '@/lib/auth/admin-auth'
 import { acknowledgeAlerts, alertSummary } from '@/lib/project/store'
+import { countPendingProposals } from '@/lib/project/proposals'
 import { badRequest, failure, NO_STORE, unauthorized } from '@/lib/http/errors'
 
 export const dynamic = 'force-dynamic'
@@ -19,7 +20,9 @@ async function isAdmin(request: Request) {
 export async function GET(request: Request) {
   if (!(await isAdmin(request))) return unauthorized()
   try {
-    return NextResponse.json(await alertSummary(), { headers: NO_STORE })
+    const [summary, pendingProposals] = await Promise.all([alertSummary(), countPendingProposals().catch(() => 0)])
+    // Usulan yang menunggu keputusan owner ikut dikirim untuk lencana menu Usulan.
+    return NextResponse.json({ ...summary, pendingProposals }, { headers: NO_STORE })
   } catch (err) {
     return failure('api/v1/admin/peringatan', err)
   }

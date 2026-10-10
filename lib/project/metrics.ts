@@ -18,9 +18,9 @@ import { TRANSLATED_LOCALES } from '@/lib/i18n/locales'
 import { getMacroCalendar, upcomingHighImpact } from '@/lib/macro/calendar'
 import { ledgerTotals, syncPremiumIncome, type ProjectIssue } from './store'
 
-type Section<T> = T | { tidakTersedia: string }
+export type Section<T> = T | { tidakTersedia: string }
 
-async function section<T>(read: () => Promise<T>): Promise<Section<T>> {
+export async function section<T>(read: () => Promise<T>): Promise<Section<T>> {
   try {
     return await read()
   } catch (err) {

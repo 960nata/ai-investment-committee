@@ -132,3 +132,8 @@
 .urgentBanner > svg { color: var(--halted); flex: none; }
 .urgentBanner strong { color: var(--halted); }
 .urgentBannerCta { margin-left: auto; color: var(--halted); font-family: var(--mono); font-size: 11px; white-space: nowrap; }
+
+.roomGrid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(300px, 1fr); gap: 14px; align-items: stretch; }
+@media (max-width: 1100px) {
+  .roomGrid { grid-template-columns: minmax(0, 1fr); }
+}

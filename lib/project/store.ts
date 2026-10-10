@@ -13,10 +13,14 @@
 import { sql } from 'drizzle-orm'
 import { db } from '@/lib/db/client'
 import type { LlmFailover } from '@/lib/ai/types'
-import { createIfMissing } from '@/lib/db/create-if-missing'
+import { createIfMissing, ensureColumn } from '@/lib/db/create-if-missing'
+import type { VoteResult } from './voting'
 
-export type ReportPeriod = 'harian' | 'mingguan' | 'bulanan'
-export const REPORT_PERIODS: readonly ReportPeriod[] = ['harian', 'mingguan', 'bulanan']
+export type ReportPeriod = 'harian' | 'mingguan' | 'bulanan' | 'tahunan'
+export const REPORT_PERIODS: readonly ReportPeriod[] = ['harian', 'mingguan', 'bulanan', 'tahunan']
+
+/** Panjang rentang rapat dadakan (hari), berakhir saat rapat dibuka. */
+export const MANUAL_PERIOD_DAYS: Record<ReportPeriod, number> = { harian: 1, mingguan: 7, bulanan: 30, tahunan: 365 }
 
 export type IssueSeverity = 'mendesak' | 'perhatian'
 
@@ -50,6 +54,8 @@ export interface ProjectReportRow {
   minutes: MeetingMinute[]
   actionItems: string[]
   note: string | null
+  /** Daftar hadir anggota dan hasil voting usulan. Null untuk rapat tanpa usulan baru. */
+  votes: VoteResult | null
   createdAt: string
 }
 
@@ -69,6 +75,7 @@ export function ensureProjectTables(): Promise<void> {
         minutes JSONB NOT NULL DEFAULT '[]'::jsonb,
         action_items JSONB NOT NULL DEFAULT '[]'::jsonb,
         note TEXT,
+        votes JSONB,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
       CREATE INDEX IF NOT EXISTS project_report_period_idx ON project_report (period, period_start DESC);
@@ -101,6 +108,7 @@ export function ensureProjectTables(): Promise<void> {
       CREATE INDEX IF NOT EXISTS project_ledger_date_idx ON project_ledger (entry_date);
     `)
     .then(ensureAlertAckColumn)
+    .then(() => ensureColumn('project_report', 'votes', 'JSONB'))
     .catch((err) => {
       ready = null
       throw err
@@ -137,6 +145,7 @@ type ReportDbRow = {
   minutes: MeetingMinute[]
   action_items: string[]
   note: string | null
+  votes: VoteResult | null
   created_at: Date | string
 }
 
@@ -153,6 +162,7 @@ function toReport(r: ReportDbRow): ProjectReportRow {
     minutes: r.minutes ?? [],
     actionItems: r.action_items ?? [],
     note: r.note,
+    votes: r.votes ?? null,
     createdAt: new Date(r.created_at).toISOString(),
   }
 }
@@ -161,11 +171,12 @@ export async function saveReport(report: Omit<ProjectReportRow, 'id' | 'createdA
   await ensureProjectTables()
   const [row] = await db.execute<{ id: number }>(sql`
     INSERT INTO project_report
-      (period, trigger, period_start, period_end, status, metrics, issues, minutes, action_items, note)
+      (period, trigger, period_start, period_end, status, metrics, issues, minutes, action_items, note, votes)
     VALUES (
       ${report.period}, ${report.trigger}, ${report.periodStart}::timestamptz, ${report.periodEnd}::timestamptz,
       ${report.status}, ${JSON.stringify(report.metrics)}::jsonb, ${JSON.stringify(report.issues)}::jsonb,
-      ${JSON.stringify(report.minutes)}::jsonb, ${JSON.stringify(report.actionItems)}::jsonb, ${report.note}
+      ${JSON.stringify(report.minutes)}::jsonb, ${JSON.stringify(report.actionItems)}::jsonb, ${report.note},
+      ${report.votes ? JSON.stringify(report.votes) : null}::jsonb
     )
     RETURNING id
   `)
@@ -295,6 +306,8 @@ export interface AlertSummary {
   /** Terbuka dan belum ditandai dilihat — angka di lonceng. */
   unseen: number
   alerts: ProjectAlertRow[]
+  /** Usulan rapat yang menunggu keputusan owner (diisi rute API, bukan `alertSummary`). */
+  pendingProposals?: number
 }
 
 /** Ringkasan untuk lonceng, lencana sidebar, dan spanduk Ringkasan Admin. */

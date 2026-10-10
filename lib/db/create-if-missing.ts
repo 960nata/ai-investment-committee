@@ -21,3 +21,20 @@ export async function createIfMissing(tables: string | string[], ddl: SQL): Prom
   if (state?.ready) return
   await db.execute(ddl)
 }
+
+/**
+ * Tambahkan satu kolom ke tabel yang sudah ada, hanya bila kolomnya belum ada.
+ * Untuk kolom yang datang sesudah tabelnya terpasang di produksi — DDL
+ * pembuatan tabel tidak lagi dijalankan di sana. `definition` ditulis pemanggil
+ * di kode, tidak pernah dari masukan pengguna.
+ */
+export async function ensureColumn(table: string, column: string, definition: string): Promise<void> {
+  const [state] = await db.execute<{ ready: boolean }>(sql`
+    SELECT EXISTS (
+      SELECT 1 FROM information_schema.columns WHERE table_name = ${table} AND column_name = ${column}
+    ) AS ready
+  `)
+  if (!state?.ready) {
+    await db.execute(sql.raw(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS ${column} ${definition}`))
+  }
+}

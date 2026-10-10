@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { requireAdmin } from '@/lib/auth/admin-auth'
 import { getReport } from '@/lib/project/store'
+import { proposalsForReport, type Proposal } from '@/lib/project/proposals'
 import { isMissing, type ProjectMetrics } from '@/lib/project/metrics'
 import styles from '@/components/admin/project.module.css'
 import { reportTitle, rupiah, WIB } from '@/components/admin/project-format'
@@ -15,6 +16,7 @@ export default async function ProjectReportDetail({ params }: { params: Promise<
   if (!Number.isInteger(id) || id <= 0) notFound()
   const report = await getReport(id)
   if (!report) notFound()
+  const proposals: Proposal[] = await proposalsForReport(id).catch(() => [])
 
   const m = report.metrics as unknown as ProjectMetrics
 
@@ -59,6 +61,58 @@ export default async function ProjectReportDetail({ params }: { params: Promise<
               </li>
             ))}
           </ul>
+        </section>
+      )}
+
+      {report.votes && (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>
+            Daftar hadir voting · {report.votes.attendance.filter((a) => a.hadir).length} hadir,{' '}
+            {report.votes.attendance.filter((a) => !a.hadir).length} absen
+          </h2>
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>Anggota</th>
+                  <th>Model</th>
+                  <th>Kehadiran</th>
+                  <th className={styles.num}>Waktu</th>
+                </tr>
+              </thead>
+              <tbody>
+                {report.votes.attendance.map((a) => (
+                  <tr key={a.providerId}>
+                    <td className={styles.mono}>{a.providerId}</td>
+                    <td className={styles.muted}>{a.model ?? '—'}</td>
+                    <td className={a.hadir ? (a.alasan ? styles.down : styles.up) : styles.down}>
+                      {a.hadir ? (a.alasan ? `hadir — ${a.alasan}` : 'hadir') : `absen — ${a.alasan}`}
+                    </td>
+                    <td className={styles.num}>{a.latencyMs ? `${(a.latencyMs / 1000).toFixed(1)} dtk` : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {proposals.length > 0 && (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Usulan dari rapat ini</h2>
+          <ul className={styles.todo}>
+            {proposals.map((p) => (
+              <li key={p.id}>
+                <span>
+                  <strong>#{p.id} {p.title}</strong> — {p.status}
+                  {p.votes ? ` · voting ${p.votes.setuju} setuju / ${p.votes.tolak} tolak / ${p.votes.abstain} abstain / ${p.votes.absen} absen` : ''}
+                  <br />
+                  <span className={styles.muted}>{p.proposal}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className={styles.muted}>Putuskan usulan di papan ceklis pada halaman Rapat Project.</p>
         </section>
       )}
 

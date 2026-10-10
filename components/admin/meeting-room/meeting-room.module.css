@@ -1,0 +1,266 @@
+/* Ruang rapat project — semua ilustrasi digambar dengan garis, tanpa isian. */
+
+.mono { font-family: var(--mono); }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 11px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 11px;
+  cursor: pointer;
+}
+.btn:disabled { opacity: 0.45; cursor: default; }
+.btnPrimary { border-color: var(--signal); background: var(--signal-dim); color: var(--signal); font-weight: 600; }
+
+.notice { margin: 0; padding: 9px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-1); color: var(--ink-soft); font-size: 12px; }
+.noticeBad { border-color: var(--halted); color: var(--halted); background: var(--halted-dim); }
+.hint { margin: 0; text-align: center; color: var(--ink-mute); font-size: 11px; font-family: var(--mono); }
+
+/* --- Meja sidang ------------------------------------------------------ */
+
+.room {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md, 7px);
+  background: radial-gradient(ellipse at 50% 45%, var(--signal-dim), transparent 65%), var(--surface-0);
+}
+
+.controls { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.controlsLabel { color: var(--ink-mute); font-size: 11px; font-family: var(--mono); margin-right: 4px; }
+
+.scene { width: 100%; height: auto; display: block; }
+
+.wall { fill: none; stroke: var(--line); stroke-width: 1.5; stroke-dasharray: 6 6; }
+.table { fill: none; stroke: var(--line-strong); stroke-width: 2.5; }
+.tableInner { fill: none; stroke: var(--line); stroke-width: 1; }
+.tableTitle { fill: var(--ink); font-family: var(--mono); font-size: 13px; font-weight: 700; letter-spacing: 0.04em; }
+.tableSub { fill: var(--ink-mute); font-family: var(--mono); font-size: 11px; }
+
+.chairBack, .chairSeat { fill: none; stroke-width: 2; transition: stroke 200ms ease; }
+.chairArm { stroke-width: 2; stroke-linecap: round; }
+.seat .chairBack, .seat .chairSeat, .seat .chairArm { stroke: var(--line-strong); }
+.seatEmpty { opacity: 0.4; }
+.seatFilled .chairBack, .seatFilled .chairSeat, .seatFilled .chairArm { stroke: var(--measured); }
+.seatClickable { cursor: pointer; }
+.seatClickable:hover .chairSeat, .seatClickable:focus-visible .chairSeat { stroke: var(--signal); }
+.seatClickable:focus { outline: none; }
+.seatActive .chairBack, .seatActive .chairSeat, .seatActive .chairArm { stroke: var(--signal); stroke-width: 3; }
+
+.seatSpeaking { opacity: 1; animation: speak 10s ease-in-out infinite; }
+.seatSpeaking .chairBack, .seatSpeaking .chairSeat, .seatSpeaking .chairArm { stroke: inherit; }
+
+@keyframes speak {
+  0%, 22% { stroke: var(--signal); filter: drop-shadow(0 0 6px var(--signal)); }
+  25%, 100% { stroke: var(--line-strong); filter: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seatSpeaking { animation: none; stroke: var(--signal); }
+}
+
+.seatTitle { fill: var(--ink); font-size: 13px; font-weight: 600; }
+.seatSub { fill: var(--ink-mute); font-family: var(--mono); font-size: 10px; }
+.seatReplaced { fill: var(--degraded); font-family: var(--mono); font-size: 10px; font-weight: 700; }
+
+.paper rect, .paper line { fill: none; stroke: var(--signal); stroke-width: 1.2; }
+.paperEmpty rect, .paperEmpty line { fill: none; stroke: var(--line); stroke-width: 1; stroke-dasharray: 3 3; }
+
+.minute { border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-1); }
+.minuteHead { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; padding: 9px 12px; border-bottom: 1px solid var(--line); font-size: 11px; color: var(--ink-mute); }
+.minuteRole { color: var(--signal); font-family: var(--mono); font-weight: 700; font-size: 12px; }
+.minuteBody { margin: 0; padding: 12px; max-height: 360px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12.5px; line-height: 1.6; color: var(--ink-soft); }
+.chain { padding: 6px 12px; font-family: var(--mono); font-size: 11px; color: var(--degraded); background: var(--degraded-dim); overflow-wrap: anywhere; }
+.close { margin-left: auto; width: 24px; height: 24px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: transparent; color: var(--ink-soft); cursor: pointer; font-size: 15px; line-height: 1; }
+
+/* --- Papan usulan ------------------------------------------------------- */
+
+.board { min-width: 0; }
+
+.boardFrame {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  border: 3px double var(--line-strong);
+  border-radius: var(--radius-md, 7px);
+  background:
+    repeating-linear-gradient(0deg, transparent 0 27px, rgba(233, 236, 233, 0.025) 27px 28px),
+    var(--surface-1);
+}
+
+.boardHead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; padding: 12px 14px 6px; }
+.boardTitle { color: var(--signal); font-family: var(--mono); font-size: 14px; font-weight: 700; letter-spacing: 0.12em; }
+.boardSub { color: var(--ink-mute); font-size: 11px; }
+
+.boardTabs { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 12px 8px; border-bottom: 1px dashed var(--line); }
+.boardTab { padding: 4px 9px; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: var(--ink-mute); font-family: var(--mono); font-size: 11px; cursor: pointer; }
+.boardTabActive { border-color: var(--signal); color: var(--signal); background: var(--signal-dim); }
+.boardCount { opacity: 0.7; }
+
+.boardList { flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; max-height: 620px; overflow: auto; }
+.boardEmpty { margin: 0; padding: 18px 8px; color: var(--ink-mute); font-size: 12px; text-align: center; line-height: 1.6; }
+
+.card { display: flex; gap: 10px; padding: 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-0); }
+.card_disetujui { border-left: 3px solid var(--measured); }
+.card_selesai { border-left: 3px solid var(--signal); opacity: 0.85; }
+.card_ditolak { border-left: 3px solid var(--halted); opacity: 0.65; }
+
+.cardCheck { position: relative; flex: none; width: 22px; height: 22px; cursor: pointer; }
+.cardCheck input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.checkBox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--line-strong);
+  border-radius: 4px;
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+.cardCheck input:checked + .checkBox { border-color: var(--signal); background: var(--signal-dim); color: var(--signal); }
+.cardCheck input:checked + .checkBox::after { content: '✔'; position: absolute; font-size: 13px; }
+.cardCheck input:focus-visible + .checkBox { outline: 2px solid var(--signal); outline-offset: 2px; }
+
+.cardBody { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.cardTop { display: flex; gap: 6px; align-items: baseline; }
+.cardId { color: var(--ink-faint); font-family: var(--mono); font-size: 10px; }
+.cardTitle { color: var(--ink); font-size: 13px; font-weight: 600; line-height: 1.4; }
+.cardText { margin: 0; color: var(--ink-soft); font-size: 12px; line-height: 1.55; }
+.cardMore { font-size: 11px; }
+.cardSummary { cursor: pointer; color: var(--signal); font-family: var(--mono); font-size: 10px; }
+.cardDl { margin: 6px 0 0; display: grid; grid-template-columns: max-content 1fr; gap: 4px 10px; color: var(--ink-soft); line-height: 1.5; }
+.cardDl dt { color: var(--ink-mute); font-family: var(--mono); font-size: 10px; }
+.cardDl dd { margin: 0; overflow-wrap: anywhere; }
+@media (max-width: 640px) {
+  .cardDl { grid-template-columns: 1fr; }
+}
+.cardAi { margin: 0; padding: 5px 8px; border-radius: var(--radius-sm); background: var(--measured-dim); color: var(--measured); font-size: 11px; }
+.cardOwner { margin: 0; padding: 5px 8px; border-radius: var(--radius-sm); background: var(--signal-dim); color: var(--signal); font-size: 11px; }
+
+.pills { display: flex; flex-wrap: wrap; gap: 4px; }
+.pill { padding: 2px 6px; border-radius: var(--radius-sm); background: var(--surface-3); color: var(--ink-soft); font-family: var(--mono); font-size: 10px; }
+.pillOk { background: var(--measured-dim); color: var(--measured); }
+.ai_sedang { background: var(--signal-dim); color: var(--signal); }
+.ai_tampak-selesai { background: var(--measured-dim); color: var(--measured); }
+.ai_terhambat { background: var(--halted-dim); color: var(--halted); }
+
+.boardBar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 12px; border-top: 1px dashed var(--line); }
+.boardSelected { color: var(--ink-mute); font-family: var(--mono); font-size: 11px; }
+.noteInput { flex: 1 1 220px; min-width: 0; height: 30px; padding: 0 9px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-0); color: var(--ink); font-size: 12px; }
+.boardActions { display: flex; flex-wrap: wrap; gap: 5px; }
+.act_ok { border-color: var(--measured); color: var(--measured); }
+.act_bad { border-color: var(--halted); color: var(--halted); }
+.act_done { border-color: var(--signal); color: var(--signal); }
+
+/* --- Jadwal ----------------------------------------------------------- */
+
+.schedule { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.calendar { display: flex; gap: 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-1); }
+.calendarArt { width: 64px; height: 64px; flex: none; }
+.art { fill: none; stroke: var(--line-strong); stroke-width: 2; }
+.artAccent { fill: none; stroke: var(--signal); stroke-width: 2; }
+.calMonth { fill: var(--signal); font-family: var(--mono); font-size: 14px; font-weight: 700; }
+.calDay { fill: var(--ink); font-family: var(--mono); font-size: 34px; font-weight: 700; }
+.calYear { fill: var(--ink-mute); font-family: var(--mono); font-size: 11px; }
+.calendarText { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.calendarTitle { color: var(--ink); font-size: 13px; font-weight: 600; text-transform: capitalize; }
+.calendarRule { color: var(--ink-mute); font-size: 11px; }
+.calendarNext { color: var(--signal); font-family: var(--mono); font-size: 10.5px; }
+.calendarLast { color: var(--ink-faint); font-family: var(--mono); font-size: 10px; }
+
+/* --- Lemari arsip ----------------------------------------------------- */
+
+.cabinetWrap { display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); gap: 16px; align-items: start; scroll-margin-top: 80px; }
+@media (max-width: 760px) {
+  .cabinetWrap { grid-template-columns: minmax(0, 1fr); }
+  .cabinet { max-width: 300px; margin: 0 auto; }
+}
+.cabinet { width: 100%; height: auto; }
+.drawer { cursor: pointer; }
+.drawerFront { fill: var(--surface-0); stroke: var(--line-strong); stroke-width: 2; transition: stroke 160ms ease; }
+.drawer:hover .drawerFront { stroke: var(--signal); }
+.drawerOpen .drawerFront { stroke: var(--signal); stroke-width: 2.5; }
+.drawerHandle { fill: none; stroke: var(--line-strong); stroke-width: 2; }
+.drawerOpen .drawerHandle { stroke: var(--signal); }
+.drawerLabel { fill: none; stroke: var(--line); stroke-width: 1; }
+.drawerText { fill: var(--ink); font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: 0.08em; }
+.drawerCount { fill: var(--ink-mute); font-family: var(--mono); font-size: 11px; }
+
+.folders { min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.foldersHead { color: var(--ink-mute); font-size: 12px; }
+.foldersHead strong { color: var(--signal); text-transform: capitalize; }
+.folderGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.folder {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 10px;
+  padding: 14px 12px 12px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) var(--radius-sm);
+  background: var(--surface-1);
+  color: var(--ink);
+  text-decoration: none;
+}
+.folder:hover { border-color: var(--signal); }
+.folderTab {
+  position: absolute;
+  top: -11px;
+  left: -1.5px;
+  padding: 1px 10px;
+  border: 1.5px solid var(--line-strong);
+  border-bottom: none;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  background: var(--surface-1);
+  color: var(--signal);
+  font-family: var(--mono);
+  font-size: 10px;
+}
+.folder:hover .folderTab { border-color: var(--signal); }
+.folderTitle { font-size: 12.5px; font-weight: 600; line-height: 1.4; }
+.folderLead { color: var(--ink-soft); font-size: 11.5px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.folderMeta { color: var(--ink-faint); font-family: var(--mono); font-size: 10px; }
+
+/* --- Daftar hadir voting ---------------------------------------------- */
+
+.attendance { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border: 1px dashed var(--line); border-radius: var(--radius-sm); }
+.attendanceHead { color: var(--ink-mute); font-size: 11px; font-family: var(--mono); }
+.attendanceHead strong { color: var(--ink); }
+.attendanceRow { display: flex; flex-wrap: wrap; gap: 6px; }
+.member { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 92px; padding: 6px 4px; border-radius: var(--radius-sm); text-align: center; }
+.memberChair { width: 30px; height: 30px; }
+.memberChair rect, .memberChair line { fill: none; stroke-width: 2; stroke-linecap: round; }
+.memberPresent .memberChair rect, .memberPresent .memberChair line { stroke: var(--measured); }
+.memberInvalid .memberChair rect, .memberInvalid .memberChair line { stroke: var(--degraded); }
+.memberAbsent { opacity: 0.6; }
+.memberAbsent .memberChair rect, .memberAbsent .memberChair line { stroke: var(--halted); stroke-dasharray: 3 3; }
+.memberName { color: var(--ink); font-family: var(--mono); font-size: 10.5px; font-weight: 700; }
+.memberState { color: var(--ink-mute); font-size: 9.5px; line-height: 1.3; overflow-wrap: anywhere; }
+.memberAbsent .memberState { color: var(--halted); }
+
+.votes { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.voteYes { color: var(--measured); }
+.voteNo { color: var(--halted); }
+.voteAbs { color: var(--ink-mute); }
+
+/* --- Pengingat usulan yang lama menunggu ------------------------------- */
+
+.card_late { border-color: var(--degraded); }
+.card_overdue { border-color: var(--halted); box-shadow: 0 0 0 1px var(--halted-dim); }
+.pillLate { background: var(--degraded-dim); color: var(--degraded); font-weight: 700; }
+.pillOverdue { background: var(--halted-dim); color: var(--halted); font-weight: 700; }
+.cardReminder { margin: 0; padding: 6px 8px; border-left: 2px solid var(--degraded); border-radius: var(--radius-sm); background: var(--degraded-dim); color: var(--ink-soft); font-size: 11.5px; line-height: 1.5; }
+.cardReminder strong { color: var(--degraded); }
+.cardReminderOverdue { border-left-color: var(--halted); background: var(--halted-dim); }
+.cardReminderOverdue strong { color: var(--halted); }

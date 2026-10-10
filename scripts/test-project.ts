@@ -4,7 +4,9 @@
  */
 
 import assert from 'node:assert/strict'
-import { periodWindow, parseDecision } from '../lib/project/meeting'
+import { periodWindow, parseDecision, nextScheduledAt } from '../lib/project/meeting'
+import { parseResearch, titleSimilarity, SAME_PROPOSAL, waitingDays } from '../lib/project/proposals'
+import { parseBallot, tally } from '../lib/project/voting'
 import { detectIssues, type ProjectMetrics } from '../lib/project/metrics'
 import { parseCalendar, upcomingHighImpact } from '../lib/macro/calendar'
 import { countSources, extractSources } from '../lib/db/work-archive-queries'
@@ -80,6 +82,7 @@ assert.deepEqual(parseDecision('```json\n{"kesimpulan":"ok","tindakan":["a","b"]
   kesimpulan: 'ok',
   tindakan: ['a', 'b'],
   mendesak: [],
+  dibuang: [],
 })
 assert.equal(parseDecision('tanpa json'), null)
 assert.equal(parseDecision('{"tindakan":[]}'), null)
@@ -112,5 +115,62 @@ assert.equal(trendUnit(730), 'month')
 assert.equal(parseRange('730d'), '730d')
 assert.equal(parseRange('99d'), '7d')
 assert.equal(parseRange(undefined), '7d')
+
+// --- Tahunan dan jadwal berikutnya ------------------------------------------
+const yearly = periodWindow('tahunan', 'jadwal', new Date('2026-12-31T18:00:00Z')) // 1 Jan 2027 01.00 WIB
+assert.equal(yearly.from.toISOString(), '2025-12-31T17:00:00.000Z') // 1 Jan 2026 WIB
+assert.equal(yearly.to.toISOString(), '2026-12-31T17:00:00.000Z') // 1 Jan 2027 WIB
+assert.equal(periodWindow('tahunan', 'manual', now).to.getTime() - periodWindow('tahunan', 'manual', now).from.getTime(), 365 * 86_400_000)
+assert.equal(nextScheduledAt('harian', now).toISOString(), '2026-10-15T17:00:00.000Z') // Jumat 16 Okt WIB
+assert.equal(nextScheduledAt('mingguan', now).toISOString(), '2026-10-18T17:00:00.000Z') // Senin 19 Okt WIB
+assert.equal(nextScheduledAt('bulanan', now).toISOString(), '2026-10-31T17:00:00.000Z') // 1 Nov WIB
+assert.equal(nextScheduledAt('tahunan', now).toISOString(), '2026-12-31T17:00:00.000Z') // 1 Jan 2027 WIB
+
+// --- Usulan peneliti -------------------------------------------------------
+const research = parseResearch(`\`\`\`json
+{"usulan":[
+  {"judul":"Ganti sumber harga Yahoo dengan cadangan Stooq","kategori":"api-baru","masalah":"timeout","bukti":"4 gagal","usulan":"Tambah adaptor Stooq","kebutuhan":{"data":["log galat"],"api":["Stooq CSV"]},"biaya":"gratis","biayaRupiahPerBulan":0,"alternatifGratis":"-","dampak":9,"usaha":"aneh"},
+  {"judul":"","usulan":"tanpa judul dibuang"},
+  {"judul":"Tanpa isi"}
+],
+"pembaruan":[{"id":3,"status":"tampak-selesai","catatan":"gejala hilang"},{"id":"x","status":"sedang"},{"id":4,"status":"ngawur"}],}
+\`\`\``)
+assert.ok(research)
+assert.equal(research.usulan.length, 1)
+assert.equal(research.usulan[0].impact, 5)
+assert.equal(research.usulan[0].effort, 'sedang')
+assert.equal(research.usulan[0].costIdr, 0)
+assert.deepEqual(research.usulan[0].needs, { data: ['log galat'], api: ['Stooq CSV'] })
+assert.deepEqual(research.pembaruan, [{ id: 3, aiStatus: 'tampak-selesai', catatan: 'gejala hilang' }])
+assert.equal(parseResearch('bukan json'), null)
+assert.ok(titleSimilarity('Ganti sumber harga Yahoo dengan Stooq', 'Ganti sumber harga Yahoo ke Stooq') >= SAME_PROPOSAL)
+assert.ok(titleSimilarity('Ganti sumber harga Yahoo', 'Tambah halaman blog edukasi') < SAME_PROPOSAL)
+assert.deepEqual(parseDecision('{"kesimpulan":"x","tindakan":[],"mendesak":[],"usulan_dibuang":[2,"3",0,-1]}')?.dibuang, [2, 3])
+
+const reminders = parseResearch('{"usulan":[],"pengingat":[{"id":7,"alasan":"Yahoo masih mati 9 hari","saran":"putuskan"},{"id":8,"alasan":"sudah tidak relevan","saran":"tarik"},{"id":9,"alasan":""}]}')
+assert.deepEqual(reminders?.pengingat, [
+  { id: 7, alasan: 'Yahoo masih mati 9 hari', saran: 'putuskan' },
+  { id: 8, alasan: 'sudah tidak relevan', saran: 'tarik' },
+])
+const created = '2026-10-01T00:00:00.000Z'
+assert.equal(waitingDays({ status: 'menunggu', createdAt: created, decidedAt: null }, Date.parse('2026-10-09T01:00:00Z')), 8)
+assert.equal(waitingDays({ status: 'disetujui', createdAt: created, decidedAt: null }, Date.parse('2026-10-09T01:00:00Z')), 0)
+// Dikembalikan ke "menunggu": hitungan mulai dari keputusan terakhir, bukan dari awal.
+assert.equal(waitingDays({ status: 'menunggu', createdAt: created, decidedAt: '2026-10-08T00:00:00Z' }, Date.parse('2026-10-09T01:00:00Z')), 1)
+
+// --- Voting ----------------------------------------------------------------
+assert.deepEqual(parseBallot('{"suara":[{"no":1,"pilihan":"Setuju","alasan":"ok"},{"no":1,"pilihan":"tolak"},{"no":3,"pilihan":"setuju"},{"no":2,"pilihan":"mungkin"}]}', 2), [
+  { no: 1, pilihan: 'setuju', alasan: 'ok' },
+])
+assert.equal(parseBallot('tidak ada json', 2), null)
+const tallies = tally(2, [
+  { no: 1, providerId: 'gemini', pilihan: 'setuju', alasan: '' },
+  { no: 1, providerId: 'groq', pilihan: 'tolak', alasan: 'mahal' },
+  { no: 1, providerId: 'cerebras', pilihan: 'setuju', alasan: '' },
+])
+assert.deepEqual(
+  tallies.map((t) => [t.no, t.setuju, t.tolak, t.abstain]),
+  [[1, 2, 1, 0], [2, 0, 0, 0]],
+)
 
 console.log('Project meeting, monitor thresholds, macro calendar, archive, and analytics range regressions passed.')

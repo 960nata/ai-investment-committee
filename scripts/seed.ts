@@ -73,8 +73,8 @@ const SCHEDULES: ScheduleSeed[] = [
   // menerima satu email per enam hari (lib/member/digest.ts).
   { jobName: 'ringkasan-mingguan', hoursOfDay: [7], timezone: 'Asia/Jakarta', tradingDaysOnly: false, market: null, enabled: true, note: '07.00 WIB, email ringkasan watchlist mingguan' },
   // Rapat project oleh agen AI. Tengah malam WIB, bersamaan dengan Vercel Cron
-  // harian: harian selalu, mingguan tiap Senin, bulanan tiap tanggal 1.
-  { jobName: 'laporan-project', hoursOfDay: [0], timezone: 'Asia/Jakarta', tradingDaysOnly: false, market: null, enabled: true, note: '00.00 WIB, rapat project harian/mingguan/bulanan' },
+  // harian: harian selalu, mingguan tiap Senin, bulanan tiap tanggal 1, tahunan tiap 1 Januari.
+  { jobName: 'laporan-project', hoursOfDay: [0], timezone: 'Asia/Jakarta', tradingDaysOnly: false, market: null, enabled: true, note: '00.00 WIB, rapat project harian/mingguan/bulanan/tahunan' },
   // Pemantau masalah mendesak. Tanpa model, hanya membaca basis data.
   { jobName: 'pantau-project', hoursOfDay: EVERY_HOUR, timezone: 'UTC', tradingDaysOnly: false, market: null, enabled: true, note: 'tiap jam, peringatan mendesak project' },
 ]

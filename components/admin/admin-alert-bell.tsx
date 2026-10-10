@@ -138,12 +138,21 @@ export function AdminAlertBell({
   )
 }
 
-/** Lencana angka di menu sidebar: masalah mendesak yang masih terbuka. */
-export function UrgentBadge({ count }: { count: number }) {
-  if (!count) return null
+/** Lencana angka di menu sidebar: masalah mendesak terbuka, dan usulan yang menunggu owner. */
+export function UrgentBadge({ count, pending = 0 }: { count: number; pending?: number }) {
+  if (!count && !pending) return null
   return (
-    <span className={styles.navBadge} aria-label={`${count} masalah mendesak`}>
-      {count}
+    <span className={styles.navBadges}>
+      {count > 0 && (
+        <span className={styles.navBadge} aria-label={`${count} masalah mendesak`} title={`${count} masalah mendesak`}>
+          {count}
+        </span>
+      )}
+      {pending > 0 && (
+        <span className={`${styles.navBadge} ${styles.navBadgePending}`} aria-label={`${pending} usulan menunggu keputusan`} title={`${pending} usulan menunggu keputusan`}>
+          {pending}
+        </span>
+      )}
     </span>
   )
 }

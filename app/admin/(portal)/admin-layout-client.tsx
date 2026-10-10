@@ -223,7 +223,7 @@ export function AdminLayoutClient({ children }: AdminLayoutClientProps) {
             >
               <IconActivity size={15} />
               <span>Rapat Project</span>
-              <UrgentBadge count={alerts?.urgent ?? 0} />
+              <UrgentBadge count={alerts?.urgent ?? 0} pending={alerts?.pendingProposals ?? 0} />
             </Link>
 
             <Link

@@ -15,7 +15,7 @@ import { reserveLlmBudget, refundLlmBudget } from '@/lib/http/budget'
 import { badRequest, failure, NO_STORE, unauthorized } from '@/lib/http/errors'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60
+export const maxDuration = 300
 
 export async function POST(request: Request) {
   if (!((await verifyAdminSession()) || isRequestAdminAuthenticated(request))) return unauthorized()

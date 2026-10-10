@@ -6,7 +6,7 @@ export const DATE: Intl.DateTimeFormatOptions = { timeZone: 'Asia/Jakarta', day:
 export function reportTitle(r: ProjectReportRow): string {
   const from = new Date(r.periodStart).toLocaleDateString('id-ID', DATE)
   const to = new Date(new Date(r.periodEnd).getTime() - 1).toLocaleDateString('id-ID', DATE)
-  const label = r.period === 'harian' ? 'Laporan harian' : r.period === 'mingguan' ? 'Laporan mingguan' : 'Laporan bulanan'
+  const label = `Laporan ${r.period}`
   return `${label} · ${from === to ? from : `${from} – ${to}`}`
 }
 
