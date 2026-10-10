@@ -136,7 +136,28 @@ export interface VisitSummary {
 }
 
 /** Rentang waktu yang boleh diminta. Nilai di luar daftar ditolak diam-diam. */
-export const VISIT_WINDOWS = { '24h': 1, '7d': 7, '30d': 30, '90d': 90 } as const
+export const VISIT_WINDOWS = {
+  '24h': 1,
+  '7d': 7,
+  '30d': 30,
+  '90d': 90,
+  '180d': 180,
+  '365d': 365,
+  '730d': 730,
+} as const
+
+/**
+ * Ember tren. Rentang panjang dikelompokkan per minggu atau bulan: 730 titik
+ * harian di satu grafik selebar layar hanya terbaca sebagai pita bergerigi.
+ */
+export type TrendUnit = 'hour' | 'day' | 'week' | 'month'
+
+export function trendUnit(days: number): TrendUnit {
+  if (days <= 1) return 'hour'
+  if (days <= 90) return 'day'
+  if (days <= 180) return 'week'
+  return 'month'
+}
 export type VisitWindow = keyof typeof VISIT_WINDOWS
 
 export function parseVisitWindow(value: string | undefined): VisitWindow {
@@ -313,7 +334,7 @@ export interface VisitAnalytics {
   }
   previous: { views: number; visitors: number }
   live: { last5: number; last30: number; pagesNow: CountRow[] }
-  trend: { unit: 'hour' | 'day'; points: TrendPoint[] }
+  trend: { unit: TrendUnit; points: TrendPoint[] }
   pages: PageRow[]
   entryPages: CountRow[]
   devices: CountRow[]
@@ -346,7 +367,7 @@ export async function getVisitAnalytics(
   const interval = `${days} days`
   const since = sql`NOW() - ${interval}::interval`
   const prevSince = sql`NOW() - (${interval}::interval * 2)`
-  const unit: 'hour' | 'day' = days <= 1 ? 'hour' : 'day'
+  const unit = trendUnit(days)
 
   const scoped = sql`created_at >= ${since} AND ${PUBLIC_ONLY}`
 
@@ -438,7 +459,7 @@ export async function getVisitAnalytics(
         SELECT generate_series(
           date_trunc(${unit}, (NOW() - ${interval}::interval) AT TIME ZONE ${TZ}),
           date_trunc(${unit}, NOW() AT TIME ZONE ${TZ}),
-          ${unit === 'hour' ? '1 hour' : '1 day'}::interval
+          ${`1 ${unit}`}::interval
         ) AS at
       ),
       agg AS (

@@ -18,6 +18,7 @@ import {
   saveNewsTranslation,
 } from '@/lib/db/news-queries'
 import type { MarketNewsRow } from '@/lib/db/schema'
+import { recordAiTrace } from '@/lib/db/ai-trace'
 import { LOCALE_INFO, TRANSLATED_LOCALES, type Locale } from '@/lib/i18n/locales'
 
 /** Aturan panjang untuk SEO, dibedakan untuk aksara CJK yang jauh lebih padat. */
@@ -162,6 +163,7 @@ export async function translateNewsArticle(
     imageCaption: payload.imageCaption?.trim() || null,
     model: `${response.providerId}/${response.model}`.slice(0, 96),
   })
+  await recordAiTrace('berita', article.id, `terjemah-${locale}`, response)
 }
 
 export interface TranslationReport {

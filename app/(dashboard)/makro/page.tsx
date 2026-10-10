@@ -13,6 +13,8 @@ import { Sparkline } from '@/components/member/sparkline'
 import { requireUser } from '@/lib/auth/user-auth'
 import { lastMacro } from '@/lib/db/macro-queries'
 import { MACRO_SERIES } from '@/lib/macro/sources'
+import { getMacroCalendar, type CalendarResult } from '@/lib/macro/calendar'
+import { MacroCalendar } from '@/components/member/macro-calendar'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Makro' }
@@ -40,8 +42,12 @@ function formatDelta(id: string, now: number, prev: number): string {
   return `${d >= 0 ? '+' : ''}${d.toFixed(2).replace('.', ',')} poin dari periode sebelumnya`
 }
 
-export default async function MacroPage() {
+export default async function MacroPage({ searchParams }: { searchParams: Promise<{ kalender?: string }> }) {
   await requireUser('/makro')
+  const showAll = (await searchParams).kalender === 'semua'
+  const renderedAt = new Date().getTime()
+  // Kalender berdiri sendiri: kegagalannya tidak boleh menyembunyikan deret makro.
+  const calendar: CalendarResult = await getMacroCalendar().catch(() => ({ events: [], origin: 'stored' as const }))
 
   let series: { id: string; label: string; points: { date: string; value: number }[] }[] = []
   let error: string | null = null
@@ -63,6 +69,7 @@ export default async function MacroPage() {
         lead="Suku bunga, inflasi, dan pertumbuhan ekonomi Indonesia dan Amerika Serikat — latar yang menentukan mahal-murahnya aset lain."
         note="Sumber: FRED (Federal Reserve Bank of St. Louis) dan Bank Dunia. Deret bulanan diperbarui harian; deret tahunan baru berubah setelah tahunnya berakhir."
       />
+      <MacroCalendar data={calendar} showAll={showAll} now={renderedAt} />
       {error && <DatabaseNotice detail={error} />}
       {!error && !hasData && (
         <section className="panel">

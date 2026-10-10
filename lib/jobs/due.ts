@@ -129,7 +129,7 @@ export const COMMITTEE_BATCH_SIZE = 2
  * berkas KSEI memuat semua saham, satu deret makro tidak punya simbol. Dibagi
  * per batch, job ini akan jalan berulang kali untuk pekerjaan yang sama.
  */
-export const WHOLE_SOURCE_JOBS = new Set(['ingest-ksei-monthly', 'ingest-macro', 'ingest-external', 'warta-otomatis', 'warta-terjemah', 'evaluasi-alert', 'ringkasan-mingguan'])
+export const WHOLE_SOURCE_JOBS = new Set(['ingest-ksei-monthly', 'ingest-macro', 'ingest-external', 'warta-otomatis', 'warta-terjemah', 'evaluasi-alert', 'ringkasan-mingguan', 'laporan-project', 'pantau-project'])
 
 export function batchSizeFor(jobName: string): number {
   return jobName.startsWith('komite-') ? COMMITTEE_BATCH_SIZE : BATCH_SIZE

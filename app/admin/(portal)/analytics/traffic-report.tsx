@@ -30,7 +30,7 @@ import {
   IconTrendUp,
   IconUser,
 } from '@/components/icons'
-import type { CountRow, VisitAnalytics } from '@/lib/db/visit-queries'
+import type { CountRow, TrendUnit, VisitAnalytics } from '@/lib/db/visit-queries'
 
 const TZ = 'Asia/Jakarta'
 const DAYS = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab']
@@ -115,7 +115,7 @@ export function TrafficReport({
         <div className="tr-trend-wrap">
           <div className="tr-trend-head mono">
             <span className="tr-trend-title">
-              {data.trend.unit === 'hour' ? 'Tren per jam (WIB)' : 'Tren per hari'}
+              {TREND_TITLES[data.trend.unit]}
             </span>
             <span className="tr-legend">
               <span><i className="tr-key area" /> Tayangan</span>
@@ -259,7 +259,14 @@ function Kpi({
  * Tayangan (area) dan pengunjung unik (garis) di satu sumbu — keduanya
  * hitungan orang/halaman, jadi skalanya memang sama dan tidak butuh sumbu kedua.
  */
-function TrendChart({ points, unit }: { points: VisitAnalytics['trend']['points']; unit: 'hour' | 'day' }) {
+const TREND_TITLES: Record<TrendUnit, string> = {
+  hour: 'Tren per jam (WIB)',
+  day: 'Tren per hari',
+  week: 'Tren per minggu',
+  month: 'Tren per bulan',
+}
+
+function TrendChart({ points, unit }: { points: VisitAnalytics['trend']['points']; unit: TrendUnit }) {
   if (points.length === 0) return <p className="tr-empty mono">belum ada data</p>
 
   const W = 1000
@@ -662,11 +669,13 @@ function niceCeil(v: number): number {
 }
 
 /** Ember waktu dari kueri sudah berupa jam WIB tanpa zona. */
-function bucketLabel(at: string, unit: 'hour' | 'day', long = false): string {
+function bucketLabel(at: string, unit: TrendUnit, long = false): string {
   const [date, time] = at.split('T')
-  const [, m, d] = date.split('-').map(Number)
+  const [y, m, d] = date.split('-').map(Number)
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
   if (unit === 'hour') return long ? `${d} ${months[m - 1]} ${time.slice(0, 5)}` : time.slice(0, 5)
+  if (unit === 'month') return `${months[m - 1]} ${String(y).slice(2)}`
+  if (unit === 'week') return long ? `Minggu mulai ${d} ${months[m - 1]} ${y}` : `${d} ${months[m - 1]}`
   return `${d} ${months[m - 1]}`
 }
 

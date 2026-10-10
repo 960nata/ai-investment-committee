@@ -20,6 +20,9 @@ import {
   IconHeart,
   IconCrown,
   IconActivity,
+  IconCourt,
+  IconHistory,
+  IconWallet,
 } from '@/components/icons'
 import { AdminLogoutButton } from './admin-logout-btn'
 
@@ -177,6 +180,46 @@ export function AdminLayoutClient({ children }: AdminLayoutClientProps) {
             >
               <IconLock size={15} />
               <span>Log Blokir WAF</span>
+            </Link>
+          </div>
+
+          {/* Group: Kerja AI — sidang langsung, arsip, rapat project, dan kas */}
+          <div className="admin-nav-group">
+            <span className="admin-nav-group-title mono">KERJA AI &amp; RAPAT</span>
+            <Link
+              href="/admin/ruang-komite"
+              className={`admin-nav-link ${pathname.startsWith('/admin/ruang-komite') ? 'active' : ''}`}
+              onClick={() => setMobileOpen(false)}
+            >
+              <IconCourt size={15} />
+              <span>Ruang Komite</span>
+            </Link>
+
+            <Link
+              href="/admin/arsip-kerja"
+              className={`admin-nav-link ${pathname.startsWith('/admin/arsip-kerja') ? 'active' : ''}`}
+              onClick={() => setMobileOpen(false)}
+            >
+              <IconHistory size={15} />
+              <span>Arsip Kerja AI</span>
+            </Link>
+
+            <Link
+              href="/admin/rapat-project"
+              className={`admin-nav-link ${pathname.startsWith('/admin/rapat-project') ? 'active' : ''}`}
+              onClick={() => setMobileOpen(false)}
+            >
+              <IconActivity size={15} />
+              <span>Rapat Project</span>
+            </Link>
+
+            <Link
+              href="/admin/keuangan"
+              className={`admin-nav-link ${pathname.startsWith('/admin/keuangan') ? 'active' : ''}`}
+              onClick={() => setMobileOpen(false)}
+            >
+              <IconWallet size={15} />
+              <span>Buku Kas</span>
             </Link>
           </div>
 

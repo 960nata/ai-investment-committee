@@ -59,6 +59,7 @@ import {
   getVisitAnalytics,
   getVisitSummary,
   parseVisitWindow,
+  VISIT_WINDOWS,
   type VisitAnalytics,
   type VisitSummary,
   type VisitWindow,
@@ -68,6 +69,8 @@ import { VisitorMap } from '@/components/visitor-map'
 import { RealtimeRefresh } from './realtime-refresh'
 
 export const dynamic = 'force-dynamic'
+// Rentang dua tahun memindai seluruh catatan kunjungan; batas bawaan function terlalu pendek.
+export const maxDuration = 60
 
 export const metadata: Metadata = {
   title: 'Analitik Pengguna | Admin AI Investdesk',
@@ -75,7 +78,7 @@ export const metadata: Metadata = {
     'Telemetri kunjungan dari Google Analytics 4: pengguna aktif, halaman teratas, perangkat, saluran akuisisi, dan sebaran kota.',
 }
 
-const RANGES: Ga4Range[] = ['24h', '7d', '30d']
+const RANGES: Ga4Range[] = ['24h', '7d', '30d', '90d', '180d', '365d', '730d']
 
 interface AnalyticsPageProps {
   searchParams: Promise<{ range?: string; heat?: string }>
@@ -120,7 +123,8 @@ export default async function AdminAnalyticsPage({ searchParams }: AnalyticsPage
   // lebih buruk daripada satu kotak berisi "muat ulang".
   const [summaryResult, trafficResult] = await Promise.allSettled([
     getVisitSummary(visitWindow),
-    withTimeout(getVisitAnalytics(visitWindow, heat), 20_000),
+    // Rentang setahun ke atas memindai jauh lebih banyak baris; batasnya ikut longgar.
+    withTimeout(getVisitAnalytics(visitWindow, heat), VISIT_WINDOWS[visitWindow] > 90 ? 45_000 : 20_000),
   ])
   if (summaryResult.status === 'fulfilled') visits = summaryResult.value
   else visitsError = errorText(summaryResult.reason)

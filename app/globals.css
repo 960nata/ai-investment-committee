@@ -19765,6 +19765,28 @@ body.rail-lock {
 .macro-card-value { margin-top: var(--space-2); font-family: var(--mono); font-size: var(--t-head); color: var(--ink); }
 .macro-card-note { margin-top: 2px; font-family: var(--mono); font-size: var(--t-micro); color: var(--ink-faint); }
 
+/* Kalender makro */
+.mcal-switch { display: inline-flex; gap: 4px; font-size: var(--t-small); }
+.mcal-switch a { padding: 3px 9px; border-radius: var(--radius-sm); color: var(--ink-mute); text-decoration: none; }
+.mcal-switch a.active { background: var(--signal-dim); color: var(--signal); }
+.mcal-note { margin: 0 0 var(--space-3); font-size: var(--t-small); color: var(--ink-mute); line-height: 1.5; }
+.mcal-day + .mcal-day { margin-top: var(--space-3); }
+.mcal-day-title { font-size: var(--t-small); color: var(--ink-soft); text-transform: capitalize; margin-bottom: 4px; }
+.mcal-table { width: 100%; border-collapse: collapse; font-size: var(--t-body); }
+.mcal-table td { padding: 6px 8px; border-top: 1px solid var(--line); color: var(--ink); vertical-align: top; }
+.mcal-table tr.past td { color: var(--ink-faint); }
+.mcal-time { width: 52px; color: var(--ink-soft); }
+.mcal-cur { width: 44px; color: var(--signal); }
+.mcal-num { width: 70px; text-align: right; color: var(--ink-soft); white-space: nowrap; }
+.mcal-impact { display: inline-block; width: 7px; height: 7px; margin-right: 8px; border-radius: 50%; background: var(--ink-faint); vertical-align: middle; }
+.mcal-impact.high { background: var(--halted); }
+.mcal-impact.medium { background: var(--degraded); }
+.mcal-impact.holiday { background: var(--measured); }
+@media (max-width: 640px) {
+  .mcal-num:last-child { display: none; }
+  .mcal-table td { padding: 6px 4px; }
+}
+
 /* Tanya komite */
 .chat-log {
   display: grid;
@@ -22609,6 +22631,8 @@ a.tr-chip:hover {
 /* Pemilih rentang sebagai satu kontrol bersegmen, bukan tiga tombol lepas. */
 .an-range {
   display: inline-flex;
+  flex-wrap: wrap;
+  max-width: 100%;
   padding: 3px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
@@ -22616,7 +22640,7 @@ a.tr-chip:hover {
 }
 
 .an-range-link {
-  padding: 6px 14px;
+  padding: 6px 11px;
   border-radius: calc(var(--radius-sm) - 2px);
   font-size: 11px;
   color: var(--ink-mute);

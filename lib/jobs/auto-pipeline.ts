@@ -51,6 +51,10 @@ function skipped(jobName: string): boolean {
 const REQUIRED_SCHEDULES = [
   { jobName: 'evaluasi-alert', hoursOfDay: Array.from({ length: 24 }, (_, h) => h), timezone: 'UTC' },
   { jobName: 'ringkasan-mingguan', hoursOfDay: [7], timezone: 'Asia/Jakarta' },
+  // Tengah malam WIB: sama dengan satu-satunya Vercel Cron harian, jadi rapat
+  // tetap jalan walau QStash dan kunjungan sedang sepi.
+  { jobName: 'laporan-project', hoursOfDay: [0], timezone: 'Asia/Jakarta' },
+  { jobName: 'pantau-project', hoursOfDay: Array.from({ length: 24 }, (_, h) => h), timezone: 'UTC' },
 ]
 
 let schedulesEnsured = false

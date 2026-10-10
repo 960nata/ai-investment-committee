@@ -41,6 +41,7 @@ import {
 } from './tools'
 import { COMMITTEE, PEMERIKSA, type AgentRole } from './roles'
 import { LLM_ADAPTERS } from '@/lib/ai/adapters'
+import { recordAiTrace } from '@/lib/db/ai-trace'
 import { parseVerdict, type CommitteeVerdict } from './verdict'
 import {
   applyGuard,
@@ -198,6 +199,7 @@ export async function runCommittee(input: CommitteeInput): Promise<CommitteeResu
         inputTokens: response.inputTokens,
         outputTokens: response.outputTokens,
       })
+      await recordAiTrace('sidang', session.id, role.name, response)
 
       turns.push({
         agent: role.name,
@@ -334,6 +336,7 @@ async function checkVerdict(
       inputTokens: response.inputTokens,
       outputTokens: response.outputTokens,
     })
+    await recordAiTrace('sidang', sessionId, PEMERIKSA.name, response)
     turns.push({ agent: PEMERIKSA.name, content, providerId: response.providerId, latencyMs: response.latencyMs })
 
     return { result, providerId: response.providerId }

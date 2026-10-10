@@ -22,6 +22,8 @@ import { buildPhotoQuery, searchInternetPhotos, type PhotoCandidate } from '@/li
 import { findYoutubeVideo } from '@/lib/media/youtube-search'
 import { sanitizeHtml } from '@/lib/security/sanitize-html'
 import type { SourceDocument } from '@/lib/news/sources'
+import { recordAiTrace } from '@/lib/db/ai-trace'
+import type { LlmResponse } from '@/lib/ai/types'
 import type { NewMarketNews, MarketNewsRow } from '@/lib/db/schema'
 
 export const NEWS_CATEGORIES = [
@@ -54,6 +56,8 @@ export interface GenerateArticleInput {
    * tidak ada yang diunggah ke storage maupun disimpan ke basis data.
    */
   dryRun?: boolean
+  /** Langkah model sebelum penulisan (mis. redaktur yang memilih berita), ikut dicatat di arsip. */
+  priorSteps?: { step: string; response: LlmResponse }[]
 }
 
 /**
@@ -860,6 +864,9 @@ foto asli di internet memakai "imageSearchQuery" Anda, mengunduhnya, dan menyimp
 
   // Simpan ke database
   const saved = await saveMarketNews(newArticle)
+
+  for (const prior of input.priorSteps ?? []) await recordAiTrace('berita', saved.id, prior.step, prior.response)
+  await recordAiTrace('berita', saved.id, 'penulis', response)
 
   // Versi empat bahasa lain ditulis sesudah sumbernya aman tersimpan. Kegagalan
   // di sini tidak membatalkan artikel: versi yang belum jadi dilengkapi nanti

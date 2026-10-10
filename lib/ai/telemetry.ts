@@ -318,6 +318,26 @@ export class TelemetryUnavailableError extends Error {
   }
 }
 
+/**
+ * Seratus panggilan terakhir, terbaru dulu, tanpa membaca ember agregat. Untuk
+ * umpan langsung ruang komite yang disegarkan tiap beberapa detik — membaca 24
+ * hash per penyegaran hanya untuk menampilkan log akan membebani Redis percuma.
+ */
+export async function getRecentLlmCalls(): Promise<LlmCallEvent[] | null> {
+  if (!cache.isAvailable()) return memoryEvents.slice(-100).reverse()
+  const rows = await cache.pipeline((p) => {
+    p.lrange(RECENT_KEY, 0, 99)
+  })
+  if (rows === null) return null
+  return ((rows[0] ?? []) as (string | LlmCallEvent)[]).flatMap((entry) => {
+    try {
+      return [typeof entry === 'string' ? (JSON.parse(entry) as LlmCallEvent) : entry]
+    } catch {
+      return []
+    }
+  })
+}
+
 /** Isi tiap ember sebagai peta field → angka, dari Redis atau dari memori. */
 async function loadBuckets(
   granularity: Granularity,

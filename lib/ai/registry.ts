@@ -162,7 +162,10 @@ export async function complete(request: LlmRequest): Promise<LlmResponse> {
           outputTokens: response.outputTokens ?? 0,
           latencyMs: response.latencyMs,
         })
-        return response
+        return {
+          ...response,
+          failovers: attempts.map(({ providerId, keyIndex, kind }) => ({ providerId, keyIndex, kind })),
+        }
       } catch (err) {
         const llmError =
           err instanceof LlmError

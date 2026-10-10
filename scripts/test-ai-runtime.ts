@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { LLM_ADAPTERS, PREMIUM_LLM_ADAPTERS } from '../lib/ai/adapters'
 import { complete, resetRegistry, llmStatus, AllProvidersFailedError } from '../lib/ai/registry'
 import { LlmError, type LlmAdapter } from '../lib/ai/types'
-import { getAiTokensDashboardData } from '../lib/ai/telemetry'
+import { getAiTokensDashboardData, TelemetryUnavailableError } from '../lib/ai/telemetry'
 import { resetLocalState } from '../lib/ai/keyring'
 import { reconcileSession } from '../lib/auth/verified-session'
 import { cache } from '../lib/cache/redis'
@@ -133,7 +133,9 @@ async function main() {
 
     cache.isAvailable = () => true
     cache.pipeline = async () => null
-    dashboard = await getAiTokensDashboardData()
+    // Penyegaran berkala menolak angka memori (lihat c9e9bc2); muatan pertama menerimanya.
+    await assert.rejects(getAiTokensDashboardData(), TelemetryUnavailableError)
+    dashboard = await getAiTokensDashboardData('24h', { allowMemoryFallback: true })
     assert.equal(dashboard.storage, 'degraded')
     assert.ok(dashboard.overview.requests > 0, 'Redis failure must retain local observations')
     cache.isAvailable = () => false

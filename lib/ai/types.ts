@@ -58,6 +58,18 @@ export interface LlmResponse {
   latencyMs: number
   inputTokens?: number
   outputTokens?: number
+  /**
+   * Percobaan yang gagal sebelum jawaban ini, berurutan. Kosong berarti
+   * penyedia pertama langsung menjawab; berisi berarti ada yang digantikan.
+   */
+  failovers?: LlmFailover[]
+}
+
+export interface LlmFailover {
+  providerId: string
+  /** -1 bila semua kunci penyedia itu sedang beristirahat. */
+  keyIndex: number
+  kind: string
 }
 
 /**

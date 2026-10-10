@@ -22,6 +22,8 @@ import { translateMissingNews } from '@/lib/agents/news-translator'
 import { publishJob } from '@/lib/queue/qstash'
 import { evaluateAlerts } from '@/lib/member/alerts'
 import { sendWeeklyDigests } from '@/lib/member/digest'
+import { runScheduledMeetings } from '@/lib/project/meeting'
+import { runUrgentMonitor } from '@/lib/project/monitor'
 
 /** Nama job = segmen URL worker. Job tak dikenal ditolak, bukan didiamkan. */
 export const HANDLERS: Record<string, (payload: JobPayload) => Promise<BatchResult>> = {
@@ -48,6 +50,8 @@ export const HANDLERS: Record<string, (payload: JobPayload) => Promise<BatchResu
   'warta-terjemah': translateNewsBatch,
   'evaluasi-alert': alertBatch,
   'ringkasan-mingguan': digestBatch,
+  'laporan-project': projectReportBatch,
+  'pantau-project': projectMonitorBatch,
 }
 
 export interface BatchResult {
@@ -376,6 +380,33 @@ async function translateNewsBatch(): Promise<BatchResult> {
 // ---------------------------------------------------------------------------
 
 /** Email ringkasan watchlist untuk tiap pengguna yang punya watchlist. */
+/** Rapat project terjadwal: harian, plus mingguan tiap Senin dan bulanan tiap tanggal 1. */
+async function projectReportBatch(): Promise<BatchResult> {
+  const results = await runScheduledMeetings()
+  const failed = results.filter((r) => r.result.status === 'tanpa-rapat')
+  return {
+    itemsProcessed: results.length,
+    itemsFailed: failed.length,
+    candlesWritten: 0,
+    quarantined: 0,
+    errors: failed.map((r) => `rapat ${r.period} tanpa model`),
+    extra: { reports: results.map((r) => ({ period: r.period, ...r.result })) },
+  }
+}
+
+/** Pemantau mendesak per jam — tanpa model, jadi tidak memakai kuota AI. */
+async function projectMonitorBatch(): Promise<BatchResult> {
+  const r = await runUrgentMonitor()
+  return {
+    itemsProcessed: r.open,
+    itemsFailed: 0,
+    candlesWritten: 0,
+    quarantined: 0,
+    errors: [],
+    extra: { openIssues: r.open, newIssues: r.fresh.map((i) => i.key), adminsNotified: r.notified },
+  }
+}
+
 async function digestBatch(): Promise<BatchResult> {
   const r = await sendWeeklyDigests()
   return {

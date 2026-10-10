@@ -51,6 +51,8 @@ const JOBS = [
   'warta-terjemah',
   'evaluasi-alert',
   'ringkasan-mingguan',
+  'laporan-project',
+  'pantau-project',
 ] as const
 
 type JobName = (typeof JOBS)[number]

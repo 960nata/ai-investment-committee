@@ -27,6 +27,7 @@ import { filterUnusedLinks, markSourcesUsed } from '@/lib/db/news-source-queries
 import { getMarketNewsList } from '@/lib/db/news-queries'
 import { generateLiveNewsArticle, NEWS_CATEGORIES, type NewsCategory } from '@/lib/agents/news-agent'
 import type { MarketNewsRow } from '@/lib/db/schema'
+import type { LlmResponse } from '@/lib/ai/types'
 
 /** Judul sebanyak ini sudah mewakili satu siklus berita tanpa membengkakkan prompt. */
 const MAX_HEADLINES_FOR_EDITOR = 60
@@ -53,7 +54,10 @@ function formatAge(date: Date): string {
   return hours === 0 ? '<1 jam' : `${hours} jam`
 }
 
-async function askEditor(headlines: Headline[], recentTitles: string[]): Promise<EditorPick> {
+async function askEditor(
+  headlines: Headline[],
+  recentTitles: string[],
+): Promise<{ pick: EditorPick; response: LlmResponse }> {
   const list = headlines
     .map((h, i) => `${i}. [${h.source}, ${formatAge(h.publishedAt)} lalu] ${h.title}${h.summary ? ` — ${h.summary.slice(0, 160)}` : ''}`)
     .join('\n')
@@ -92,7 +96,7 @@ Balas JSON murni:
 
   const raw = response.text.trim().replace(/^```json\s*/i, '').replace(/\s*```$/i, '')
   try {
-    return JSON.parse(raw) as EditorPick
+    return { pick: JSON.parse(raw) as EditorPick, response }
   } catch {
     throw new Error(`Editor AI membalas bukan JSON: ${raw.slice(0, 200)}`)
   }
@@ -114,7 +118,7 @@ export async function runAutoNewsJob(options: { dryRun?: boolean } = {}): Promis
   }
 
   const recent = await getMarketNewsList({ limit: 15 })
-  const decision = await askEditor(
+  const { pick: decision, response: editorResponse } = await askEditor(
     fresh,
     recent.map((a) => a.title),
   )
@@ -148,6 +152,7 @@ export async function runAutoNewsJob(options: { dryRun?: boolean } = {}): Promis
     sources,
     translate: false,
     dryRun: options.dryRun,
+    priorSteps: [{ step: 'redaktur', response: editorResponse }],
   })
 
   if (options.dryRun) {

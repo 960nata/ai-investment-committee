@@ -1,0 +1,120 @@
+.page { gap: 18px; }
+
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.tab {
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+  color: var(--ink-soft);
+  font-family: var(--mono);
+  font-size: 12px;
+  text-decoration: none;
+}
+.tabActive { border-color: var(--signal); color: var(--signal); background: var(--signal-dim); }
+
+.filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.input {
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+  color: var(--ink);
+  font-size: 12px;
+  min-width: 0;
+}
+.button {
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--ink);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.tableWrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 720px; }
+.table th {
+  text-align: left;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-1);
+  color: var(--ink-mute);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.table td { padding: 9px 12px; border-bottom: 1px solid var(--line); color: var(--ink-soft); vertical-align: top; }
+.table tr:last-child td { border-bottom: none; }
+.table a { color: var(--ink); text-decoration: none; }
+.table a:hover { color: var(--signal); }
+.mono { font-family: var(--mono); }
+.muted { color: var(--ink-mute); font-size: 11px; }
+.num { text-align: right; font-family: var(--mono); white-space: nowrap; }
+
+.tag {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+}
+.t_beli, .t_done, .t_bullish { color: var(--measured); background: var(--measured-dim); }
+.t_jual, .t_failed, .t_bearish { color: var(--halted); background: var(--halted-dim); }
+.t_tahan, .t_running, .t_mixed { color: var(--signal); background: var(--signal-dim); }
+.replaced { color: var(--degraded); background: var(--degraded-dim); }
+
+.pager { display: flex; gap: 10px; align-items: center; justify-content: space-between; font-size: 12px; color: var(--ink-mute); }
+.pager a { color: var(--signal); text-decoration: none; font-family: var(--mono); }
+
+.empty { padding: 28px; text-align: center; color: var(--ink-mute); font-size: 13px; }
+
+/* --- Rinci ------------------------------------------------------------ */
+
+.back { color: var(--signal); font-family: var(--mono); font-size: 12px; text-decoration: none; }
+.summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+.stat { padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-1); }
+.statLabel { color: var(--ink-mute); font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; }
+.statValue { margin-top: 4px; color: var(--ink); font-family: var(--mono); font-size: 15px; overflow-wrap: anywhere; }
+
+.turn { border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-1); }
+.turnHead {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: center;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+  font-size: 11px;
+  color: var(--ink-mute);
+}
+.turnAgent { color: var(--signal); font-family: var(--mono); font-weight: 700; font-size: 12px; }
+.turnBody {
+  margin: 0;
+  padding: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ink-soft);
+}
+.chain { padding: 6px 12px; font-family: var(--mono); font-size: 11px; color: var(--degraded); background: var(--degraded-dim); overflow-wrap: anywhere; }
+
+.section { display: flex; flex-direction: column; gap: 10px; }
+.sectionTitle { margin: 0; font-size: 14px; color: var(--ink); }
+.prose { margin: 0; font-size: 13px; line-height: 1.6; color: var(--ink-soft); }
+.list { margin: 0; padding-left: 18px; font-size: 12px; line-height: 1.7; color: var(--ink-soft); }
+.list a { color: var(--ink); }

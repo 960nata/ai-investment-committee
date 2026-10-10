@@ -201,12 +201,26 @@ function dim(row: ReportRow, index: number): string {
 // Rentang waktu
 // ---------------------------------------------------------------------------
 
-export type Ga4Range = '24h' | '7d' | '30d'
+export type Ga4Range = '24h' | '7d' | '30d' | '90d' | '180d' | '365d' | '730d'
 
 export const RANGE_LABELS: Record<Ga4Range, string> = {
   '24h': 'Hari ini',
-  '7d': '7 hari terakhir',
-  '30d': '30 hari terakhir',
+  '7d': '7 hari',
+  '30d': '1 bulan',
+  '90d': '3 bulan',
+  '180d': '6 bulan',
+  '365d': '1 tahun',
+  '730d': '2 tahun',
+}
+
+/** Panjang tiap rentang dalam hari. Rentang panjang tetap dibandingkan dengan periode sebelumnya yang sama panjang. */
+const RANGE_DAYS: Record<Exclude<Ga4Range, '24h'>, number> = {
+  '7d': 7,
+  '30d': 30,
+  '90d': 90,
+  '180d': 180,
+  '365d': 365,
+  '730d': 730,
 }
 
 /** Rentang yang diminta, beserta rentang sebelumnya yang sepanjang itu juga. */
@@ -217,15 +231,10 @@ function dateRanges(range: Ga4Range): { current: DateRange; previous: DateRange 
       previous: { startDate: 'yesterday', endDate: 'yesterday' },
     }
   }
-  if (range === '7d') {
-    return {
-      current: { startDate: '7daysAgo', endDate: 'today' },
-      previous: { startDate: '14daysAgo', endDate: '8daysAgo' },
-    }
-  }
+  const days = RANGE_DAYS[range]
   return {
-    current: { startDate: '30daysAgo', endDate: 'today' },
-    previous: { startDate: '60daysAgo', endDate: '31daysAgo' },
+    current: { startDate: `${days}daysAgo`, endDate: 'today' },
+    previous: { startDate: `${days * 2}daysAgo`, endDate: `${days + 1}daysAgo` },
   }
 }
 
@@ -236,7 +245,7 @@ interface DateRange {
 
 /** Kembalikan nilai `Ga4Range` yang sah dari teks bebas di query string. */
 export function parseRange(value: string | undefined): Ga4Range {
-  return value === '7d' || value === '30d' || value === '24h' ? value : '7d'
+  return value && value in RANGE_LABELS ? (value as Ga4Range) : '7d'
 }
 
 // ---------------------------------------------------------------------------
