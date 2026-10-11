@@ -198,6 +198,25 @@ export const ollamaAdapter = createOpenAiCompatibleAdapter({
   extraBody: { reasoning_effort: 'low' },
 })
 
+export const llm7Adapter = createOpenAiCompatibleAdapter({
+  id: 'llm7',
+  name: 'LLM7',
+  baseUrl: 'https://api.llm7.io/v1',
+  // Hanya model tier "turbo" yang gratis; yang lain 402. Alternatif gratis yang
+  // lolos JSON mode: mistral-Nemo-Instruct-2407, codestral-latest, gpt-oss:20b.
+  model: process.env.LLM7_MODEL ?? 'DeepSeek-V4-Flash-0731',
+  envPrefix: 'LLM7_API_KEY',
+})
+
+export const agnesAdapter = createOpenAiCompatibleAdapter({
+  id: 'agnes',
+  name: 'Agnes AI',
+  baseUrl: 'https://apihub.agnes-ai.com/v1',
+  // agnes-3.0-flash dan 2.5-flash gratis; pro dan flash-max menolak dengan 403 kuota.
+  model: process.env.AGNES_MODEL ?? 'agnes-3.0-flash',
+  envPrefix: 'AGNES_API_KEY',
+})
+
 export const cohereAdapter = createOpenAiCompatibleAdapter({
   id: 'cohere',
   name: 'Cohere',

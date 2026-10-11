@@ -11,10 +11,12 @@ import { openAiAdapter } from './providers/openai'
 import { cloudflareAdapter } from './providers/cloudflare'
 import { geminiAdapter } from './providers/gemini'
 import {
+  agnesAdapter,
   cerebrasAdapter,
   cohereAdapter,
   deepSeekAdapter,
   groqAdapter,
+  llm7Adapter,
   mistralAdapter,
   nvidiaAdapter,
   ollamaAdapter,
@@ -33,6 +35,8 @@ export const LLM_ADAPTERS: LlmAdapter[] = [
   openRouterAdapter, // model gratis, kuota harian
   deepSeekAdapter,
   mistralAdapter,
+  llm7Adapter, // DeepSeek V4 Flash gratis, ±1 detik
+  agnesAdapter,
   ollamaAdapter, // gpt-oss 120b, kuota gratis per jam/minggu
   cohereAdapter, // kunci trial dibatasi ±1.000 panggilan/bulan, jadi cadangan
   nvidiaAdapter,

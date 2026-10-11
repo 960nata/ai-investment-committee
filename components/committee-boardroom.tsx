@@ -38,6 +38,8 @@ const PROVIDER_NAMES: Record<string, string> = {
   mistral: 'Mistral',
   cohere: 'Cohere',
   ollama: 'Ollama',
+  llm7: 'LLM7',
+  agnes: 'Agnes',
   nvidia: 'NVIDIA',
   premium: 'Premium',
 }
