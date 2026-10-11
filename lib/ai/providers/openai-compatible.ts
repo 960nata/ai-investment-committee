@@ -188,6 +188,15 @@ export const mistralAdapter = createOpenAiCompatibleAdapter({
   envPrefix: 'MISTRAL_API_KEY',
 })
 
+export const cohereAdapter = createOpenAiCompatibleAdapter({
+  id: 'cohere',
+  name: 'Cohere',
+  // Jalur kompatibilitas OpenAI milik Cohere; response_format json_object didukung.
+  baseUrl: 'https://api.cohere.ai/compatibility/v1',
+  model: process.env.COHERE_MODEL ?? 'command-a-03-2025',
+  envPrefix: 'COHERE_API_KEY',
+})
+
 /**
  * Model terkuat untuk pengguna Premium. Berbayar per token, jadi tidak ikut
  * rantai biasa — hanya dipanggil untuk permintaan bertingkat 'premium'.

@@ -12,6 +12,7 @@ import { cloudflareAdapter } from './providers/cloudflare'
 import { geminiAdapter } from './providers/gemini'
 import {
   cerebrasAdapter,
+  cohereAdapter,
   deepSeekAdapter,
   groqAdapter,
   mistralAdapter,
@@ -31,6 +32,7 @@ export const LLM_ADAPTERS: LlmAdapter[] = [
   openRouterAdapter, // model gratis, kuota harian
   deepSeekAdapter,
   mistralAdapter,
+  cohereAdapter, // kunci trial dibatasi ±1.000 panggilan/bulan, jadi cadangan
   nvidiaAdapter,
   zaiAdapter, // GLM gratis, konkurensi kecil — cadangan terakhir
 ]

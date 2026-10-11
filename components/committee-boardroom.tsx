@@ -36,6 +36,7 @@ const PROVIDER_NAMES: Record<string, string> = {
   openrouter: 'OpenRouter',
   deepseek: 'DeepSeek',
   mistral: 'Mistral',
+  cohere: 'Cohere',
   nvidia: 'NVIDIA',
   premium: 'Premium',
 }
