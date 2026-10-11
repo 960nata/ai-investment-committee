@@ -17,6 +17,7 @@ import {
   groqAdapter,
   mistralAdapter,
   nvidiaAdapter,
+  ollamaAdapter,
   openRouterAdapter,
   premiumAdapter,
   zaiAdapter,
@@ -32,6 +33,7 @@ export const LLM_ADAPTERS: LlmAdapter[] = [
   openRouterAdapter, // model gratis, kuota harian
   deepSeekAdapter,
   mistralAdapter,
+  ollamaAdapter, // gpt-oss 120b, kuota gratis per jam/minggu
   cohereAdapter, // kunci trial dibatasi ±1.000 panggilan/bulan, jadi cadangan
   nvidiaAdapter,
   zaiAdapter, // GLM gratis, konkurensi kecil — cadangan terakhir

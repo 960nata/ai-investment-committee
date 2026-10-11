@@ -188,6 +188,16 @@ export const mistralAdapter = createOpenAiCompatibleAdapter({
   envPrefix: 'MISTRAL_API_KEY',
 })
 
+export const ollamaAdapter = createOpenAiCompatibleAdapter({
+  id: 'ollama',
+  name: 'Ollama Cloud',
+  baseUrl: 'https://ollama.com/v1',
+  model: process.env.OLLAMA_MODEL ?? 'gpt-oss:120b',
+  envPrefix: 'OLLAMA_API_KEY',
+  // gpt-oss menalar dulu; 'low' menjaga jawaban tetap ±1 detik dan tak terpotong.
+  extraBody: { reasoning_effort: 'low' },
+})
+
 export const cohereAdapter = createOpenAiCompatibleAdapter({
   id: 'cohere',
   name: 'Cohere',

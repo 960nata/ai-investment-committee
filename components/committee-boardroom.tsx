@@ -37,6 +37,7 @@ const PROVIDER_NAMES: Record<string, string> = {
   deepseek: 'DeepSeek',
   mistral: 'Mistral',
   cohere: 'Cohere',
+  ollama: 'Ollama',
   nvidia: 'NVIDIA',
   premium: 'Premium',
 }
